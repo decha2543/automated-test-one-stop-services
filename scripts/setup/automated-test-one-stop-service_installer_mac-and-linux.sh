@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-REPO_URL="https://github.com/decha2543/automated-test-one-stop-service.git"
+REPO_URL="https://github.com/decha2543/automated-test-one-stop-services.git"
 
 echo "==================================================="
 echo "  AUTOMATED TEST ONE-STOP SERVICE — INSTALLER"
