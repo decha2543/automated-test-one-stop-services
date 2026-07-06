@@ -385,11 +385,6 @@ tasks:
   # WORKSPACE HEALTH
   # ==============================================================================
 
-  lint-kiro:
-    desc: "Lint .kiro/ structure (pass args after --)"
-    cmds:
-      - node .kiro/scripts/lint-kiro.mjs {{.CLI_ARGS}}
-
   eval:
     desc: "Score generated test quality (pass args after --, e.g. -- --json, or a root dir; tune via EVAL_MIN_SCORE/EVAL_ROOTS)"
     cmds:
@@ -405,13 +400,8 @@ tasks:
     cmds:
       - pnpm run md:fix
 
-  test-brain:
-    desc: "Run brain pipeline regression suite (~30-60s)"
-    cmds:
-      - node --test {{.CLI_ARGS}} ".kiro/tests/**/*.spec.mjs"
-
   test:
-    desc: "Run the FULL test suite — every test module (isolated, sequential) + brain"
+    desc: "Run the FULL test suite — every workspace test module (isolated, sequential)"
     cmds:
       # Each module runs in its OWN vitest process, sequentially. A single
       # all-projects vitest process is unreliable here (mixing node + jsdom +
@@ -422,7 +412,6 @@ tasks:
       - pnpm exec vitest run --root scripts/install-core
       - pnpm -C hub/server exec vitest run
       - pnpm -C hub/client exec vitest run
-      - node --test ".kiro/tests/**/*.spec.mjs"
       - node --test "scripts/__tests__/**/*.spec.mjs"
 
   check:

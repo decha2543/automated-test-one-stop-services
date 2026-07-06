@@ -6,7 +6,9 @@
 # in their OWN git repos (still on GitLab) and are git-ignored here, so they are
 # NOT present in a CI checkout. This pipeline validates only the main-repo code:
 # script modules (scripts/manifests, scripts/install-core), the Hub
-# (hub/shared, hub/server, hub/client), and the brain suite (.kiro/tests).
+# (hub/shared, hub/server, hub/client), and the workspace script tests
+# (scripts/__tests__). The AI layer (.kiro/) + brain vault live in their own
+# repos, so this pipeline never references them.
 # No uv/Python, no Playwright browsers, no Docker, no secrets needed.
 #
 # Node + pnpm match package.json `volta` (node 25.x, pnpm 11.1.0).
@@ -42,8 +44,6 @@ jobs:
         run: pnpm exec biome check .
       - name: Markdown
         run: pnpm run md:check
-      - name: Kiro structure + brain lint
-        run: node .kiro/scripts/lint-kiro.mjs
 
   typecheck:
     runs-on: ubuntu-latest
@@ -92,8 +92,8 @@ jobs:
         run: |
           pnpm -C hub/server exec vitest run
           pnpm -C hub/client exec vitest run
-      - name: Brain suite
-        run: node --test ".kiro/tests/**/*.spec.mjs"
+      - name: Workspace script tests
+        run: node --test "scripts/__tests__/**/*.spec.mjs"
       - name: Test quality (soft signal — never blocks)
         continue-on-error: true
         run: node scripts/eval/test-quality.mjs

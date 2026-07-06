@@ -14,8 +14,7 @@
     "lint": "biome lint .",
     "md:check": "markdownlint-cli2 \"**/*.md\"",
     "md:fix": "markdownlint-cli2 --fix \"**/*.md\"",
-    "prepare": "lefthook install",
-    "test:brain": "node --test \".kiro/tests/**/*.spec.mjs\""
+    "prepare": "lefthook install"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",

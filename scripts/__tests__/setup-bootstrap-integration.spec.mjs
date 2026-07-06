@@ -63,7 +63,7 @@ import { fileURLToPath } from 'node:url';
 import { STEP_ORDER as ENGINE_STEP_ORDER } from '../setup/setup-state.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// `.kiro/tests/<file>.spec.mjs` → repo root is two levels up.
+// `scripts/__tests__/<file>.spec.mjs` → repo root is two levels up.
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const SETUP_DIR = path.join(REPO_ROOT, 'scripts', 'setup');
 const LAUNCHER_SH = path.join(SETUP_DIR, 'automated-test-one-stop-service_installer_mac-and-linux.sh');

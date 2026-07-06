@@ -8,12 +8,10 @@ pre-commit:
       stage_fixed: true
     ruff-check:
       glob: "**/*.py"
-      exclude: ".kiro/**"
       run: uv run ruff check --fix {staged_files}
       stage_fixed: true
     ruff-format:
       glob: "**/*.py"
-      exclude: ".kiro/**"
       run: uv run ruff format {staged_files}
       stage_fixed: true
     robocop-check:
@@ -31,6 +29,3 @@ pre-commit:
     manifests-typecheck:
       glob: "scripts/manifests/*.ts"
       run: npx tsc --noEmit -p scripts/manifests/tsconfig.json
-    lint-kiro:
-      glob: ".kiro/**/*.{md,mjs,json}"
-      run: node .kiro/scripts/lint-kiro.mjs
