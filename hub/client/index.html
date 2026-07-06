@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoQA Hub - Test Execution Manager</title>
+    <link rel="icon" type="image/webp" href="/logo.png" />
+  </head>
+  <body class="bg-gray-950 text-gray-100 antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Auto-reload once when a JS chunk fails to load (stale deploy).
+      // After rebuild + pm2 restart, old chunk hashes no longer exist.
+      // This catches the error and reloads so the browser fetches fresh index.html.
+      (function () {
+        var reloaded = sessionStorage.getItem('__chunk_reload');
+        window.addEventListener('error', function (e) {
+          if (
+            e.target &&
+            e.target.tagName === 'SCRIPT' &&
+            e.target.src &&
+            e.target.src.includes('/assets/')
+          ) {
+            if (!reloaded) {
+              sessionStorage.setItem('__chunk_reload', '1');
+              window.location.reload();
+            }
+          }
+        }, true);
+        // Clear the flag on successful load so future deploys can reload again.
+        window.addEventListener('load', function () {
+          sessionStorage.removeItem('__chunk_reload');
+        });
+      })();
+    </script>
+  </body>
+</html>

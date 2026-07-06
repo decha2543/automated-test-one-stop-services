@@ -1,0 +1,12 @@
+*.pem
+*.key
+*-lock.yml
+*-lock.yaml
+*-lock.json
+
+credentials/
+**/credentials
+node_modules/
+**/node_modules
+.venv/
+**/.venv

@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToolRegistry",
+  "description": "Workspace-local registry of installable tool repositories. Repository pointers only. See design section 3.6.",
+  "type": "object",
+  "required": ["schemaVersion", "tools"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional JSON Schema reference for IDE support."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1",
+      "description": "Registry schema version. Bump on breaking changes."
+    },
+    "tools": {
+      "type": "array",
+      "description": "List of installable tool repository entries.",
+      "items": {
+        "$ref": "#/definitions/ToolRegistryEntry"
+      }
+    }
+  },
+  "definitions": {
+    "ToolRegistryEntry": {
+      "type": "object",
+      "description": "A single installable tool pointer in the registry.",
+      "required": ["name", "title", "description", "gitUrl", "ref"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+$",
+          "description": "Folder name to clone into (must match the manifest id)."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable display name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of the tool."
+        },
+        "gitUrl": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Git URL — https, ssh, or git@host:path."
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Branch, tag, or commit SHA to clone."
+        },
+        "manifestPath": {
+          "type": "string",
+          "description": "Path of the manifest within the cloned repo. Default: tool.manifest.json."
+        },
+        "compatibleWith": {
+          "type": "string",
+          "description": "Optional semver range of compatible workspace versions."
+        }
+      }
+    }
+  }
+}

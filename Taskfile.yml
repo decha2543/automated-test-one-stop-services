@@ -1,0 +1,462 @@
+version: "3"
+
+# ==============================================================================
+# Automated Test One-Stop Service — Task runner
+#
+# Why Task:
+# - Cross-platform: uses embedded mvdan/sh, no Git Bash quoting hell on Windows
+# - Better arg passing via {{.CLI_ARGS}} (regex tags work without escape gymnastics)
+# - Native namespacing via includes (task pw:run-local, task robot:run-local, ...)
+#
+# Quick reference:
+# task → interactive runner
+# task pw:run-local PROJECT=x TYPE=web TAG='@smoke' -- --headed
+# task robot:run-local PROJECT=x TYPE=web TAG=login PROC=4
+# task k6:run-local PROJECT=x SECTION=login PERFORMANCE_TYPE=LOAD
+# task --list → show all tasks
+# task --list-all → show all tasks including hidden ones
+# ==============================================================================
+
+includes:
+  pw:
+    taskfile: ./tools/playwright/Taskfile.yml
+    dir: ./tools/playwright
+    optional: true
+  robot:
+    taskfile: ./tools/robot-framework/Taskfile.yml
+    dir: ./tools/robot-framework
+    optional: true
+  k6:
+    taskfile: ./tools/k6/Taskfile.yml
+    dir: ./tools/k6
+    optional: true
+
+env:
+  # Test-output run folder segments:
+  #   outputs/<tool>/<type>/<project>/<status>/<CURRENT_DATE>/<CURRENT_TIME>/
+  # ISO-style (YYYY-MM-DD / HH-MM-SS) so runs sort chronologically in both the
+  # file explorer and the Hub, with minimal nesting.
+  CURRENT_DATE:
+    sh: date +%Y-%m-%d
+  CURRENT_TIME:
+    sh: date +%H-%M-%S
+  # CURRENT_USER is an AUDIT field only (the "executed by" column in the Google
+  # Sheet usage log) — it is NOT part of the output-dir path.
+  CURRENT_USER:
+    sh: node scripts/lib/current-user.mjs
+  # Playwright resolves browser binaries from PLAYWRIGHT_BROWSERS_PATH; without
+  # it, it falls back to the per-user default cache (which may lack the exact
+  # chromium build pinned by @playwright/test, triggering "run npx playwright
+  # install"). Default the var to the workspace-local shared cache so every
+  # `task pw:*` run — and the Hub, which spawns `task` with cwd=workspace root —
+  # resolves browsers from .cache regardless of whether the persisted machine
+  # env (setx, from scripts/setup) is present in the calling shell.
+  #
+  # MUST use {{.ROOT_DIR}} (the root Taskfile's dir = workspace root), NOT
+  # {{.TASKFILE_DIR}}: in an included tools/*/Taskfile.yml task, .TASKFILE_DIR
+  # re-resolves to the tool dir (e.g. tools/playwright), which would point the
+  # path at the wrong place. Taskfile env is only a DEFAULT — a value already
+  # set in the environment still wins, so a custom/shared cache override holds.
+  PLAYWRIGHT_BROWSERS_PATH: "{{.ROOT_DIR}}/.cache/playwright-browsers"
+
+vars:
+  LAST_RUN_FILE: .last-run
+
+tasks:
+  default:
+    desc: Interactive test runner
+    deps: [_init-env]
+    cmds:
+      - dotenvx run --quiet -f ./scripts/.env -- tsx scripts/runner.ts
+
+  # ==============================================================================
+  # HELP & INFO
+  # ==============================================================================
+
+  help:
+    desc: Quick reference of common commands
+    silent: true
+    cmds:
+      - |
+        echo ""
+        echo "+--------------------------------------------------------------------------+"
+        echo "|        Automated Test One-Stop Service -- Quick Reference                |"
+        echo "+--------------------------------------------------------------------------+"
+        echo ""
+        echo "  Daily Commands:"
+        echo "  --------------------------------------------------------------------------"
+        echo "  task                  -> Interactive test runner"
+        echo "  task rerun            -> Re-run last command"
+        echo "  task status           -> List all projects"
+        echo "  task report           -> Open latest test report"
+        echo ""
+        echo "  Direct Commands (skip menu):"
+        echo "  --------------------------------------------------------------------------"
+        echo "  task pw:run-local PROJECT=<name> TYPE=web TAG='@smoke' -- --headed"
+        echo "  task pw:run-docker PROJECT=<name> TYPE=web"
+        echo "  task robot:run-local PROJECT=<name> TYPE=web TAG=login"
+        echo "  task k6:run-local PROJECT=<name> SECTION=<name> PERFORMANCE_TYPE=LOAD"
+        echo ""
+        echo "  Setup & Maintenance:"
+        echo "  --------------------------------------------------------------------------"
+        echo "  task setup            -> Install all dependencies (first time)"
+        echo "  task doctor           -> Check environment"
+        echo "  task create-project   -> Scaffold a new project from template"
+        echo "  task validate         -> Check project readiness before running"
+        echo "  task pull             -> Pull root + all git subprojects"
+        echo "  task clean            -> Remove all outputs"
+        echo ""
+        echo "  Tips:"
+        echo "  --------------------------------------------------------------------------"
+        echo "  * Use task pw:tags PROJECT=<name> TYPE=web to list all tags"
+        echo "  * Pass extra args after --, e.g. task pw:run-local ... -- --headed --workers=2"
+        echo "  * Add TRACK=none to skip Google Sheet logging"
+        echo ""
+
+  status:
+    desc: List all detected projects across tools
+    silent: true
+    cmds:
+      - |
+        echo ""
+        echo "Projects Overview"
+        echo "============================================================================"
+        echo ""
+        echo "  Playwright:"
+        for type_dir in tools/playwright/projects/*/; do
+            [ ! -d "$type_dir" ] && continue
+            type_name=$(basename "$type_dir")
+            projects=""
+            for proj_dir in "$type_dir"*/; do
+                [ ! -d "$proj_dir" ] && continue
+                proj_name=$(basename "$proj_dir")
+                [[ "$proj_name" == *template* ]] && continue
+                projects="$projects $proj_name"
+            done
+            if [ -n "$projects" ]; then
+                echo "     [$type_name]:$projects"
+            else
+                echo "     [$type_name]: (none)"
+            fi
+        done
+        echo ""
+        echo "  Robot Framework:"
+        for type_dir in tools/robot-framework/projects/*/; do
+            [ ! -d "$type_dir" ] && continue
+            type_name=$(basename "$type_dir")
+            projects=""
+            for proj_dir in "$type_dir"*/; do
+                [ ! -d "$proj_dir" ] && continue
+                proj_name=$(basename "$proj_dir")
+                [[ "$proj_name" == *template* ]] && continue
+                projects="$projects $proj_name"
+            done
+            if [ -n "$projects" ]; then
+                echo "     [$type_name]:$projects"
+            else
+                echo "     [$type_name]: (none)"
+            fi
+        done
+        echo ""
+        echo "  k6 (Performance):"
+        projects=""
+        for proj_dir in tools/k6/projects/performance/*/; do
+            [ ! -d "$proj_dir" ] && continue
+            proj_name=$(basename "$proj_dir")
+            [[ "$proj_name" == *template* ]] && continue
+            projects="$projects $proj_name"
+        done
+        if [ -n "$projects" ]; then
+            echo "     [performance]:$projects"
+        else
+            echo "     [performance]: (none)"
+        fi
+        echo ""
+        echo "============================================================================"
+        echo "  Use 'task create-project' to scaffold a new project"
+        echo ""
+
+  # ==============================================================================
+  # UTILITIES
+  # ==============================================================================
+
+  _init-env:
+    internal: true
+    cmds:
+      - |
+        if [ -f scripts/.env.template ] && [ ! -f scripts/.env ]; then
+            cp scripts/.env.template scripts/.env
+            echo "  [bootstrap] created scripts/.env from template"
+        fi
+      - tsx scripts/sync-projects.ts
+
+  setup:
+    desc: Install all dependencies (Node + Python) and run each present tool's setup
+    deps: [_init-env]
+    cmds:
+      - pnpm install
+      # ----------------------------------------------------------------------
+      # Tool provisioning is folder-presence delegation (C1, R5.1/R5.5/R6.*).
+      # The plan is computed ONCE by the shared pure planner
+      # (scripts/manifests/setup-planner.ts) that this loop AND the Hub / CLI
+      # install-core both consume, so no install decision logic is duplicated.
+      # Per present tool: isolated `pnpm install --ignore-workspace` when it has
+      # a package.json; a single root `uv sync` when any uv tool is present;
+      # then the tool's own `setup` task by taskfile path. A tool with no setup
+      # task is a no-op; a failing setup is reported (id + hint) but is NOT fatal
+      # to the Core install; an empty tools/ set finishes cleanly. Adding a new
+      # tool folder that defines a `setup` task needs zero edits here.
+      #
+      # TLS: certificate validation is NEVER disabled here. Behind a
+      # TLS-intercepting proxy or an internal mirror, export HTTPS_PROXY and
+      # trust the mirror's CA (NODE_EXTRA_CA_CERTS for Node; `uv sync
+      # --native-tls` already uses the OS trust store) instead of turning
+      # verification off.
+      # ----------------------------------------------------------------------
+      - |
+        # NOTE: `task` runs commands through its embedded mvdan/sh interpreter,
+        # which does NOT support bash process substitution (`done < <(...)`) on
+        # Windows ("TODO: support process substitution on Windows"). We capture
+        # the plan into a variable first and feed the loop via a here-string,
+        # which mvdan/sh supports cross-platform. A here-string (not a pipe) also
+        # keeps the loop in the current shell so $FAILED survives the loop.
+        PLAN=$(tsx scripts/manifests/setup-planner.ts plan)
+        FAILED=""
+        while read -r kind id; do
+          case "$kind" in
+            PNPM)
+              echo "  [deps] tools/$id (pnpm --ignore-workspace)"
+              pnpm -C "tools/$id" install --ignore-workspace || echo "  [deps] WARN: pnpm install failed for tools/$id"
+              ;;
+            UVSYNC)
+              echo "  [deps] uv sync (root workspace)"
+              uv sync --all-packages --native-tls || echo "  [deps] WARN: uv sync failed"
+              ;;
+            SETUP)
+              echo "  [setup] tools/$id"
+              if ! task --taskfile "tools/$id/Taskfile.yml" --dir "tools/$id" setup; then
+                FAILED="$FAILED $id"
+              fi
+              ;;
+          esac
+        done <<< "$PLAN"
+        if [ -n "$FAILED" ]; then
+          tsx scripts/manifests/setup-planner.ts report $FAILED || true
+        fi
+
+  setup-android:
+    desc: "Install the Android SDK + emulator (opt-in; not part of core setup)"
+    # Single opt-in Android entry point. Android provisioning lives
+    # ONLY in the two platform helpers invoked below; the core installers
+    # (scripts/setup/setup-windows.bat, scripts/setup/setup-linux.sh) never
+    # install Android — they only print a one-line pointer to this target.
+    # The helpers perform equivalent actions on every OS: bootstrap
+    # the cmdline-tools, install the system image + emulator + platform-tools,
+    # and create the QA_Emulator AVD. Set KIRO_ANDROID_API to override the API
+    # level (both helpers default to 34); the env var flows to the helper.
+    #
+    # R3.5 (Hub parity): any future Hub Android-PROVISIONING trigger MUST shell
+    # out to this same `task setup-android` target rather than re-implement the
+    # SDK/emulator install. There is no such Hub trigger today — the Hub
+    # device-farm "emulator/start" endpoint only launches an already-provisioned
+    # AVD (it does not install the SDK), so nothing is rerouted here yet.
+    cmds:
+      - |
+        if [ "{{OS}}" = "windows" ]; then
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup/windows/set-android-home.ps1
+        else
+          bash scripts/setup/set-android-home.sh
+        fi
+
+  doctor:
+    desc: Check environment (node, pnpm, uv, task, k6, docker, playwright-cli)
+    silent: true
+    cmds:
+      - |
+        echo "Checking environment..."
+        echo ""
+        check() { command -v "$1" &>/dev/null && echo "  [OK] $1 $(eval "$1 $2" 2>/dev/null)" || echo "  [MISSING] $1 not found"; }
+        check "node" "-v"
+        check "pnpm" "-v"
+        check "uv" "--version"
+        check "task" "--version"
+        check "k6" "version"
+        check "docker" "--version"
+        check "playwright-cli" "--version"
+        echo ""
+        echo "Environment check complete."
+
+  create-project:
+    desc: "Scaffold a new project from template (pass args after --)"
+    cmds:
+      - tsx scripts/create-project.ts {{.CLI_ARGS}}
+
+  clean:
+    desc: Remove outputs and ephemeral artifacts
+    silent: true
+    cmds:
+      - |
+        echo "Cleaning outputs and ephemeral artifacts..."
+        echo ""
+        rm -rf outputs/playwright outputs/k6 outputs/robot-framework 2>/dev/null
+        rm -rf .playwright-mcp .playwright-cli 2>/dev/null
+        # Cross-platform artifact sweep (replaces GNU `find ... -exec rm -rf`):
+        # node is a Core tool, so `task clean` runs from cmd/PowerShell/Git Bash.
+        node scripts/lib/rm-matching-dirs.mjs . \
+            --names test-results,playwright-report,blob-report,performance-results,__pycache__,.robotcode_cache,.pytest_cache \
+            --prune .venv,node_modules
+        if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+            docker exec grafana sh -c "rm -rf /var/lib/grafana/dashboards/*" 2>/dev/null || true
+        fi
+        echo ""
+        echo "Cleanup complete."
+
+  clean-modules:
+    desc: Remove all node_modules directories (run task setup to reinstall)
+    silent: true
+    cmds:
+      - |
+        echo "Removing all node_modules directories..."
+        echo ""
+        # Cross-platform node_modules sweep (replaces GNU `find -name node_modules
+        # -prune -print0`); node is a Core tool so this runs from any shell.
+        node scripts/lib/rm-matching-dirs.mjs . --names node_modules --prune .venv
+        echo ""
+        echo "Run 'task setup' to reinstall."
+
+  rerun:
+    desc: Re-run the last task command from .last-run history
+    silent: true
+    cmds:
+      - |
+        if [ ! -f "{{.LAST_RUN_FILE}}" ]; then
+            echo "[ERROR] No previous run found."
+            echo "        -> Run 'task' or 'task default' first to create a run history."
+            exit 1
+        fi
+        LAST_CMD=$(cat "{{.LAST_RUN_FILE}}")
+        echo "Re-running last command:"
+        echo "   $LAST_CMD"
+        echo ""
+        eval "$LAST_CMD"
+
+  pull:
+    desc: Pull root repo + all git subprojects under tools/
+    silent: true
+    cmds:
+      - |
+        echo ""
+        echo "Pulling all git subprojects..."
+        echo ""
+        ROOT_DIR=$(pwd)
+        ERRORS=0
+
+        echo "  [root] pulling..."
+        if git pull --ff-only; then
+            echo "  [root] done"
+        else
+            echo "  [root] failed"
+            ERRORS=$((ERRORS + 1))
+        fi
+        echo ""
+
+        for git_dir in $(node scripts/lib/list-git-dirs.mjs tools); do
+            proj_dir=$(dirname "$git_dir")
+            proj_name=$(echo "$proj_dir" | sed 's|tools/||')
+            echo "  [$proj_name] pulling..."
+            cd "$proj_dir"
+            if git pull --ff-only; then
+                echo "  [$proj_name] done"
+            else
+                echo "  [$proj_name] failed"
+                ERRORS=$((ERRORS + 1))
+            fi
+            cd "$ROOT_DIR"
+            echo ""
+        done
+
+        if [ $ERRORS -eq 0 ]; then
+            echo "All repos pulled successfully."
+        else
+            echo "$ERRORS repo(s) failed to pull."
+        fi
+
+  # ==============================================================================
+  # WORKSPACE HEALTH
+  # ==============================================================================
+
+  lint-kiro:
+    desc: "Lint .kiro/ structure (pass args after --)"
+    cmds:
+      - node .kiro/scripts/lint-kiro.mjs {{.CLI_ARGS}}
+
+  eval:
+    desc: "Score generated test quality (pass args after --, e.g. -- --json, or a root dir; tune via EVAL_MIN_SCORE/EVAL_ROOTS)"
+    cmds:
+      - node scripts/eval/test-quality.mjs {{.CLI_ARGS}}
+
+  md-check:
+    desc: "Lint all *.md files (markdownlint-cli2)"
+    cmds:
+      - pnpm run md:check
+
+  md-fix:
+    desc: "Auto-fix all *.md files (markdownlint-cli2 --fix)"
+    cmds:
+      - pnpm run md:fix
+
+  test-brain:
+    desc: "Run brain pipeline regression suite (~30-60s)"
+    cmds:
+      - node --test {{.CLI_ARGS}} ".kiro/tests/**/*.spec.mjs"
+
+  test:
+    desc: "Run the FULL test suite — every test module (isolated, sequential) + brain"
+    cmds:
+      # Each module runs in its OWN vitest process, sequentially. A single
+      # all-projects vitest process is unreliable here (mixing node + jsdom +
+      # the hub server's timers/handles in one run hangs on Windows), and
+      # isolated runs match how each suite was designed + verified. Fail-fast:
+      # `task` stops at the first failing suite.
+      - pnpm exec vitest run --root scripts/manifests
+      - pnpm exec vitest run --root scripts/install-core
+      - pnpm -C hub/server exec vitest run
+      - pnpm -C hub/client exec vitest run
+      - node --test ".kiro/tests/**/*.spec.mjs"
+      - node --test "scripts/__tests__/**/*.spec.mjs"
+
+  check:
+    desc: "Full validation gate — biome + markdown + typechecks + the whole test suite"
+    cmds:
+      - pnpm exec biome check .
+      - pnpm run md:check
+      - pnpm -C hub/shared run typecheck
+      - pnpm -C hub/server run typecheck
+      - pnpm -C hub/client run typecheck
+      - |
+        for cfg in tools/playwright/tsconfig.json tools/k6/tsconfig.json; do
+          if [ -f "$cfg" ]; then
+            echo "[typecheck] $cfg"
+            pnpm exec tsc --noEmit -p "$cfg" || exit 1
+          fi
+        done
+      - task test
+
+  hub:
+    desc: Start the Hub server + client (development mode)
+    cmds:
+      - |
+        echo "Starting Hub (server + client)..."
+        (cd hub/server && tsx watch src/index.ts) &
+        (cd hub/client && pnpm exec vite) &
+        wait
+
+  hub-build:
+    desc: Build the Hub for production (shared + server + client)
+    cmds:
+      - pnpm -C hub build
+
+  hub-start:
+    desc: Serve the production Hub build (run task hub-build first)
+    cmds:
+      - pnpm -C hub start

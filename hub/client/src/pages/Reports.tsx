@@ -1,0 +1,661 @@
+import type { ReportEntry, ToolId } from '@hub/shared';
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Pagination,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Tooltip,
+} from '@mantine/core';
+import { DatePickerInput, type DateValue } from '@mantine/dates';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import dayjs from 'dayjs';
+import { useState } from 'react';
+import {
+  TbCalendar,
+  TbExternalLink,
+  TbFilter,
+  TbLock,
+  TbLockOpen,
+  TbPlayerPlay,
+  TbReportAnalytics,
+  TbTrash,
+} from 'react-icons/tb';
+import { api } from '~/api/client.js';
+import { confirmDialog } from '~/components/confirmDialog.js';
+import { EmptyState } from '~/components/EmptyState.js';
+import { PageHeader } from '~/components/PageHeader.js';
+import { ArtifactMenu } from '~/components/reports/ArtifactMenu.js';
+import { SavedFiltersBar } from '~/components/SavedFilters.js';
+import { toast } from '~/components/Toast.js';
+import { PAGE_SIZE_OPTIONS, SortableHeader } from '~/components/table/SortableHeader.js';
+import { useTableSort } from '~/hooks/useTableSort.js';
+import { useTools } from '~/hooks/useTools.js';
+import { useT } from '~/i18n/index.js';
+import { formatAbsolute, formatRelative } from '~/utils/datetime.js';
+import { getStatusColor, getStatusIcon } from '~/utils/run-status.js';
+
+const ALL_STATUSES = ['success', 'error'];
+
+// The server emits report timestamps as ISO-8601 strings (same shape as a
+// run's `startedAt`), so they parse with a plain `dayjs(iso)` — no month-name
+// custom format, and they sort chronologically as strings.
+
+type SortField = 'timestamp' | 'tool' | 'project' | 'type' | 'status';
+
+export function ReportsPage() {
+  const t = useT();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [selectedTools, setSelectedTools] = useState<Set<ToolId>>(new Set());
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set());
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [filterProject, setFilterProject] = useState('');
+  const [dateRange, setDateRange] = useState<[DateValue, DateValue]>([null, null]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { sortField, sortDir, handleSort } = useTableSort<SortField>('timestamp');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+
+  const reports = useQuery<ReportEntry[]>({
+    queryKey: ['reports'],
+    queryFn: () => api.get('/api/reports'),
+  });
+
+  const toolIds = (useTools().data ?? [])
+    .filter((t) => t.status === 'enabled')
+    .map((t) => t.id as ToolId);
+
+  const deleteMutation = useMutation({
+    mutationFn: (reportPath: string) =>
+      api.delete(`/api/reports?path=${encodeURIComponent(reportPath)}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      toast.success(t('reports.reportDeleted'));
+    },
+    onError: () => toast.error(t('reports.deleteFailed')),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (paths: string[]) => {
+      for (const p of paths) {
+        await api.delete(`/api/reports?path=${encodeURIComponent(p)}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      setSelectedRows(new Set());
+      toast.success(t('reports.reportsDeleted'));
+    },
+    onError: () => toast.error(t('reports.deleteSomeFailed')),
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: (reportPath: string) => api.post('/api/reports/lock', { path: reportPath }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      toast.success(t('reports.locked'));
+    },
+    onError: () => toast.error(t('reports.lockFailed')),
+  });
+
+  const unlockMutation = useMutation({
+    mutationFn: (reportPath: string) => api.post('/api/reports/unlock', { path: reportPath }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      toast.success(t('reports.unlocked'));
+    },
+    onError: () => toast.error(t('reports.unlockFailed')),
+  });
+
+  async function handleDelete(reportPath: string) {
+    const ok = await confirmDialog({
+      title: t('reports.deleteTitle'),
+      message: t('reports.cannotUndo'),
+      confirmLabel: t('common.delete'),
+      danger: true,
+    });
+    if (ok) {
+      deleteMutation.mutate(reportPath);
+    }
+  }
+
+  async function handleBulkDelete() {
+    const paths = [...selectedRows];
+    if (paths.length === 0) return;
+    const ok = await confirmDialog({
+      title: `${t('common.delete')} ${paths.length} ${t('reports.reportsWord')}?`,
+      message: t('reports.cannotUndo'),
+      confirmLabel: `${t('common.delete')} ${paths.length}`,
+      danger: true,
+    });
+    if (ok) {
+      bulkDeleteMutation.mutate(paths);
+    }
+  }
+
+  const availableTypes = [...new Set((reports.data ?? []).map((r) => r.type))].sort();
+
+  function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    return next;
+  }
+
+  function toggleRow(reportPath: string) {
+    setSelectedRows((prev) => toggleInSet(prev, reportPath));
+  }
+
+  function toggleAllRows(paths: string[]) {
+    const allSelected = paths.every((p) => selectedRows.has(p));
+    if (allSelected) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(paths));
+    }
+  }
+
+  const filtered = (reports.data ?? []).filter((r) => {
+    if (selectedTools.size > 0 && !selectedTools.has(r.tool)) return false;
+    if (selectedStatuses.size > 0 && !selectedStatuses.has(r.status)) return false;
+    if (selectedTypes.size > 0 && !selectedTypes.has(r.type)) return false;
+    if (filterProject && !r.project.toLowerCase().includes(filterProject.toLowerCase()))
+      return false;
+    const [from, to] = dateRange;
+    if (from || to) {
+      const reportDay = dayjs(r.timestamp);
+      if (!reportDay.isValid()) return false;
+      if (from && reportDay.isBefore(dayjs(from).startOf('day'))) return false;
+      if (to && reportDay.isAfter(dayjs(to).endOf('day'))) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0;
+    switch (sortField) {
+      case 'timestamp':
+        cmp = a.timestamp.localeCompare(b.timestamp);
+        break;
+      case 'tool':
+        cmp = a.tool.localeCompare(b.tool);
+        break;
+      case 'project':
+        cmp = a.project.localeCompare(b.project);
+        break;
+      case 'type':
+        cmp = a.type.localeCompare(b.type);
+        break;
+      case 'status':
+        cmp = a.status.localeCompare(b.status);
+        break;
+    }
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(sorted.length / pageSize);
+  const safePage = Math.min(currentPage, totalPages || 1);
+  const paginatedData = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const activeFilterCount =
+    (selectedTools.size > 0 ? 1 : 0) +
+    (selectedStatuses.size > 0 ? 1 : 0) +
+    (selectedTypes.size > 0 ? 1 : 0) +
+    (filterProject ? 1 : 0) +
+    (dateRange[0] || dateRange[1] ? 1 : 0);
+
+  function clearFilters() {
+    setSelectedTools(new Set());
+    setSelectedStatuses(new Set());
+    setSelectedTypes(new Set());
+    setFilterProject('');
+    setDateRange([null, null]);
+    setCurrentPage(1);
+  }
+
+  return (
+    <Stack gap="md">
+      <PageHeader
+        title={t('reports.title')}
+        description={t('nav.reports.desc')}
+        actions={
+          <>
+            {selectedRows.size > 0 && (
+              <Button
+                color="red"
+                size="xs"
+                variant="light"
+                leftSection={<TbTrash size={14} />}
+                onClick={handleBulkDelete}
+                loading={bulkDeleteMutation.isPending}
+              >
+                {t('common.delete')} {selectedRows.size}
+              </Button>
+            )}
+            <Button
+              variant="default"
+              size="xs"
+              leftSection={<TbFilter size={14} />}
+              rightSection={
+                activeFilterCount > 0 ? (
+                  <Badge size="xs" color="blue" circle>
+                    {activeFilterCount}
+                  </Badge>
+                ) : null
+              }
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              {t('reports.filters')}
+            </Button>
+          </>
+        }
+      />
+
+      {showFilters && (
+        <Paper p="md" withBorder>
+          <Stack gap="sm">
+            <Group justify="space-between">
+              <Text size="xs" fw={600} c="dimmed" tt="uppercase">
+                {t('reports.advancedSearch')}
+              </Text>
+              {activeFilterCount > 0 && (
+                <Button size="compact-xs" variant="subtle" color="gray" onClick={clearFilters}>
+                  {t('common.clearAll')}
+                </Button>
+              )}
+            </Group>
+
+            <SavedFiltersBar
+              page="reports"
+              currentFilters={{
+                tools: [...selectedTools],
+                statuses: [...selectedStatuses],
+                types: [...selectedTypes],
+                project: filterProject,
+              }}
+              onLoad={(filters) => {
+                const f = filters as {
+                  tools?: string[];
+                  statuses?: string[];
+                  types?: string[];
+                  project?: string;
+                };
+                setSelectedTools(new Set(f.tools ?? []) as Set<ToolId>);
+                setSelectedStatuses(new Set(f.statuses ?? []));
+                setSelectedTypes(new Set(f.types ?? []));
+                setFilterProject(f.project ?? '');
+                setCurrentPage(1);
+              }}
+            />
+
+            <Group grow align="flex-end">
+              <DatePickerInput
+                type="range"
+                label={t('table.dateRange')}
+                size="xs"
+                value={dateRange as [DateValue, DateValue]}
+                onChange={(v) => {
+                  setDateRange(v);
+                  setCurrentPage(1);
+                }}
+                placeholder={t('filter.pickDates')}
+                leftSection={<TbCalendar size={14} />}
+                clearable
+                valueFormat="DD MMM YYYY"
+              />
+              <TextInput
+                label={t('run.project')}
+                size="xs"
+                value={filterProject}
+                onChange={(e) => {
+                  setFilterProject(e.currentTarget.value);
+                  setCurrentPage(1);
+                }}
+                placeholder={t('filter.filterByName')}
+              />
+            </Group>
+
+            <Group gap="xl" align="flex-start" wrap="wrap">
+              <Stack gap={4}>
+                <Text size="xs" c="dimmed">
+                  {t('filter.tools')}
+                </Text>
+                <Group gap={6}>
+                  {toolIds.map((t) => (
+                    <Badge
+                      key={t}
+                      size="sm"
+                      variant={selectedTools.has(t) ? 'filled' : 'outline'}
+                      color={selectedTools.has(t) ? 'blue' : 'gray'}
+                      onClick={() => {
+                        setSelectedTools(toggleInSet(selectedTools, t));
+                        setCurrentPage(1);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {t}
+                    </Badge>
+                  ))}
+                </Group>
+              </Stack>
+              {availableTypes.length > 0 && (
+                <Stack gap={4}>
+                  <Text size="xs" c="dimmed">
+                    {t('table.type')}
+                  </Text>
+                  <Group gap={6}>
+                    {availableTypes.map((t) => (
+                      <Badge
+                        key={t}
+                        size="sm"
+                        variant={selectedTypes.has(t) ? 'filled' : 'outline'}
+                        color={selectedTypes.has(t) ? 'blue' : 'gray'}
+                        onClick={() => {
+                          setSelectedTypes(toggleInSet(selectedTypes, t));
+                          setCurrentPage(1);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {t}
+                      </Badge>
+                    ))}
+                  </Group>
+                </Stack>
+              )}
+              <Stack gap={4}>
+                <Text size="xs" c="dimmed">
+                  {t('table.status')}
+                </Text>
+                <Group gap={6}>
+                  {ALL_STATUSES.map((s) => (
+                    <Badge
+                      key={s}
+                      size="sm"
+                      variant={selectedStatuses.has(s) ? 'filled' : 'outline'}
+                      color={selectedStatuses.has(s) ? getStatusColor(s) : 'gray'}
+                      leftSection={getStatusIcon(s)}
+                      onClick={() => {
+                        setSelectedStatuses(toggleInSet(selectedStatuses, s));
+                        setCurrentPage(1);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {s}
+                    </Badge>
+                  ))}
+                </Group>
+              </Stack>
+            </Group>
+          </Stack>
+        </Paper>
+      )}
+
+      {reports.data && (
+        <Group justify="space-between">
+          <Text size="xs" c="dimmed">
+            {t('filter.showing')} {paginatedData.length} {t('filter.of')} {sorted.length}{' '}
+            {t('reports.reportsWord')}
+            {sorted.length !== reports.data.length &&
+              ` (${reports.data.length} ${t('history.totalSuffix')})`}
+          </Text>
+          <Group gap="xs">
+            <Text size="xs" c="dimmed">
+              {t('history.perPage')}:
+            </Text>
+            <Select
+              size="xs"
+              w={70}
+              value={String(pageSize)}
+              onChange={(v) => {
+                setPageSize(Number(v));
+                setCurrentPage(1);
+              }}
+              data={PAGE_SIZE_OPTIONS}
+              allowDeselect={false}
+            />
+          </Group>
+        </Group>
+      )}
+
+      {/* Loading skeleton */}
+      {reports.isLoading && (
+        <Paper withBorder p="md">
+          <Stack gap="xs">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Group key={i as number} gap="md" wrap="nowrap">
+                <Skeleton height={20} width={60} radius="sm" />
+                <Skeleton height={20} width={100} radius="sm" />
+                <Skeleton height={20} style={{ flex: 1 }} radius="sm" />
+                <Skeleton height={20} width={60} radius="sm" />
+                <Skeleton height={20} width={80} radius="sm" />
+                <Skeleton height={20} width={120} radius="sm" />
+              </Group>
+            ))}
+          </Stack>
+        </Paper>
+      )}
+
+      {/* Empty state */}
+      {!reports.isLoading && sorted.length === 0 && (
+        <EmptyState
+          icon={<TbReportAnalytics size={48} color="var(--mantine-color-dimmed)" />}
+          description={activeFilterCount > 0 ? t('reports.noMatchFilter') : t('reports.noReports')}
+          action={
+            activeFilterCount > 0 ? (
+              <Button size="xs" variant="subtle" onClick={clearFilters}>
+                {t('common.clearFilters')}
+              </Button>
+            ) : (
+              <Button
+                size="xs"
+                color="green"
+                leftSection={<TbPlayerPlay size={14} />}
+                onClick={() => {
+                  navigate({ to: '/run' });
+                }}
+              >
+                {t('reports.runFirst')}
+              </Button>
+            )
+          }
+        />
+      )}
+
+      {paginatedData.length > 0 && (
+        <Paper withBorder style={{ overflow: 'hidden' }}>
+          <Table.ScrollContainer minWidth={800}>
+            <Table striped highlightOnHover verticalSpacing="xs">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th w={40}>
+                    <Checkbox
+                      size="xs"
+                      checked={
+                        paginatedData.length > 0 &&
+                        paginatedData.every((r) => selectedRows.has(r.reportPath))
+                      }
+                      indeterminate={
+                        paginatedData.some((r) => selectedRows.has(r.reportPath)) &&
+                        !paginatedData.every((r) => selectedRows.has(r.reportPath))
+                      }
+                      onChange={() => toggleAllRows(paginatedData.map((r) => r.reportPath))}
+                      aria-label={t('reports.selectAll')}
+                    />
+                  </Table.Th>
+                  <Table.Th>
+                    <SortableHeader
+                      label={t('table.status')}
+                      field="status"
+                      currentField={sortField}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                  </Table.Th>
+                  <Table.Th>
+                    <SortableHeader
+                      label={t('run.tool')}
+                      field="tool"
+                      currentField={sortField}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                  </Table.Th>
+                  <Table.Th>
+                    <SortableHeader
+                      label={t('run.project')}
+                      field="project"
+                      currentField={sortField}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                  </Table.Th>
+                  <Table.Th>
+                    <SortableHeader
+                      label={t('run.type')}
+                      field="type"
+                      currentField={sortField}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                  </Table.Th>
+                  <Table.Th>
+                    <SortableHeader
+                      label={t('table.timestamp')}
+                      field="timestamp"
+                      currentField={sortField}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                  </Table.Th>
+                  <Table.Th>{t('table.actions')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {paginatedData.map((r) => (
+                  <Table.Tr
+                    key={r.id}
+                    bg={
+                      selectedRows.has(r.reportPath)
+                        ? 'var(--mantine-color-brand-light)'
+                        : undefined
+                    }
+                  >
+                    <Table.Td>
+                      <Checkbox
+                        size="xs"
+                        checked={selectedRows.has(r.reportPath)}
+                        onChange={() => toggleRow(r.reportPath)}
+                        aria-label={`${t('reports.selectRow')} ${r.project}`}
+                      />
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge
+                        color={getStatusColor(r.status)}
+                        variant="light"
+                        size="sm"
+                        leftSection={getStatusIcon(r.status)}
+                      >
+                        {r.status}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="xs" ff="monospace" truncate maw={120}>
+                        {r.tool}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Tooltip label={r.project} withArrow>
+                        <Text size="xs" ff="monospace" truncate maw={150}>
+                          {r.project}
+                        </Text>
+                      </Tooltip>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="xs" truncate maw={80}>
+                        {r.type}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Tooltip label={formatAbsolute(r.timestamp)} withArrow>
+                        <Text size="xs" c="dimmed">
+                          {formatRelative(r.timestamp)}
+                        </Text>
+                      </Tooltip>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap="xs">
+                        <Button
+                          component="a"
+                          href={`/api/reports/open?path=${encodeURIComponent(r.reportPath)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          size="compact-xs"
+                          leftSection={<TbExternalLink size={12} />}
+                        >
+                          {t('reports.open')}
+                        </Button>
+                        {r.tool === 'playwright' && <ArtifactMenu reportPath={r.reportPath} />}
+                        <Tooltip label={r.locked ? t('reports.unlockHint') : t('reports.lockHint')}>
+                          <ActionIcon
+                            variant="subtle"
+                            color={r.locked ? 'yellow' : 'gray'}
+                            size="sm"
+                            onClick={() =>
+                              r.locked
+                                ? unlockMutation.mutate(r.reportPath)
+                                : lockMutation.mutate(r.reportPath)
+                            }
+                            aria-label={
+                              r.locked ? t('reports.unlockReport') : t('reports.lockReport')
+                            }
+                          >
+                            {r.locked ? <TbLock size={14} /> : <TbLockOpen size={14} />}
+                          </ActionIcon>
+                        </Tooltip>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          size="sm"
+                          onClick={() => handleDelete(r.reportPath)}
+                          aria-label={t('reports.deleteAria')}
+                        >
+                          <TbTrash size={14} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        </Paper>
+      )}
+
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <Group justify="center">
+          <Pagination
+            value={safePage}
+            onChange={setCurrentPage}
+            total={totalPages}
+            size="sm"
+            withEdges
+          />
+        </Group>
+      )}
+    </Stack>
+  );
+}

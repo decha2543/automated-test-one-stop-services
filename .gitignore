@@ -1,0 +1,100 @@
+# =============================================================================
+# Root .gitignore — WORKSPACE-LEVEL concerns only.
+#
+# Tool-specific artefacts (playwright-report, k6 summary/grafana, robot caches,
+# generated docker-compose.yml / tsconfig.json) live in each tool's OWN
+# tools/<id>/.gitignore so a tool stays self-sufficient when extracted to its
+# own repo. Keep this file free of per-tool patterns.
+# =============================================================================
+
+# =============================================================================
+# OS / editor / logs
+# =============================================================================
+.idea/
+.obsidian/
+**/.DS_Store
+Thumbs.db
+log/
+local.log
+lefthook-local.yml
+.last-run
+.setup-state.json
+/_tmp*
+/_scratch*
+*.tmp
+**/.trash/
+
+# Obsidian workspace config (personal per user)
+**/.obsidian/workspace*
+**/.obsidian/cache
+**/.obsidian/plugins/*/data.json
+
+# Reference material (not part of the product)
+example/
+
+# =============================================================================
+# Secrets & env — track templates only
+# =============================================================================
+.env*
+!.env.template
+**/credentials/*
+!**/credentials/.gitkeep
+
+# =============================================================================
+# Universal build & dependency artefacts (hub, scripts, tools — language-level)
+# =============================================================================
+**/node_modules/
+**/.venv/
+**/__pycache__/
+**/dist/
+**/*.tsbuildinfo
+**/.cache/
+**/.ruff_cache/
+**/outputs/
+
+# =============================================================================
+# Hub server (persisted runtime data)
+# =============================================================================
+hub/server/data/
+hub/server/data/*.json
+!hub/client/src/projects
+
+# Local schedulers (user-specific)
+**/schedulers/*
+
+# =============================================================================
+# AI layer — separate private repos overlaid at these paths on a dev machine.
+# The workspace never depends on them (see .kiro/kiro-boundary), so they are
+# ignored wholesale here; each is cloned/managed as its own git repo:
+#   git clone <url> .kiro   &&   git clone <url> brain
+# =============================================================================
+.kiro/
+brain/
+
+# =============================================================================
+# Workspace-generated config (per-developer / generated projections)
+# =============================================================================
+# Local tool enable/disable overrides (per-developer, never committed)
+config/.tool-overrides.json
+# Generated projection of tool.manifest.json by pipeline-projection.ts
+# (static parts live in config/pipeline.static.json — that IS tracked)
+config/pipeline.json
+
+# =============================================================================
+# Portable tool plugins (M4)
+#
+# Tools installed from git (Hub install) or manually cloned into tools/<id>/
+# keep their OWN .git and must NOT be tracked by the parent repo as
+# gitlinks/submodules. Ignore every tools/<id>/ directory, then re-include the
+# in-repo built-ins + the shared template. When a built-in is later extracted
+# to its own repo, remove its negation here.
+#
+# Each built-in's own generated/cache artefacts are handled by its own
+# tools/<id>/.gitignore — NOT here.
+# =============================================================================
+tools/*/
+!tools/tool-template-example/
+scripts/manifests/._*
+~$*.*
+.playwright-cli
+.playwright-mcp

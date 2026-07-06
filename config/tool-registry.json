@@ -1,0 +1,41 @@
+{
+  "$schema": "../../scripts/manifests/schemas/tool-registry.schema.json",
+  "schemaVersion": "1",
+  "tools": [
+    {
+      "name": "playwright",
+      "title": "Playwright (Web UI / API)",
+      "description": "End-to-end browser + API testing using Microsoft Playwright.",
+      "gitUrl": "https://gitlab.com/automated-tester-project-template/one-stop-service-tools-collections/playwright.git",
+      "ref": "main"
+    },
+    {
+      "name": "robot-framework",
+      "title": "Robot Framework",
+      "description": "Keyword-driven acceptance testing with Robot Framework + Browser library.",
+      "gitUrl": "https://gitlab.com/automated-tester-project-template/one-stop-service-tools-collections/robot-framework.git",
+      "ref": "main"
+    },
+    {
+      "name": "k6",
+      "title": "k6 (Performance)",
+      "description": "Load and performance testing with Grafana k6.",
+      "gitUrl": "https://gitlab.com/automated-tester-project-template/one-stop-service-tools-collections/k6.git",
+      "ref": "main"
+    },
+    {
+      "name": "cypress",
+      "title": "Cypress",
+      "description": "JavaScript end-to-end testing framework with time-travel debugging",
+      "gitUrl": "null",
+      "ref": "v1.0.0"
+    },
+    {
+      "name": "selenium",
+      "title": "Selenium WebDriver",
+      "description": "Cross-browser web automation via the WebDriver protocol",
+      "gitUrl": "null",
+      "ref": "main"
+    }
+  ]
+}

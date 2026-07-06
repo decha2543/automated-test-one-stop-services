@@ -1,0 +1,67 @@
+import type { RunRequest } from '@hub/shared';
+import type { FastifyInstance } from 'fastify';
+import { getEnabledToolIds } from '../services/manifest-registry.js';
+import { scheduler } from '../services/scheduler.js';
+
+export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
+  /** GET /api/schedules — list schedules for ENABLED tools only.
+   *  Schedules targeting a disabled/uninstalled tool are hidden. */
+  app.get('/api/schedules', async () => {
+    const enabledIds = await getEnabledToolIds();
+    return scheduler.getAll().filter((s) => enabledIds.has(s.config.tool));
+  });
+
+  /** POST /api/schedules — create a new schedule */
+  app.post<{ Body: { name: string; cron: string; config: RunRequest } }>(
+    '/api/schedules',
+    async (req, reply) => {
+      try {
+        const schedule = scheduler.create(req.body.name, req.body.cron, req.body.config);
+        return schedule;
+      } catch (err) {
+        reply.status(400);
+        return { code: 'INVALID_CRON', message: (err as Error).message };
+      }
+    },
+  );
+
+  /** PUT /api/schedules/:id — update a schedule */
+  app.put<{
+    Params: { id: string };
+    Body: { name?: string; cron?: string; config?: RunRequest; enabled?: boolean };
+  }>('/api/schedules/:id', async (req, reply) => {
+    try {
+      const schedule = scheduler.update(req.params.id, req.body);
+      if (!schedule) {
+        reply.status(404);
+        return { code: 'NOT_FOUND', message: 'Schedule not found' };
+      }
+      return schedule;
+    } catch (err) {
+      reply.status(400);
+      return { code: 'INVALID_CRON', message: (err as Error).message };
+    }
+  });
+
+  /** POST /api/schedules/:id/toggle — enable/disable a schedule */
+  app.post<{ Params: { id: string } }>('/api/schedules/:id/toggle', async (req, reply) => {
+    const schedule = scheduler.toggle(req.params.id);
+    if (!schedule) {
+      reply.status(404);
+      return { code: 'NOT_FOUND', message: 'Schedule not found' };
+    }
+    return schedule;
+  });
+
+  /** DELETE /api/schedules/:id — delete a schedule */
+  app.delete<{ Params: { id: string } }>('/api/schedules/:id', async (req, reply) => {
+    const ok = scheduler.delete(req.params.id);
+    if (!ok) {
+      reply.status(404);
+      return { code: 'NOT_FOUND', message: 'Schedule not found' };
+    }
+    return { success: true };
+  });
+}
+
+export default scheduleRoutes;

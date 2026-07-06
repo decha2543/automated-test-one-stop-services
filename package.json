@@ -1,0 +1,44 @@
+{
+  "name": "automated-test-one-stop-service",
+  "version": "1.2.0",
+  "description": "Root node package for automated testing tools",
+  "author": {
+    "name": "Decha_L",
+    "email": "Decha.L2543@gmail.com"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "private": true,
+  "scripts": {
+    "updater": "pnpm up -i -L -r",
+    "check": "biome check . && biome format --write .",
+    "lint": "biome lint .",
+    "md:check": "markdownlint-cli2 \"**/*.md\"",
+    "md:fix": "markdownlint-cli2 --fix \"**/*.md\"",
+    "prepare": "lefthook install",
+    "test:brain": "node --test \".kiro/tests/**/*.spec.mjs\""
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.16",
+    "@evilmartians/lefthook": "^2.1.9",
+    "@huggingface/transformers": "^4.2.0",
+    "@types/node": "^25.9.2",
+    "@types/prompts": "^2.4.9",
+    "@vitest/coverage-v8": "4.1.8",
+    "dayjs": "^1.11.21",
+    "docx": "9.5.1",
+    "exceljs": "^4.4.0",
+    "fast-check": "^4.8.0",
+    "image-size": "^2.0.2",
+    "markdown-it": "^14.3.0",
+    "markdownlint-cli2": "0.22.1",
+    "pptxgenjs": "^4.0.1",
+    "prompts": "^2.4.2",
+    "typescript": "^6.0.3",
+    "vitest": "4.1.8",
+    "zod": "^4.4.3"
+  },
+  "volta": {
+    "node": "25.9.0",
+    "pnpm": "11.1.0"
+  }
+}

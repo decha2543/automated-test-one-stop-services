@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1",
+  "alias": "cy",
+  "title": "Cypress (missing id)",
+  "description": "Manifest with no id field — must fail schema validation",
+  "version": "1.0.0",
+  "enabled": true,
+  "runtime": "node",
+  "packageManager": "pnpm",
+  "taskfile": "Taskfile.yml",
+  "projects": {
+    "root": "projects",
+    "depth": 2,
+    "typeAxis": true,
+    "fixedType": null,
+    "templates": { "default": "projects/web/cypress-web-template-example" },
+    "specsSubdir": "automations/specs",
+    "sectionAxis": false
+  },
+  "compose": {
+    "template": "docker-compose.template.yml",
+    "anchor": "cypress-template",
+    "networks": []
+  },
+  "tsconfigGen": null,
+  "docker": { "baseImage": "cypress/included:latest", "extras": ["task", "pnpm"] },
+  "runner": {
+    "taskNamespace": "cy",
+    "title": "Cypress",
+    "executionTypes": [
+      { "id": "run", "title": "Run", "commandTemplate": "{ns}:run-{environment}" }
+    ],
+    "environments": ["local"],
+    "commandTemplate": "task {ns}:run-{environment}",
+    "steps": []
+  },
+  "pipeline": {
+    "id": "cypress",
+    "targetPaths": {
+      "default": "tools/cypress/projects/{project}/automations/specs/{name}.spec.ts"
+    },
+    "envToken": "process.env.{KEY}",
+    "runCommands": { "local": "task cy:run-local PROJECT=<name>" },
+    "artifactPaths": ["outputs/cypress/{project}/"]
+  }
+}

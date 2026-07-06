@@ -1,0 +1,296 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kiro.local/schemas/tool.manifest.schema.json",
+  "title": "ToolManifest",
+  "description": "Single source of truth describing one test tool plugin. Mirrors scripts/manifests/validate.ts (ToolManifestSchema). See design section 3.1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "alias",
+    "title",
+    "description",
+    "version",
+    "enabled",
+    "runtime",
+    "packageManager",
+    "taskfile",
+    "projects",
+    "compose",
+    "tsconfigGen",
+    "docker",
+    "runner",
+    "pipeline"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": "1" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$",
+      "description": "Stable identifier; must equal the containing folder name."
+    },
+    "alias": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*$",
+      "description": "Short alias used in `task <alias>:run-local`; unique across enabled tools."
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "version": { "type": "string" },
+    "enabled": { "type": "boolean" },
+    "runtime": { "enum": ["node", "python", "binary"] },
+    "packageManager": { "enum": ["pnpm", "uv", "none"] },
+    "taskfile": { "type": "string" },
+    "projects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["depth", "typeAxis", "fixedType", "templates", "sectionAxis"],
+      "properties": {
+        "root": { "type": "string", "default": "projects" },
+        "depth": { "enum": [1, 2] },
+        "typeAxis": { "type": "boolean" },
+        "fixedType": { "type": ["string", "null"] },
+        "templates": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "specsSubdir": { "type": "string", "default": "automations/specs" },
+        "sectionAxis": { "type": "boolean" }
+      },
+      "if": { "properties": { "typeAxis": { "const": false } } },
+      "then": { "properties": { "fixedType": { "type": "string" } } }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional run-capability block (design 7.1). Absent resolves to no extra run vars.",
+      "properties": {
+        "vars": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "when"],
+            "properties": {
+              "name": { "type": "string" },
+              "when": { "enum": ["sectionAxis", "always"] }
+            }
+          }
+        },
+        "headlessVar": {
+          "type": "string",
+          "description": "Template like 'HEADLESS:{value}' threaded into the command."
+        }
+      }
+    },
+    "reports": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional reports-capability block (design 7.1). Absent resolves to a generic **/*.html listing.",
+      "properties": {
+        "resultGlob": { "type": "string" },
+        "kind": { "type": "string" }
+      }
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional tags-capability block (design 7.1). Unknown/absent strategy resolves to 'none'.",
+      "properties": {
+        "strategy": { "type": "string" }
+      }
+    },
+    "compose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["template", "anchor", "networks"],
+      "properties": {
+        "template": { "type": "string" },
+        "anchor": { "type": "string" },
+        "networks": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+        }
+      }
+    },
+    "tsconfigGen": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["template", "output", "aliasPrefix", "aliasTarget"],
+          "properties": {
+            "template": { "type": "string" },
+            "output": { "type": "string" },
+            "aliasPrefix": { "type": "string" },
+            "aliasTarget": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "docker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseImage", "extras"],
+      "properties": {
+        "baseImage": { "type": "string" },
+        "extras": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskNamespace",
+        "title",
+        "executionTypes",
+        "environments",
+        "steps",
+        "commandTemplate"
+      ],
+      "properties": {
+        "taskNamespace": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Taskfile namespace; unique across enabled tools."
+        },
+        "title": { "type": "string" },
+        "executionTypes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "title", "commandTemplate"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "commandTemplate": { "type": "string" }
+            }
+          }
+        },
+        "environments": {
+          "type": "array",
+          "items": { "enum": ["local", "docker"] }
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/runnerStep" }
+        },
+        "commandTemplate": { "type": "string" }
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "targetPaths", "envToken", "runCommands", "artifactPaths"],
+      "properties": {
+        "id": { "type": "string" },
+        "targetPaths": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "envToken": { "type": "string" },
+        "runCommands": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "artifactPaths": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "definitions": {
+    "passAs": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "key"],
+          "properties": {
+            "kind": { "const": "task" },
+            "key": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "cli" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "none" } }
+        }
+      ]
+    },
+    "when": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "runnerStep": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "title", "from", "passAs"],
+          "properties": {
+            "kind": { "const": "selectDirs" },
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "from": { "type": "string" },
+            "exclude": { "type": "string" },
+            "when": { "$ref": "#/definitions/when" },
+            "preAction": { "type": "string" },
+            "passAs": { "$ref": "#/definitions/passAs" },
+            "dockerOverride": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "title", "choices", "passAs"],
+          "properties": {
+            "kind": { "const": "select" },
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "choices": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["title", "value"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "value": { "type": "string" }
+                }
+              }
+            },
+            "when": { "$ref": "#/definitions/when" },
+            "preAction": { "type": "string" },
+            "passAs": { "$ref": "#/definitions/passAs" },
+            "dockerOverride": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "title", "passAs"],
+          "properties": {
+            "kind": { "const": "text" },
+            "id": { "type": "string" },
+            "title": { "type": "string" },
+            "initial": { "type": "string" },
+            "when": { "$ref": "#/definitions/when" },
+            "preAction": { "type": "string" },
+            "passAs": { "$ref": "#/definitions/passAs" },
+            "dockerOverride": { "type": "string" }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1. Node - Install Package",
+      "type": "shell",
+      "command": "pnpm install",
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "2. Node - Update Package",
+      "type": "shell",
+      "command": "pnpm updater",
+      "group": "build"
+    },
+    {
+      "label": "3. Python - Install Package",
+      "type": "shell",
+      "command": "uv sync --all-packages --native-tls",
+      "group": "build"
+    },
+    {
+      "label": "4. Python - Update Package",
+      "type": "shell",
+      "command": "uv lock --upgrade && uv sync --all-packages --native-tls",
+      "group": "build"
+    },
+    {
+      "label": "5. Robot Framework - Format & Lint",
+      "type": "shell",
+      "command": "uv run robocop format && uv run robocop check && uv run ruff format && uv run ruff check",
+      "options": {
+        "cwd": "${workspaceFolder}/tools/robot-framework"
+      },
+      "group": "test"
+    }
+  ]
+}

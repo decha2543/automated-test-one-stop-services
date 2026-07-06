@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1",
+  "id": "my-tool",
+  "alias": "mt",
+  "title": "My Tool (Description)",
+  "description": "Short description of what this tool does.",
+  "version": "1.0.0",
+  "enabled": true,
+  "runtime": "node",
+  "packageManager": "pnpm",
+  "taskfile": "Taskfile.yml",
+  "projects": {
+    "root": "projects",
+    "depth": 2,
+    "typeAxis": true,
+    "fixedType": null,
+    "templates": {
+      "default": "projects/web/my-tool-web-template-example"
+    },
+    "specsSubdir": "automations/specs",
+    "sectionAxis": false
+  },
+  "compose": {
+    "template": "docker-compose.template.yml",
+    "anchor": "my-tool-template",
+    "networks": []
+  },
+  "tsconfigGen": null,
+  "docker": {
+    "baseImage": "node:22-slim",
+    "extras": ["task", "pnpm", "dotenvx"]
+  },
+  "runner": {
+    "taskNamespace": "mt",
+    "title": "My Tool",
+    "executionTypes": [
+      { "id": "run", "title": "Run", "commandTemplate": "{ns}:run-{environment}" }
+    ],
+    "environments": ["local", "docker"],
+    "steps": [
+      {
+        "id": "type",
+        "kind": "selectDirs",
+        "title": "Select test type:",
+        "from": "projects",
+        "passAs": { "kind": "task", "key": "TYPE" }
+      },
+      {
+        "id": "project",
+        "kind": "selectDirs",
+        "title": "Select the project:",
+        "from": "projects/{type}",
+        "exclude": "*-template-example",
+        "passAs": { "kind": "task", "key": "PROJECT" }
+      }
+    ],
+    "commandTemplate": "task {ns}:run-{environment}"
+  },
+  "pipeline": {
+    "id": "my-tool",
+    "targetPaths": {
+      "default": "tools/my-tool/projects/{type}/{project}/automations/specs/**/*.spec.ts"
+    },
+    "envToken": "process.env.{KEY}",
+    "runCommands": {
+      "local": "task mt:run-local TYPE=<type> PROJECT=<name>",
+      "docker": "task mt:run-docker TYPE=<type> PROJECT=<name>"
+    },
+    "artifactPaths": ["outputs/my-tool/{type}/{project}/"]
+  }
+}

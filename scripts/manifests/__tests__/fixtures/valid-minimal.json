@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1",
+  "id": "cypress",
+  "alias": "cy",
+  "title": "Cypress",
+  "description": "JavaScript end-to-end testing framework",
+  "version": "1.0.0",
+  "enabled": true,
+  "runtime": "node",
+  "packageManager": "pnpm",
+  "taskfile": "Taskfile.yml",
+  "projects": {
+    "root": "projects",
+    "depth": 2,
+    "typeAxis": true,
+    "fixedType": null,
+    "templates": {
+      "default": "projects/web/cypress-web-template-example",
+      "web": "projects/web/cypress-web-template-example"
+    },
+    "specsSubdir": "automations/specs",
+    "sectionAxis": false
+  },
+  "compose": {
+    "template": "docker-compose.template.yml",
+    "anchor": "cypress-template",
+    "networks": []
+  },
+  "tsconfigGen": {
+    "template": "tsconfig.template.json",
+    "output": "tsconfig.json",
+    "aliasPrefix": "~",
+    "aliasTarget": "./projects/{type}/{project}/*"
+  },
+  "docker": {
+    "baseImage": "cypress/included:latest",
+    "extras": ["task", "pnpm"]
+  },
+  "runner": {
+    "taskNamespace": "cy",
+    "title": "Cypress (Web)",
+    "executionTypes": [
+      { "id": "run", "title": "Run", "commandTemplate": "{ns}:run-{environment}" }
+    ],
+    "environments": ["local", "docker"],
+    "commandTemplate": "task {ns}:run-{environment}",
+    "steps": [
+      {
+        "id": "type",
+        "kind": "selectDirs",
+        "title": "Select test type:",
+        "from": "projects",
+        "passAs": { "kind": "task", "key": "TYPE" }
+      },
+      {
+        "id": "project",
+        "kind": "selectDirs",
+        "title": "Select the project:",
+        "from": "projects/{type}",
+        "exclude": "*-template-example",
+        "passAs": { "kind": "task", "key": "PROJECT" }
+      }
+    ]
+  },
+  "pipeline": {
+    "id": "cypress",
+    "targetPaths": {
+      "web": "tools/cypress/projects/web/{project}/automations/specs/{domain}/{kind}.spec.ts"
+    },
+    "envToken": "process.env.{KEY}",
+    "runCommands": {
+      "local": "task cy:run-local TYPE=<web> PROJECT=<name>",
+      "docker": "task cy:run-docker TYPE=<web> PROJECT=<name>"
+    },
+    "artifactPaths": ["outputs/cypress/{type}/{project}/"]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "_comment": "Static (manifest-independent) sections of pipeline.json. These parts are NOT derived from any tool.manifest.json — they are spread verbatim into the generated config/pipeline.json by scripts/manifests/pipeline-projection.ts. Edit here; the generated pipeline.json is a build artifact (gitignored).",
+
+  "routing": {
+    "_comment": "Pipeline order + the ONLY payload fields each stage receives (strict routing — forward nothing else). delivery = merged git+ops.",
+    "stages": [
+      "analyst",
+      "tcd+datagen (parallel)",
+      "auto",
+      "revie",
+      "delivery",
+      "defect (on logs only)"
+    ],
+    "payload_to": {
+      "tcd": [
+        "business_rules",
+        "data_constraints",
+        "user_flows",
+        "error_conditions",
+        "coverage_plan",
+        "coverage_gap_analysis",
+        "brain_context"
+      ],
+      "datagen": [
+        "business_rules",
+        "data_constraints",
+        "user_flows",
+        "error_conditions",
+        "brain_context"
+      ],
+      "auto": ["test_cases", "environment_variables", "framework", "type", "project"],
+      "revie": ["script_code", "test_cases"],
+      "delivery": [
+        "target_file_path",
+        "test_case_coverage",
+        "framework",
+        "type",
+        "project",
+        "revie_approved"
+      ],
+      "defect": ["logs", "test_case_id"]
+    },
+    "retry_budget": 2,
+    "correction_loop": "Revie REJECTED → forward findings + original script_code to Auto only (skip resending Analyst/TCD). Max 2 rounds.",
+    "parallel": "tcd + datagen run concurrently after analyst; auto waits for both."
+  },
+
+  "id_conventions": {
+    "_comment": "Stable IDs so specs/reports/commits cross-reference. 3-digit zero-padded, sequential per session.",
+    "BR": "Business Rule (BR-001)",
+    "DC": "Data Constraint (DC-001)",
+    "UF": "User Flow (UF-001)",
+    "EC": "Error Condition (EC-001)",
+    "TC": "Test Case — TC-<DOMAIN>-<nnn> when domain obvious, else TC-001",
+    "DS": "DataGen dataset (DS-001)",
+    "FB": "Revie feedback item (FB-001)",
+    "DEF": "Defect report (DEF-001)"
+  }
+}

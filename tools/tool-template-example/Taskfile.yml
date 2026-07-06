@@ -1,0 +1,40 @@
+version: "3"
+
+# ==============================================================================
+# My Tool tasks (TEMPLATE)
+#
+# Invoked from root via: task mt:<task> ARGS...
+# CWD when running: tools/my-tool/
+#
+# Replace `mt` with your tool's alias (must match manifest.runner.taskNamespace).
+# ==============================================================================
+
+vars:
+  PROJECT_DIR: "projects/{{.TYPE}}/{{.PROJECT}}"
+
+tasks:
+  _check-vars:
+    internal: true
+    silent: true
+    preconditions:
+      - sh: 'test -n "{{.TYPE}}"'
+        msg: "Error: Missing required variable TYPE"
+      - sh: 'test -n "{{.PROJECT}}"'
+        msg: "Error: Missing required variable PROJECT"
+
+  # ============================================================================
+  # TEST RUNNERS
+  # ============================================================================
+
+  run-local:
+    desc: "Run tests locally"
+    deps: [_check-vars]
+    cmds:
+      - echo "'TODO:' implement local test runner"
+      - echo "  TYPE={{.TYPE}} PROJECT={{.PROJECT}}"
+
+  run-docker:
+    desc: "Run tests in Docker"
+    deps: [_check-vars]
+    cmds:
+      - docker compose run --rm my-tool-{{.PROJECT}}

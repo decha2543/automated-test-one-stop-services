@@ -1,0 +1,12 @@
+// biome-ignore-all assist/source/useSortedKeys: For Auto Generation
+{
+  "compilerOptions": {
+    "paths": {
+      "~global-resources/*": ["./resources/*"]
+    },
+    "types": ["node"]
+  },
+  "exclude": ["../../outputs/**", "**/node_modules/**"],
+  "extends": "../../tsconfig.json",
+  "include": ["./projects/**/*.ts"]
+}

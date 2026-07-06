@@ -1,0 +1,39 @@
+# http://editorconfig.org
+root = true
+
+# -----------------------------------------------------------------------------
+# 1. Global Default Settings
+# -----------------------------------------------------------------------------
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+# บังคับใช้ LF (Linux Style) เสมอ เพื่อป้องกันปัญหาเวลา Mount volume เข้า Docker
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+
+# -----------------------------------------------------------------------------
+# 2. Documentation
+# -----------------------------------------------------------------------------
+# Markdown บางทีต้องเว้นวรรค 2 ทีท้ายบรรทัดเพื่อขึ้นบรรทัดใหม่
+[*.md]
+trim_trailing_whitespace = false
+
+# -----------------------------------------------------------------------------
+# 3. Python -> Ruff / PEP 8 Compat
+# -----------------------------------------------------------------------------
+[*.py]
+indent_size = 4
+
+[*.robot]
+indent_size = 4
+trim_trailing_whitespace = true
+
+# -----------------------------------------------------------------------------
+# 4. Windows scripts must use CRLF (matches .gitattributes) so cmd.exe parses
+#    them correctly. A .bat with LF endings breaks when double-clicked.
+# -----------------------------------------------------------------------------
+[*.{bat,cmd,ps1}]
+end_of_line = crlf

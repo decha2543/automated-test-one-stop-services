@@ -1,0 +1,14 @@
+x-cypress-template: &cypress-template
+  image: cypress/included:13.0.0
+  volumes:
+    - ./projects/${TYPE}/${PROJECT}:/workspace/tools/cypress/projects/${TYPE}/${PROJECT}
+  working_dir: /workspace/tools/cypress
+  environment:
+    - TYPE
+    - PROJECT
+
+services:
+  cypress-web-template-example:
+    <<: *cypress-template
+    container_name: cypress-web-template-example
+  # Put your project here

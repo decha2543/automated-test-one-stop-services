@@ -1,0 +1,120 @@
+import type {
+  DoctorReport,
+  EnvFile,
+  ProjectSummary,
+  RunRecord,
+  TagsResponse,
+  ToolId,
+} from '@hub/shared';
+import { queryOptions } from '@tanstack/react-query';
+import { api } from '~/api/client.js';
+
+/**
+ * Centralized query-options factory.
+ *
+ * Each entry is a `queryOptions()` object — the single source of truth for a
+ * query's key, fetcher, and tuning. Components call `useQuery(qProjects())`
+ * and route loaders call `queryClient.ensureQueryData(qProjects())`, so both
+ * read and write the *same* cache entry. Previously these keys/fetchers were
+ * re-declared inline in every page, which risked key drift (broken
+ * invalidation) and made it impossible for a loader to prefetch what a page
+ * would later request.
+ *
+ * Why `queryOptions()` over plain objects: it ties the `queryKey` to the
+ * `queryFn` return type, so `useQuery(qDoctor()).data` is `DoctorReport`
+ * without a manual generic, and `invalidateQueries` calls are key-checked.
+ */
+
+// ---------------------------------------------------------------------------
+// Dashboard / global axis
+// ---------------------------------------------------------------------------
+
+export const qDoctor = () =>
+  queryOptions({
+    queryKey: ['doctor'] as const,
+    queryFn: () => api.get<DoctorReport>('/api/doctor'),
+    staleTime: 10_000,
+  });
+
+export const qProjects = () =>
+  queryOptions({
+    queryKey: ['projects'] as const,
+    queryFn: () => api.get<ProjectSummary[]>('/api/projects'),
+  });
+
+export const qRunsHistory = () =>
+  queryOptions({
+    queryKey: ['runs-history'] as const,
+    queryFn: () => api.get<RunRecord[]>('/api/runs/history'),
+  });
+
+export const qActiveRuns = () =>
+  queryOptions({
+    queryKey: ['activeRuns'] as const,
+    queryFn: () => api.get<RunRecord[]>('/api/runs/active'),
+  });
+
+// ---------------------------------------------------------------------------
+// Project axis (tool / type / project) — shared by Run, EnvProfiles, etc.
+// ---------------------------------------------------------------------------
+
+/** All project names across every tool/type. */
+export const qAllProjects = () =>
+  queryOptions({
+    queryKey: ['allProjects'] as const,
+    queryFn: () => api.get<string[]>('/api/projects/list'),
+  });
+
+export const qProjectTypes = (tool: ToolId | undefined | '') =>
+  queryOptions({
+    queryKey: ['types', tool] as const,
+    queryFn: () => api.get<string[]>(`/api/projects/types?tool=${tool}`),
+    enabled: !!tool,
+    gcTime: Number.POSITIVE_INFINITY,
+  });
+
+/** k6 forces type=performance — caller passes that effective type. */
+export const qProjectList = (tool: ToolId | undefined | '', type: string | undefined | '') =>
+  queryOptions({
+    queryKey: ['projectList', tool, type] as const,
+    queryFn: () => api.get<string[]>(`/api/projects/list?tool=${tool}&type=${type}`),
+    enabled: !!tool && !!type,
+    gcTime: Number.POSITIVE_INFINITY,
+  });
+
+/** Used by k6 only — sections under `automations/specs/<section>/`. */
+export const qProjectSections = (project: string | undefined | '', enabled = true) =>
+  queryOptions({
+    queryKey: ['sections', project] as const,
+    queryFn: () => api.get<string[]>(`/api/projects/sections?project=${project}`),
+    enabled: enabled && !!project,
+    gcTime: Number.POSITIVE_INFINITY,
+  });
+
+export const qProjectTags = (
+  tool: ToolId | undefined | '',
+  type: string | undefined | '',
+  project: string | undefined | '',
+) =>
+  queryOptions({
+    queryKey: ['tags', tool, type, project] as const,
+    queryFn: () => api.get<TagsResponse>(`/api/tags?tool=${tool}&type=${type}&project=${project}`),
+    enabled: !!tool && !!type && !!project,
+  });
+
+/**
+ * Project `.env` contents (key/value entries). Used by the Element Picker to
+ * prefill the URL field from a selected project's `BASE_URL` entry. Enabled
+ * only once a full tool/type/project axis is chosen.
+ */
+export const qProjectEnv = (
+  tool: ToolId | undefined | '',
+  type: string | undefined | '',
+  project: string | undefined | '',
+) =>
+  queryOptions({
+    queryKey: ['projectEnv', tool, type, project] as const,
+    queryFn: () =>
+      api.get<EnvFile>(`/api/env/project?tool=${tool}&type=${type}&project=${project}`),
+    enabled: !!tool && !!type && !!project,
+  });

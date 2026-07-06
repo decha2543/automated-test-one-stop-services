@@ -1,0 +1,77 @@
+[project]
+name = "automated-test-one-stop-service"
+version = "1.0.0"
+description = "Root python package for automated testing tools"
+authors = [{ name = "Decha_L", email = "Decha.L2543@gmail.com" }]
+license = "MIT"
+requires-python = ">=3.14"
+
+dependencies = ["python-dotenv>=1.2.2"]
+
+[dependency-groups]
+dev = ["ruff>=0.15.12", "ty>=0.0.35"]
+
+[tool.uv.workspace]
+members = ["tools/robot-framework"]
+exclude = [
+  "node_modules",
+  "outputs",
+  "tools/k6/node_modules",
+  "tools/playwright/node_modules",
+]
+
+[tool.uv]
+package = false
+link-mode = "copy"
+
+# ---------------------------------------------------------------------------
+# Ruff (Python lint + format)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+exclude = ["outputs", ".kiro"]
+extend-exclude = [".kiro/**/*.py"]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+line-ending = "lf"
+
+# ---------------------------------------------------------------------------
+# ty (Python type checker)
+# ---------------------------------------------------------------------------
+[tool.ty.environment]
+python = ".venv"
+python-version = "3.14"
+
+[tool.ty.src]
+exclude = [
+  "**/generated",
+  "**/*.proto",
+  "**/outputs",
+  "**/results",
+  "**/reports",
+  "**/logs",
+  "**/.venv",
+  "**/node_modules",
+  "**/dist",
+  "**/.git",
+  "**/.kiro",
+]
+
+[tool.ty.rules]
+invalid-argument-type = "error"
+missing-argument = "error"
+invalid-assignment = "error"
+call-non-callable = "error"
+index-out-of-bounds = "error"
+invalid-return-type = "warn"
+redundant-cast = "warn"
+possibly-unresolved-reference = "warn"
+possibly-missing-submodule = "warn"
+unresolved-import = "ignore"

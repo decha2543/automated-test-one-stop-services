@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1",
+  "id": "cypress",
+  "alias": "cypress",
+  "title": "Cypress (E2E)",
+  "description": "End-to-end JavaScript testing using Cypress.",
+  "version": "13.0.0",
+  "enabled": true,
+  "runtime": "node",
+  "packageManager": "pnpm",
+  "taskfile": "Taskfile.yml",
+  "projects": {
+    "root": "projects",
+    "depth": 2,
+    "typeAxis": true,
+    "fixedType": null,
+    "templates": {
+      "default": "projects/web/cypress-template-example",
+      "web": "projects/web/cypress-template-example"
+    },
+    "specsSubdir": "automations/specs",
+    "sectionAxis": false
+  },
+  "compose": {
+    "template": "docker-compose.template.yml",
+    "anchor": "cypress-template",
+    "networks": []
+  },
+  "tsconfigGen": null,
+  "docker": {
+    "baseImage": "cypress/included:13.0.0",
+    "extras": ["task", "pnpm", "dotenvx"]
+  },
+  "runner": {
+    "taskNamespace": "cypress",
+    "title": "Cypress (E2E)",
+    "executionTypes": [
+      { "id": "run", "title": "Run", "commandTemplate": "{ns}:run-{environment}" }
+    ],
+    "environments": ["local", "docker"],
+    "commandTemplate": "task {ns}:run-{environment}",
+    "steps": [
+      {
+        "id": "type",
+        "kind": "selectDirs",
+        "title": "Select test type:",
+        "from": "projects",
+        "passAs": { "kind": "task", "key": "TYPE" }
+      },
+      {
+        "id": "project",
+        "kind": "selectDirs",
+        "title": "Select the project:",
+        "from": "projects/{type}",
+        "exclude": "*-template-example",
+        "passAs": { "kind": "task", "key": "PROJECT" }
+      }
+    ]
+  },
+  "pipeline": {
+    "id": "cypress",
+    "targetPaths": {
+      "web": "tools/cypress/projects/web/{project}/automations/specs/{domain}/{kind}.spec.cy.ts"
+    },
+    "envToken": "process.env.{KEY}",
+    "runCommands": {
+      "local": "task cypress:run-local TYPE=<web> PROJECT=<name>",
+      "docker": "task cypress:run-docker TYPE=<web> PROJECT=<name>"
+    },
+    "artifactPaths": [
+      "tools/cypress/projects/{type}/{project}/test-results/",
+      "outputs/cypress/{type}/{project}/"
+    ]
+  }
+}

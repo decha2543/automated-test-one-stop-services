@@ -1,0 +1,36 @@
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "**/*.{js,ts,json}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched --staged
+        {staged_files}
+      stage_fixed: true
+    ruff-check:
+      glob: "**/*.py"
+      exclude: ".kiro/**"
+      run: uv run ruff check --fix {staged_files}
+      stage_fixed: true
+    ruff-format:
+      glob: "**/*.py"
+      exclude: ".kiro/**"
+      run: uv run ruff format {staged_files}
+      stage_fixed: true
+    robocop-check:
+      glob: "**/*.{robot,resource}"
+      run: uv run robocop check --config tools/robot-framework/robot.toml --fix {staged_files}
+      stage_fixed: true
+    robocop-format:
+      glob: "**/*.{robot,resource}"
+      run: uv run robocop format --config tools/robot-framework/robot.toml {staged_files}
+      stage_fixed: true
+    markdownlint:
+      glob: "**/*.md"
+      run: pnpm exec markdownlint-cli2 --fix {staged_files}
+      stage_fixed: true
+    manifests-typecheck:
+      glob: "scripts/manifests/*.ts"
+      run: npx tsc --noEmit -p scripts/manifests/tsconfig.json
+    lint-kiro:
+      glob: ".kiro/**/*.{md,mjs,json}"
+      run: node .kiro/scripts/lint-kiro.mjs

@@ -1,0 +1,338 @@
+import {
+  Badge,
+  Button,
+  Card,
+  CloseButton,
+  Group,
+  Loader,
+  Paper,
+  ScrollArea,
+  SimpleGrid,
+  Skeleton,
+  Stack,
+  Stepper,
+  Text,
+  Title,
+  Tooltip,
+  UnstyledButton,
+} from '@mantine/core';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import dayjs from 'dayjs';
+import { useCallback, useMemo } from 'react';
+import { TbPlayerPlay, TbRocket } from 'react-icons/tb';
+import { qDoctor, qProjects, qRunsHistory } from '~/api/queries.js';
+import { DoctorPanel } from '~/components/DoctorPanel.js';
+import { NeedsAttentionWidget } from '~/components/NeedsAttentionWidget.js';
+import { PageHeader } from '~/components/PageHeader.js';
+import { RunHeatmap } from '~/components/RunHeatmap.js';
+import { TopProjectsBars } from '~/components/TopProjectsBars.js';
+import { TrendChart } from '~/components/TrendChart.js';
+import { useTools } from '~/hooks/useTools.js';
+import { useT } from '~/i18n/index.js';
+import { usePreferences } from '~/stores/hub.js';
+import { useNavigationStore } from '~/stores/navigation.js';
+import { getStatusColor } from '~/utils/run-status.js';
+import { toolLabel } from '~/utils/tool-label.js';
+
+export function DashboardPage() {
+  const navigate = useNavigate();
+  const t = useT();
+
+  const onNavigate = useCallback(
+    (page: string) => {
+      const path = page === 'dashboard' ? '/' : `/${page}`;
+      navigate({ to: path });
+    },
+    [navigate],
+  );
+
+  const prefs = usePreferences();
+  const setPendingRunConfig = useNavigationStore((s) => s.setPendingRunConfig);
+
+  const doctor = useQuery(qDoctor());
+  const toolsQuery = useTools();
+  const projects = useQuery(qProjects());
+
+  // Only surface enabled tools in the overview — disabled/uninstalled/broken
+  // tools must not appear on the dashboard (status comes from the manifest
+  // registry; `broken` and `disabled` are both excluded).
+  const enabledTools = useMemo(
+    () => (toolsQuery.data ?? []).filter((tool) => tool.status === 'enabled'),
+    [toolsQuery.data],
+  );
+
+  const history = useQuery(qRunsHistory());
+
+  const recentRuns = useMemo(
+    () =>
+      (history.data ?? [])
+        .filter((r) => r.endedAt)
+        .sort((a, b) => (b.endedAt ?? '').localeCompare(a.endedAt ?? ''))
+        .slice(0, 8),
+    [history.data],
+  );
+
+  // One-click re-run: load a past run's settings onto the Run page (does not
+  // auto-execute — the user confirms with the Run button). Mirrors History.
+  const rerun = useCallback(
+    (config: Parameters<typeof setPendingRunConfig>[0]) => {
+      setPendingRunConfig(config);
+      navigate({ to: '/run' });
+    },
+    [navigate, setPendingRunConfig],
+  );
+
+  const hasProjects = (projects.data ?? []).length > 0;
+  const envOk = doctor.data?.overallOk ?? false;
+
+  return (
+    <Stack gap="md">
+      <PageHeader
+        title={t('dashboard.title')}
+        description={t('nav.dashboard.desc')}
+        actions={
+          hasProjects ? (
+            <Button
+              color="green"
+              leftSection={<TbPlayerPlay size={16} />}
+              onClick={() => onNavigate('run')}
+            >
+              {t('nav.runTests')}
+            </Button>
+          ) : null
+        }
+      />
+
+      {/* Loading skeleton — shown during initial data fetch */}
+      {(toolsQuery.isLoading || projects.isLoading || history.isLoading) &&
+        !projects.data &&
+        !history.data && (
+          <Stack gap="md">
+            <Skeleton height={80} radius="md" />
+            <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
+              <Skeleton height={340} radius="md" />
+              <Skeleton height={340} radius="md" />
+              <Skeleton height={340} radius="md" />
+            </SimpleGrid>
+            <Skeleton height={200} radius="md" />
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+              <Skeleton height={200} radius="md" />
+              <Skeleton height={200} radius="md" />
+            </SimpleGrid>
+          </Stack>
+        )}
+
+      {/* Main content — render once data is available */}
+      {(projects.data || history.data || (!toolsQuery.isLoading && !projects.isLoading)) && (
+        <>
+          {/* Onboarding */}
+          {prefs.showOnboarding && (
+            <Paper p="md" withBorder style={{ position: 'relative' }}>
+              <CloseButton
+                size="sm"
+                style={{ position: 'absolute', top: 8, right: 8 }}
+                onClick={prefs.dismissOnboarding}
+                aria-label={t('dashboard.dismissOnboarding')}
+              />
+              <Group gap="sm" mb="sm">
+                <TbRocket size={20} color="var(--mantine-color-brand-6)" />
+                <Title order={5}>{t('dashboard.gettingStarted')}</Title>
+              </Group>
+              <Stepper
+                active={envOk ? (hasProjects ? 2 : 1) : 0}
+                size="sm"
+                orientation="horizontal"
+              >
+                <Stepper.Step
+                  label={t('dashboard.stepEnv')}
+                  description={envOk ? t('dashboard.stepEnvOk') : t('dashboard.stepEnvFix')}
+                />
+                <Stepper.Step
+                  label={t('dashboard.stepProjects')}
+                  description={
+                    hasProjects
+                      ? `${projects.data?.length} ${t('dashboard.stepProjectsReady')}`
+                      : t('dashboard.stepProjectsCreate')
+                  }
+                />
+                <Stepper.Step
+                  label={t('dashboard.stepRun')}
+                  description={t('dashboard.stepRunDesc')}
+                />
+              </Stepper>
+              <Group gap="xs" mt="md">
+                {!hasProjects && (
+                  <Button size="xs" onClick={() => onNavigate('projects')}>
+                    {t('run.goToProjects')}
+                  </Button>
+                )}
+                {hasProjects && (
+                  <Button size="xs" onClick={() => onNavigate('run')}>
+                    {t('nav.runTests')}
+                  </Button>
+                )}
+              </Group>
+            </Paper>
+          )}
+
+          {/* Doctor status — collapse to a single OK badge once everything is green
+          to keep the dashboard clean for users with a healthy environment. */}
+          <DoctorPanel doctor={doctor.data} isLoading={doctor.isLoading} />
+
+          {/* Recent Runs + Project Overview — side by side */}
+          <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
+            {/* Recent Runs */}
+            <Paper p="md" withBorder>
+              <Group justify="space-between" mb="sm">
+                <Title order={5}>{t('dashboard.recentRuns')}</Title>
+                {recentRuns.length > 0 && (
+                  <Button size="compact-xs" variant="subtle" onClick={() => onNavigate('history')}>
+                    {t('dashboard.viewAll')}
+                  </Button>
+                )}
+              </Group>
+
+              {history.isLoading && (
+                <Group gap="xs">
+                  <Loader size="xs" />
+                  <Text c="dimmed" size="sm">
+                    {t('common.loading')}
+                  </Text>
+                </Group>
+              )}
+              {!history.isLoading && recentRuns.length === 0 && (
+                <Text size="sm" c="dimmed">
+                  {t('dashboard.noRuns')}
+                </Text>
+              )}
+              {recentRuns.length > 0 && (
+                <ScrollArea h={300}>
+                  <Stack gap={6} h="100%">
+                    {recentRuns.map((run) => (
+                      <Tooltip
+                        key={run.id}
+                        label={t('dashboard.runAgain')}
+                        position="left"
+                        withArrow
+                        openDelay={500}
+                      >
+                        <UnstyledButton
+                          onClick={() => rerun(run.request)}
+                          aria-label={`${t('dashboard.runAgain')} · ${run.request.project}`}
+                          data-run-row
+                          style={{
+                            display: 'block',
+                            borderRadius: 6,
+                            background: 'var(--mantine-color-default-hover)',
+                          }}
+                        >
+                          <Group justify="space-between" px="sm" py={6} wrap="nowrap">
+                            <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                              <Badge size="xs" color={getStatusColor(run.status)} variant="filled">
+                                {run.status}
+                              </Badge>
+                              <Text size="xs" ff="monospace" truncate>
+                                {run.request.project}
+                              </Text>
+                              <Badge size="xs" variant="light" color="gray">
+                                {toolLabel(run.request.tool, toolsQuery.data ?? [])}
+                              </Badge>
+                            </Group>
+                            <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+                              <Text size="xs" c="dimmed">
+                                {run.endedAt ? dayjs(run.endedAt).fromNow() : '-'}
+                              </Text>
+                              <TbPlayerPlay
+                                size={14}
+                                color="var(--mantine-color-green-6)"
+                                aria-hidden
+                              />
+                            </Group>
+                          </Group>
+                        </UnstyledButton>
+                      </Tooltip>
+                    ))}
+                  </Stack>
+                </ScrollArea>
+              )}
+            </Paper>
+            {/* Project overview */}
+            <Paper p="md" withBorder>
+              <Group justify="space-between" mb="sm">
+                <Title order={5}>{t('dashboard.projectsOverview')}</Title>
+                <Button size="compact-xs" variant="subtle" onClick={() => onNavigate('projects')}>
+                  {t('dashboard.manage')}
+                </Button>
+              </Group>
+              {projects.isLoading && (
+                <Group gap="xs">
+                  <Loader size="xs" />
+                  <Text c="dimmed" size="sm">
+                    {t('common.loading')}
+                  </Text>
+                </Group>
+              )}
+              {projects.data && (
+                <ScrollArea h={300}>
+                  <Stack gap="xs">
+                    <SimpleGrid cols={1} spacing="md">
+                      {enabledTools.map((tool) => (
+                        <Card key={tool.id} p="md" withBorder ta="center">
+                          <Text size="xl" fw={700}>
+                            {projects.data?.filter((p) => p.tool === tool.id).length ?? 0}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {tool.title}
+                          </Text>
+                        </Card>
+                      ))}
+                    </SimpleGrid>
+                  </Stack>
+                </ScrollArea>
+              )}
+            </Paper>
+            {/* Needs Attention */}
+            <NeedsAttentionWidget onNavigate={onNavigate} />
+          </SimpleGrid>
+
+          {/* Test Trend Chart */}
+          <Paper p="md" withBorder>
+            <Group justify="space-between" mb="sm">
+              <Title order={5}>{t('dashboard.testTrends')}</Title>
+              <Text size="xs" c="dimmed">
+                {t('dashboard.trendsDesc')}
+              </Text>
+            </Group>
+            <TrendChart />
+          </Paper>
+
+          {/* Top Projects + Run Activity — side by side */}
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+            {/* Top Projects */}
+            <Paper p="md" withBorder>
+              <Group justify="space-between" mb="sm">
+                <Title order={5}>{t('dashboard.topProjects')}</Title>
+                <Text size="xs" c="dimmed">
+                  {t('dashboard.topProjectsDesc')}
+                </Text>
+              </Group>
+              <TopProjectsBars />
+            </Paper>
+
+            {/* Run Activity Heatmap */}
+            <Paper p="md" withBorder>
+              <Group justify="space-between" mb="sm">
+                <Title order={5}>{t('dashboard.runActivity')}</Title>
+                <Text size="xs" c="dimmed">
+                  {t('dashboard.runActivityDesc')}
+                </Text>
+              </Group>
+              <RunHeatmap />
+            </Paper>
+          </SimpleGrid>
+        </>
+      )}
+    </Stack>
+  );
+}

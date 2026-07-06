@@ -1,0 +1,14 @@
+packages:
+  - "scripts/third-party/google"
+  - "hub/shared"
+  - "hub/server"
+  - "hub/client"
+allowBuilds:
+  "@evilmartians/lefthook": true
+  esbuild: true
+  onnxruntime-node: true
+  protobufjs: true
+  sharp: false
+overrides:
+  basic-ftp@<=5.2.2: ">=5.3.0"
+  uuid@<14.0.0: ">=14.0.0"

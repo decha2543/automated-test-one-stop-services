@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+namespace: cy
+tasks:
+  run-local:
+    desc: Run Cypress tests locally
+    cmds:
+      - echo "cy run-local TYPE={{.TYPE}} PROJECT={{.PROJECT}}"
+  run-docker:
+    desc: Run Cypress tests in Docker
+    cmds:
+      - echo "cy run-docker TYPE={{.TYPE}} PROJECT={{.PROJECT}}"

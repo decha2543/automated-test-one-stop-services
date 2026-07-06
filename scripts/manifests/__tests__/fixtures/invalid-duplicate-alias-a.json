@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1",
+  "id": "alpha",
+  "alias": "dup",
+  "title": "Alpha",
+  "description": "Individually valid; shares alias 'dup' with beta to trigger DUPLICATE_ALIAS",
+  "version": "1.0.0",
+  "enabled": true,
+  "runtime": "node",
+  "packageManager": "pnpm",
+  "taskfile": "Taskfile.yml",
+  "projects": {
+    "root": "projects",
+    "depth": 1,
+    "typeAxis": false,
+    "fixedType": "performance",
+    "templates": { "default": "projects/performance/alpha-template-example" },
+    "specsSubdir": "automations/specs",
+    "sectionAxis": true
+  },
+  "compose": {
+    "template": "docker-compose.template.yml",
+    "anchor": "alpha-template",
+    "networks": []
+  },
+  "tsconfigGen": null,
+  "docker": { "baseImage": "node:22-slim", "extras": ["task", "pnpm"] },
+  "runner": {
+    "taskNamespace": "alpha",
+    "title": "Alpha",
+    "executionTypes": [
+      { "id": "run", "title": "Run", "commandTemplate": "{ns}:run-{environment}" }
+    ],
+    "environments": ["local"],
+    "commandTemplate": "task {ns}:run-{environment}",
+    "steps": []
+  },
+  "pipeline": {
+    "id": "alpha",
+    "targetPaths": { "default": "tools/alpha/projects/{project}/automations/specs/{name}.spec.ts" },
+    "envToken": "process.env.{KEY}",
+    "runCommands": { "local": "task alpha:run-local PROJECT=<name>" },
+    "artifactPaths": ["outputs/alpha/{project}/"]
+  }
+}

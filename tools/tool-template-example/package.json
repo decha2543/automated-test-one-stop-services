@@ -1,0 +1,12 @@
+{
+  "name": "my-tool",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "My Tool — portable tool plugin template",
+  "scripts": {
+    "test": "echo \"TODO: add test command\""
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

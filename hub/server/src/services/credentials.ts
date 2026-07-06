@@ -1,0 +1,101 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { SCRIPTS_DIR } from '../config.js';
+import { SAFE_ID } from '../lib/safe-id.js';
+
+/**
+ * Third-party integrations live under `scripts/third-party/<tool>/`. A tool
+ * that needs secrets ships a `credentials/` folder (e.g. Google OAuth's
+ * `credentials.json`). This service scans those folders and writes uploaded
+ * credential files — the same pattern works for any future third-party tool.
+ */
+function thirdPartyDir(): string {
+  return path.join(SCRIPTS_DIR, 'third-party');
+}
+
+/** Canonical credential filename expected inside each `<tool>/credentials/`. */
+const CREDENTIALS_FILENAME = 'credentials.json';
+
+export interface CredentialStatus {
+  /** Third-party tool folder name (e.g. "google"). */
+  readonly tool: string;
+  /** True once a `credentials.json` exists in the tool's credentials folder. */
+  readonly hasCredentials: boolean;
+}
+
+/** Resolve a tool's credentials directory, guarding against path traversal. */
+function credentialsDir(tool: string): string {
+  const base = path.resolve(thirdPartyDir());
+  const resolved = path.resolve(base, tool, 'credentials');
+  if (!resolved.startsWith(base + path.sep)) {
+    throw new Error('INVALID_TOOL_PATH');
+  }
+  return resolved;
+}
+
+/**
+ * List every third-party tool that declares a `credentials/` folder, with
+ * whether its `credentials.json` is present. Tools without a credentials
+ * folder are omitted — they don't need uploaded secrets.
+ */
+export function listCredentialStatus(): CredentialStatus[] {
+  const root = thirdPartyDir();
+  if (!fs.existsSync(root)) return [];
+  return fs
+    .readdirSync(root, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .filter((d) => fs.existsSync(path.join(root, d.name, 'credentials')))
+    .map((d) => ({
+      tool: d.name,
+      hasCredentials: fs.existsSync(path.join(root, d.name, 'credentials', CREDENTIALS_FILENAME)),
+    }))
+    .sort((a, b) => a.tool.localeCompare(b.tool));
+}
+
+export type SaveCredentialsResult =
+  | { readonly ok: true; readonly path: string }
+  | {
+      readonly ok: false;
+      readonly code: 'INVALID_TOOL_NAME' | 'NO_CREDENTIALS_DIR' | 'INVALID_JSON';
+      readonly message: string;
+    };
+
+/**
+ * Persist an uploaded `credentials.json` for `tool`. The content must be valid
+ * JSON. The tool must already expose a `credentials/` folder (the convention
+ * that marks it as needing credentials).
+ */
+export function saveCredentials(tool: string, content: string): SaveCredentialsResult {
+  if (!SAFE_ID.test(tool)) {
+    return {
+      ok: false,
+      code: 'INVALID_TOOL_NAME',
+      message: 'tool name contains unsafe characters',
+    };
+  }
+
+  let dir: string;
+  try {
+    dir = credentialsDir(tool);
+  } catch {
+    return { ok: false, code: 'INVALID_TOOL_NAME', message: 'tool path is invalid' };
+  }
+
+  if (!fs.existsSync(dir)) {
+    return {
+      ok: false,
+      code: 'NO_CREDENTIALS_DIR',
+      message: `scripts/third-party/${tool} has no credentials/ folder`,
+    };
+  }
+
+  try {
+    JSON.parse(content);
+  } catch {
+    return { ok: false, code: 'INVALID_JSON', message: 'uploaded file is not valid JSON' };
+  }
+
+  const target = path.join(dir, CREDENTIALS_FILENAME);
+  fs.writeFileSync(target, content, 'utf8');
+  return { ok: true, path: path.relative(SCRIPTS_DIR, target) };
+}

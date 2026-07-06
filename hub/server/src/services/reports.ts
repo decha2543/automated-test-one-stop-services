@@ -1,0 +1,318 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import type { ReportEntry, ToolId } from '@hub/shared';
+import { nanoid } from 'nanoid';
+import { OUTPUTS_DIR } from '../config.js';
+import { getEnabledTools, getManifestModule } from './manifest-registry.js';
+
+/**
+ * Recursively walking `outputs/` is the slow part of every dashboard poll.
+ * Cache the result for a short window and invalidate when reports are
+ * created, deleted, or locked/unlocked.
+ */
+const REPORTS_CACHE_TTL_MS = 10_000;
+let reportsCache: { value: ReportEntry[]; at: number } | null = null;
+
+/**
+ * Per-tool walk config resolved from the manifest registry. `typeAxis` decides
+ * the `outputs/` directory shape (type axis vs flat), `type` is the report type
+ * label for flat tools (e.g. k6 -> 'performance'), and `resultGlob` selects the
+ * tool's result HTML file (design §7.1/§7.3).
+ */
+interface ToolWalkConfig {
+  readonly typeAxis: boolean;
+  readonly type: string;
+  readonly resultGlob: string;
+}
+
+/**
+ * Resolve every enabled tool's walk config once. Mirrors the manifest-driven
+ * scanner: a tool dir under `outputs/` is only scanned when it maps to a known
+ * ENABLED manifest id; unknown/disabled dirs are skipped. The result glob comes
+ * from `resolveCapabilities(manifest).reports.resultGlob`, which falls back to
+ * the generic `**\/*.html` when the manifest declares no `reports` block.
+ */
+async function resolveToolWalkConfigs(): Promise<Map<string, ToolWalkConfig>> {
+  const tools = await getEnabledTools();
+  const mod = await getManifestModule();
+  const byId = new Map<string, ToolWalkConfig>();
+  for (const manifest of tools) {
+    const { typeAxis, fixedType } = manifest.projects;
+    const resultGlob = mod.resolveCapabilities(manifest).reports.resultGlob;
+    byId.set(manifest.id, {
+      typeAxis,
+      type: fixedType ?? '',
+      resultGlob,
+    });
+  }
+  return byId;
+}
+
+async function buildAllEntries(): Promise<ReportEntry[]> {
+  if (!fs.existsSync(OUTPUTS_DIR)) return [];
+  const toolConfigs = await resolveToolWalkConfigs();
+  const entries: ReportEntry[] = [];
+  walkOutputs(OUTPUTS_DIR, toolConfigs, entries);
+  return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+/** Drop the cache so the next listReports call re-walks `outputs/`. */
+export function invalidateReportsCache(): void {
+  reportsCache = null;
+}
+
+/**
+ * Recursively find HTML report files under outputs/.
+ *
+ * Output structure (type-axis tool):
+ *   outputs/<tool>/<type>/<project>/<success|error>/<YYYY-MM-DD>/<HH-MM-SS>/<result>
+ * Flat tool (e.g. k6, typeAxis=false):
+ *   outputs/<tool>/<project>/<success|error>/<YYYY-MM-DD>/<HH-MM-SS>/<result>
+ */
+export async function listReports(filters?: {
+  tool?: ToolId;
+  type?: string;
+  project?: string;
+  status?: 'success' | 'error';
+}): Promise<ReportEntry[]> {
+  const now = Date.now();
+  if (!reportsCache || now - reportsCache.at >= REPORTS_CACHE_TTL_MS) {
+    reportsCache = { value: await buildAllEntries(), at: now };
+  }
+  const all = reportsCache.value;
+  if (!filters) return [...all];
+  return all.filter((e) => {
+    if (filters.tool && e.tool !== filters.tool) return false;
+    if (filters.type && e.type !== filters.type) return false;
+    if (filters.project && e.project !== filters.project) return false;
+    if (filters.status && e.status !== filters.status) return false;
+    return true;
+  });
+}
+
+function walkOutputs(
+  baseDir: string,
+  toolConfigs: Map<string, ToolWalkConfig>,
+  out: ReportEntry[],
+): void {
+  for (const toolName of safeDirs(baseDir)) {
+    // A tool dir is valid iff it maps to a known ENABLED manifest id. Unknown
+    // and disabled tool dirs (and hidden dirs, via safeDirs) are skipped.
+    const config = toolConfigs.get(toolName);
+    if (!config) continue;
+
+    const toolDir = path.join(baseDir, toolName);
+    if (config.typeAxis) {
+      walkTypeAxis(toolDir, toolName, config.resultGlob, out);
+    } else {
+      walkFlat(toolDir, toolName, config.type, config.resultGlob, out);
+    }
+  }
+}
+
+/** Type-axis tools: outputs/<tool>/<type>/<project>/… (Playwright, Robot). */
+function walkTypeAxis(toolDir: string, tool: ToolId, resultGlob: string, out: ReportEntry[]): void {
+  for (const type of safeDirs(toolDir)) {
+    const typeDir = path.join(toolDir, type);
+    for (const project of safeDirs(typeDir)) {
+      const projDir = path.join(typeDir, project);
+      findHtmlReports(projDir, tool, type, project, resultGlob, out);
+    }
+  }
+}
+
+/** Flat tools: outputs/<tool>/<project>/… with a fixed type (k6 -> performance). */
+function walkFlat(
+  toolDir: string,
+  tool: ToolId,
+  type: string,
+  resultGlob: string,
+  out: ReportEntry[],
+): void {
+  for (const project of safeDirs(toolDir)) {
+    const projDir = path.join(toolDir, project);
+    findHtmlReports(projDir, tool, type, project, resultGlob, out);
+  }
+}
+
+function findHtmlReports(
+  dir: string,
+  tool: ToolId,
+  type: string,
+  project: string,
+  resultGlob: string,
+  out: ReportEntry[],
+): void {
+  // The manifest's `reports.resultGlob` selects the tool's result file:
+  //   Playwright: **/html-results/index.html  (NOT trace/)
+  //   Robot:      **/report.html
+  //   k6:         **/summary.html
+  //   unknown:    **/*.html                    (generic fallback)
+  const htmlFiles = findFiles(dir, '.html').filter((f) => matchesGlob(f, resultGlob));
+  for (const filePath of htmlFiles) {
+    const rel = path.relative(dir, filePath).replace(/\\/g, '/');
+    const parts = rel.split('/');
+
+    const status = parts.includes('success')
+      ? 'success'
+      : parts.includes('error')
+        ? 'error'
+        : 'unknown';
+
+    const { timestamp } = extractMeta(parts);
+
+    out.push({
+      id: nanoid(8),
+      tool,
+      type,
+      project,
+      status: status as 'success' | 'error' | 'unknown',
+      reportPath: filePath,
+      timestamp,
+      locked: isLocked(filePath),
+    });
+  }
+}
+
+/**
+ * Minimal, dependency-free glob matcher for the report-result globs the
+ * manifests emit: `**\/*.html`, `**\/report.html`, `**\/summary.html`,
+ * `**\/html-results/index.html`. Supports a single leading `**` (matches any
+ * number of leading path segments) followed by literal/`*` segments matched
+ * against the path's trailing segments; `*` matches within a single segment.
+ * This is intentionally not a general-purpose glob engine — adding minimatch /
+ * picomatch just for these patterns is unjustified.
+ */
+function matchesGlob(filePath: string, glob: string): boolean {
+  const segs = filePath.replace(/\\/g, '/').split('/').filter(Boolean);
+  const globSegs = glob.split('/').filter(Boolean);
+
+  if (globSegs[0] === '**') {
+    const tail = globSegs.slice(1);
+    if (tail.length === 0) return true; // bare `**` matches anything
+    if (segs.length < tail.length) return false;
+    const start = segs.length - tail.length;
+    return tail.every((g, i) => segmentMatches(segs[start + i] ?? '', g));
+  }
+
+  // No leading `**`: require an exact, full-length segment match.
+  if (segs.length !== globSegs.length) return false;
+  return globSegs.every((g, i) => segmentMatches(segs[i] ?? '', g));
+}
+
+function segmentMatches(segment: string, pattern: string): boolean {
+  if (pattern === '*') return true;
+  if (!pattern.includes('*')) return segment === pattern;
+  const re = new RegExp(`^${pattern.split('*').map(escapeRegex).join('[^/]*')}$`);
+  return re.test(segment);
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Convert a report directory's LOCAL wall-clock segments (`<YYYY-MM-DD>/<HH-MM-SS>`)
+ * into an ISO-8601 instant, so every report carries the SAME timestamp shape as
+ * a history record's `startedAt` (both ISO). History is the source of truth for
+ * run times; aligning reports to it means the same run shows the same time — and
+ * sorts chronologically.
+ *
+ * The segments are produced by the shell `date` command in the host's local
+ * timezone, and the Hub server runs on that same host, so building a local
+ * `Date` and calling `toISOString()` reconstructs the correct instant; the
+ * browser then re-localizes it exactly as it does for history.
+ *
+ * The seconds segment is optional: legacy dirs emitted `HH-MM` (no seconds), so
+ * a missing seconds field defaults to 0. An unparseable pair falls back to a
+ * naive string so the entry still lists.
+ */
+function toIsoTimestamp(date: string, time: string): string {
+  const [yStr, moStr, dStr] = date.split('-');
+  const [hStr, mStr, sStr] = time.split('-');
+  const year = Number(yStr);
+  const month = Number(moStr);
+  const day = Number(dStr);
+  const hh = Number(hStr);
+  const mm = Number(mStr);
+  const ss = Number(sStr); // NaN when the segment omits seconds (legacy HH-MM)
+  const valid =
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    Number.isInteger(day) &&
+    Number.isInteger(hh) &&
+    Number.isInteger(mm);
+  if (valid)
+    return new Date(year, month - 1, day, hh, mm, Number.isInteger(ss) ? ss : 0).toISOString();
+  // Fallback: keep a naive string so the entry still shows.
+  return `${date}T${time.replace(/-/g, ':')}`;
+}
+
+function extractMeta(parts: string[]): { timestamp: string } {
+  let timestamp = '';
+
+  const statusIdx = parts.findIndex((p) => p === 'success' || p === 'error');
+  if (statusIdx >= 0 && parts.length > statusIdx + 2) {
+    const date = parts[statusIdx + 1] ?? '';
+    const time = parts[statusIdx + 2] ?? '';
+    timestamp = toIsoTimestamp(date, time);
+  }
+
+  return { timestamp };
+}
+
+function findFiles(dir: string, ext: string): string[] {
+  const results: string[] = [];
+  if (!fs.existsSync(dir)) return results;
+
+  const SKIP_DIRS = new Set(['.', 'node_modules', 'trace']);
+
+  function walk(current: string): void {
+    const entries = fs.readdirSync(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (!entry.name.startsWith('.') && !SKIP_DIRS.has(entry.name)) {
+          walk(full);
+        }
+      } else if (entry.name.endsWith(ext)) {
+        results.push(full);
+      }
+    }
+  }
+  walk(dir);
+  return results;
+}
+
+function safeDirs(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => d.name);
+}
+
+/** Check if a report is locked (has .lock file in its time directory). */
+function isLocked(reportPath: string): boolean {
+  // reportPath is e.g. .../html-results/index.html
+  const htmlResultsDir = path.dirname(reportPath);
+  const timeDir = path.dirname(htmlResultsDir);
+  return fs.existsSync(path.join(timeDir, '.lock'));
+}
+
+/** Lock a report by creating a .lock file in its time directory. */
+export function lockReport(reportPath: string): void {
+  const htmlResultsDir = path.dirname(reportPath);
+  const timeDir = path.dirname(htmlResultsDir);
+  fs.writeFileSync(path.join(timeDir, '.lock'), '', 'utf8');
+  invalidateReportsCache();
+}
+
+/** Unlock a report by removing the .lock file from its time directory. */
+export function unlockReport(reportPath: string): void {
+  const htmlResultsDir = path.dirname(reportPath);
+  const timeDir = path.dirname(htmlResultsDir);
+  const lockFile = path.join(timeDir, '.lock');
+  if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile);
+  invalidateReportsCache();
+}

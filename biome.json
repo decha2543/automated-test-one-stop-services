@@ -1,0 +1,118 @@
+{
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "always",
+      "bracketSameLine": false,
+      "bracketSpacing": true,
+      "quoteStyle": "single",
+      "semicolons": "always"
+    }
+  },
+  "json": {
+    "parser": {
+      "allowComments": true
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "correctness": {
+        "noEmptyPattern": "off",
+        "noUndeclaredDependencies": {
+          "options": {
+            "devDependencies": false,
+            "peerDependencies": false,
+            "optionalDependencies": false
+          }
+        },
+        "noUndeclaredVariables": "error",
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
+      },
+      "recommended": true,
+      "style": {
+        "noNonNullAssertion": "warn",
+        "useConst": "error",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["../../**/*", "../../*"],
+                "message": "Please use absolute imports"
+              }
+            ]
+          }
+        }
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noUnknownAtRules": "off"
+      }
+    }
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**/*.{js,jsx,ts,tsx,json}",
+      "!!**/*.{robot,resource,py,pem,key,log,xml,db}",
+      "!!**/.vscode",
+      "!!**/.idea",
+      "!!**/node_modules",
+      "!!**/.git",
+      "!!**/.DS_Store",
+      "!!**/.Thumbs.db",
+      "!!**/.env",
+      "!!**/.env.*",
+      "!!**/outputs",
+      "!!**/dist",
+      "!!**/build",
+      "!!**/log",
+      "!!**/states",
+      "!!**/credentials",
+      "!!**/grafana",
+      "!!**/performance-results",
+      "!!**/test-results",
+      "!!**/playwright-report",
+      "!!**/blob-report",
+      "!!**/pabot_results",
+      "!!**/.venv",
+      "!!**/__pycache__",
+      "!!**/.robotcode_cache",
+      "!!**/.robocop_cache",
+      "!!**/.ruff_cache",
+      "!!**/.uv",
+      "!!**/.pabotsuitenames",
+      "!!**/coverage",
+      "!!**/.cache",
+      "!!**/*_cache",
+      "!!**/*.html",
+      "!!**/shared",
+      "!!**/libs",
+      "!!**/.playwright-mcp",
+      "!!**/.playwright-report",
+      "!!**/.playwright-cli",
+      "!!**/.kiro",
+      "!!**/hub/server/data",
+      "!!**/selectorshub",
+      "!!**/brain",
+      "!!**/__tests__",
+      "!**/package*.json",
+      "!**/tsconfig.json",
+      "!**/*lock.json"
+    ]
+  },
+  "vcs": {
+    "clientKind": "git",
+    "enabled": true,
+    "useIgnoreFile": false
+  }
+}

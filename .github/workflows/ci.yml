@@ -1,0 +1,120 @@
+# =============================================================================
+# Workspace CI/CD (GitHub Actions) — validate every push to main; release the
+# one-click installers on a git tag. Ports the former .gitlab-ci.yml.
+#
+# SCOPE: the portable test tools (tools/playwright | robot-framework | k6) live
+# in their OWN git repos (still on GitLab) and are git-ignored here, so they are
+# NOT present in a CI checkout. This pipeline validates only the main-repo code:
+# script modules (scripts/manifests, scripts/install-core), the Hub
+# (hub/shared, hub/server, hub/client), and the brain suite (.kiro/tests).
+# No uv/Python, no Playwright browsers, no Docker, no secrets needed.
+#
+# Node + pnpm match package.json `volta` (node 25.x, pnpm 11.1.0).
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+# A newer push to the same ref cancels superseded, still-running runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Biome
+        run: pnpm exec biome check .
+      - name: Markdown
+        run: pnpm run md:check
+      - name: Kiro structure + brain lint
+        run: node .kiro/scripts/lint-kiro.mjs
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C hub/shared run typecheck
+      - run: pnpm -C hub/server run typecheck
+      - run: pnpm -C hub/client run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Best-effort clone of the built-in tool repos (still on GitLab). If they
+      # are private/unreachable the clone is skipped and the manifest-integration
+      # tests self-skip via the realToolsPresent guard — the run stays green.
+      - name: Clone tool repos (best-effort)
+        run: |
+          BASE="https://gitlab.com/automated-tester-project-template/one-stop-service-tools-collections"
+          for t in playwright robot-framework k6; do
+            [ -d "tools/$t/.git" ] && continue
+            git clone --depth 1 "$BASE/$t.git" "tools/$t" \
+              || echo "[tools] clone of $t skipped — its integration tests will self-skip"
+          done
+      - name: Script module tests
+        run: |
+          pnpm exec vitest run --root scripts/manifests
+          pnpm exec vitest run --root scripts/install-core
+      - name: Hub tests
+        run: |
+          pnpm -C hub/server exec vitest run
+          pnpm -C hub/client exec vitest run
+      - name: Brain suite
+        run: node --test ".kiro/tests/**/*.spec.mjs"
+      - name: Test quality (soft signal — never blocks)
+        continue-on-error: true
+        run: node scripts/eval/test-quality.mjs
+
+  release:
+    needs: [lint, typecheck, test]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish GitHub Release with installers
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          body: |
+            Automated Test One-Stop Service — ${{ github.ref_name }}
+
+            One-click installers (download the file for your OS and run it; it
+            bootstraps git, clones the workspace, and runs setup):
+          files: |
+            scripts/setup/automated-test-one-stop-service_installer_windows.bat
+            scripts/setup/automated-test-one-stop-service_installer_mac-and-linux.sh

@@ -1,0 +1,27 @@
+# Enforce LF line endings on checkout across all OSes.
+# Tool repos are cloned on Windows where Git may otherwise convert to CRLF,
+# which breaks generated artefacts (e.g. compose-gen's `services:` anchor) and
+# the workspace's LF convention.
+* text=auto eol=lf
+
+# Explicit LF for text formats the generators / tooling parse line-by-line.
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.ts    text eol=lf
+*.js    text eol=lf
+*.md    text eol=lf
+*.sh    text eol=lf
+*.toml  text eol=lf
+*.robot text eol=lf
+*.py    text eol=lf
+
+# Binary files — never normalise.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary

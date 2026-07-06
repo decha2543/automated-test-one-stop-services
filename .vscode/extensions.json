@@ -1,0 +1,25 @@
+{
+  "recommendations": [
+   "biomejs.biome",
+   "ms-azuretools.vscode-containers",
+   "editorconfig.editorconfig",
+   "irongeek.vscode-env",
+   "usernamehw.errorlens",
+   "tamasfe.even-better-toml",
+   "davidanson.vscode-markdownlint",
+   "pkief.material-icon-theme",
+   "techer.open-in-browser",
+   "christian-kohler.path-intellisense",
+   "yoavbls.pretty-ts-errors",
+   "ms-python.python",
+   "ms-python.debugpy",
+   "d-biehl.robotcode",
+   "charliermarsh.ruff",
+   "marclipovsky.string-manipulation",
+   "wayou.vscode-todo-highlight",
+   "astral-sh.ty",
+   "task.vscode-task",
+   "redhat.vscode-yaml",
+   "repreng.csv",
+  ]
+}

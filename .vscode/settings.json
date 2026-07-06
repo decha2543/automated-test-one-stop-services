@@ -1,0 +1,347 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/__pycache__": true,
+    "**/.mypy_cache": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/.robocop_cache": true,
+    "**/.pabotsuitenames": true,
+    "**/.last-run": true,
+    "**/.playwright-mcp": true,
+    "**/.cache": true,
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/.dockerignore": true,
+    "**/.editorconfig": true,
+    "**/.gitattributes": true,
+    "**/.kiroignore": true,
+    "**/.markdownlint-cli2.jsonc": true,
+    "**/.setup-state.json": true
+  },
+  "search.exclude": {
+    "**/__pycache__": true,
+    "**/.DS_Store": true,
+    "**/.git/**": true,
+    "**/.vscode/**": true,
+    "**/*-lock.json": true,
+    "**/*-lock.yaml": true,
+    "**/*.lock": true,
+    "**/*.xml": true,
+    "**/bin": true,
+    "**/bun.lockb": true,
+    "**/dist": true,
+    "**/env-*": true,
+    "**/outputs": true,
+    "**/package-lock.json": true,
+    "**/playwright-report": true,
+    "**/test-results": true,
+    "**/venv": true,
+    "**/*.map": true,
+    "**/*.min.js": true,
+    "**/*.min.css": true,
+    "**/output.xml": true,
+    "**/log.html": true,
+    "**/report.html": true,
+    "**/*.db": true,
+    "**/*.sqlite": true,
+    "**/.ruff_cache": true,
+    "**/.robocop_cache": true,
+    "**/libs": true,
+    "**/.last-run": true,
+    "**/.playwright-mcp": true,
+    "**/schedulers": true,
+    "**/.cache": true,
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/selectorshub": true,
+    "**/.setup-state.json": true,
+    "**/.playwright-cli": true
+  },
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/node_modules/*/**": true,
+    "**/outputs/**": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.venv/**": true,
+    "**/.vscode": true,
+    "**/*-lock.json": true,
+    "**/*-lock.yaml": true,
+    "**/*.lock": true,
+    "**/*.html": true,
+    "**/*.log": true,
+    "**/*.png": true,
+    "**/*.webm": true,
+    "**/*.xml": true,
+    "**/*.zip": true,
+    "**/bin": true,
+    "**/coverage": true,
+    "**/dist": true,
+    "**/env-*": true,
+    "**/playwright-report/**": true,
+    "**/test-results/**": true,
+    "**/robot_output/**": true,
+    "**/tmp/**": true,
+    "**/.ruff_cache": true,
+    "**/.robocop_cache": true,
+    "**/.last-run": true,
+    "**/.playwright-mcp": true,
+    "**/.cache": true,
+    "**/selectorshub": true,
+    "**/.setup-state.json": true,
+    "**/.playwright-cli": true
+  },
+  "workbench.localHistory.exclude": {
+    "**/__pycache__": true,
+    "**/.venv": true,
+    "**/*.db": true,
+    "**/*.log": true,
+    "**/*.sqlite": true,
+    "**/dist": true,
+    "**/log.html": true,
+    "**/node_modules": true,
+    "**/output.xml": true,
+    "**/outputs": true,
+    "**/playwright-report": true,
+    "**/report.html": true,
+    "**/robot_output": true,
+    "**/test-results": true,
+    "**/.ruff_cache": true,
+    "**/.robocop_cache": true,
+    "**/.playwright-mcp": true,
+    "**/.cache": true,
+    "**/.setup-state.json": true
+  },
+  "git.repositoryScanIgnoredFolders": [
+    "node_modules",
+    "outputs",
+    "logs",
+    "states",
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    ".pytest_cache",
+    "dist",
+    "build",
+    "bin",
+    "obj",
+    "playwright-report",
+    "test-results",
+    "coverage",
+    "robot_output",
+    ".vscode",
+    ".idea",
+    ".playwright-mcp",
+    ".cache"
+  ],
+  "npm.exclude": [
+    "**/node_modules",
+    "**/test-results",
+    "**/playwright-report",
+    "**/robot_output",
+    "**/dist",
+    "**/.venv",
+    "**/.kiro/",
+    "**/brain/",
+    "**/outputs/",
+    "**/.ruff_cache",
+    "**/.robocop_cache",
+    "**/.playwright-mcp",
+    "**/.cache"
+  ],
+  "npm.scriptExplorerExclude": [
+    "**/.venv",
+    "**/__pycache__",
+    "**/.kiro/",
+    "**/brain/",
+    "**/outputs/",
+    "**/.ruff_cache",
+    "**/.robocop_cache",
+    "**/.playwright-mc",
+    "**/.cache",
+    "**/node_modules"
+  ],
+  "robotcode.workspace.excludePatterns": [
+    ".hatch/",
+    ".venv/",
+    "node_modules/",
+    ".pytest_cache/",
+    "__pycache__/",
+    ".mypy_cache/",
+    ".robotcode_cache/",
+    ".kiro/",
+    "brain/",
+    "hub/",
+    "outputs/",
+    "scripts/",
+    ".playwright-mcp",
+    ".cache"
+  ],
+  "robotcode.analysis.cache.ignoredLibraries": [
+    "**/.venv",
+    "**/node_modules"
+  ],
+  "robotcode.analysis.cache.ignoreArgumentsForLibrary": [
+    "**/.venv",
+    "**/node_modules"
+  ],
+  "kiroAgent.agentIgnoreFiles": [
+    ".kiroignore"
+  ],
+  "python.analysis.exclude": [
+    "**/.venv",
+    "**/node_modules",
+    "**/outputs",
+    "**/playwright-report",
+    "**/test-results",
+    "**/robot_output",
+    "**/.kiro",
+    "**/brain"
+  ],
+
+  "search.followSymlinks": false,
+
+  "python.analysis.diagnosticMode": "openFilesOnly",
+  "python.analysis.indexing": false,
+  "python.analysis.autoImportCompletions": false,
+  "python.analysis.typeCheckingMode": "off",
+
+  "telemetry.telemetryLevel": "off",
+  "workbench.activityBar.location": "top",
+  "workbench.startupEditor": "none",
+  "workbench.editor.limit.enabled": true,
+  "workbench.editor.limit.value": 8,
+  "workbench.editor.limit.perEditorGroup": true,
+  "explorer.compactFolders": false,
+  "search.useGlobalIgnoreFiles": true,
+  "files.hotExit": "onExitAndWindowClose",
+
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  "editor.tabSize": 4,
+  "editor.wordWrap": "on",
+  "editor.guides.bracketPairs": "active",
+  "editor.codeLens": false,
+  "editor.fontLigatures": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnType": false,
+  "editor.minimap.enabled": false,
+  "editor.hover.delay": 300,
+  "editor.suggest.preview": false,
+  "errorLens.delay": 500,
+  "diffEditor.ignoreTrimWhitespace": false,
+  "editor.codeActionsOnSave": {
+    "source.removeUnusedImports": "explicit",
+    "source.action.useSortedKeys.biome": "explicit",
+    "source.organizeImports.biome": "explicit",
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.ruff": "explicit",
+    "source.fixAll.ruff": "explicit"
+  },
+
+  "terminal.integrated.defaultProfile.windows": "Git Bash",
+  "terminal.integrated.profiles.windows": {
+    "Git Bash": {
+      "path": [
+        "C:\\Program Files\\Git\\bin\\bash.exe"
+      ],
+      "args": [
+        "--login",
+        "-i"
+      ]
+    }
+  },
+
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.autofetchPeriod": 600,
+  "git.autoRepositoryDetection": "subFolders",
+
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "ruff.lineLength": 100,
+  "ruff.configuration": "${workspaceFolder}/pyproject.toml",
+  "ty.configurationFile": "${workspaceFolder}/pyproject.toml",
+
+  "robotcode.robocop.enabled": true,
+  "robotcode.robocop.ignoreGitDir": true,
+  "robotcode.robocop.configFile": "tools/robot-framework/robot.toml",
+  "robotcode.testExplorer.enabled": false,
+  "robotcode.debug.outputLog": false,
+
+  "kiroAgent.enableTabAutocomplete": true,
+
+  "typescript.tsdk": "node_modules\\typescript\\lib",
+  "typescript.tsserver.log": "off",
+  "typescript.tsserver.maxTsServerMemory": 3072,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.validate.enable": true,
+  "javascript.validate.enable": true,
+
+  "telemetry.feedback.enabled": false,
+  "telemetry.editStats.enabled": false,
+  "redhat.telemetry.enabled": false,
+  "yaml.schemaStore.enable": false,
+  "accessibility.verbosity.debug": false,
+  "markdownlint.lintWorkspaceGlobs": [
+    "**/*.{md,mkd,mdwn,mdown,markdown,markdn,mdtxt,mdtext,workbook}",
+    "!**/*.code-search",
+    "!**/bower_components",
+    "!**/node_modules",
+    "!**/.venv",
+    "!**/.git",
+    "!**/vendor",
+    "!**/.kiro"
+  ],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  },
+  "[robotframework]": {
+    "editor.defaultFormatter": "d-biehl.robotcode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.tabSize": 2
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.tabSize": 2
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.tabSize": 2
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.tabSize": 2
+  },
+  "[env]": {
+    "editor.defaultFormatter": "IronGeek.vscode-env"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.tabSize": 2,
+    "editor.formatOnSave": false
+  },
+  "[dockercompose]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.tabSize": 2,
+    "editor.formatOnSave": false
+  },
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-containers"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+  },
+  "typescript.autoClosingTags": false,
+}

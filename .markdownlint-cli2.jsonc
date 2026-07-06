@@ -1,0 +1,101 @@
+// markdownlint-cli2 — root config
+// Docs: https://github.com/DavidAnson/markdownlint-cli2
+//
+// Scope: every *.md in the workspace, minus generated/vendor folders.
+// Per-folder overrides live next to the content they govern:
+//   - .kiro/.markdownlint-cli2.jsonc  → Kiro steering syntax (#[[file:...]])
+//   - brain/.markdownlint-cli2.jsonc  → Obsidian wikilinks, vault conventions
+//
+// Rule philosophy (Phase 1 — permissive baseline):
+//   Keep rules with high signal (broken links, heading hash spacing, fenced
+//   code language, list/heading whitespace). Disable cosmetic rules that
+//   conflict with .editorconfig, Thai prose, or existing inline-HTML usage.
+//   Tighten over time after baseline cleanup is green.
+//
+// Rules disabled at baseline — rationale:
+//   MD009  trailing-space    .editorconfig keeps trailing for hard-line-break
+//   MD013  line-length       Thai prose, code samples, link-heavy steering
+//   MD025  single-h1         workspace-brain concatenates scoped docs (`<!-- agent:start -->` + own H1)
+//   MD026  trailing-punct    Thai sentence punctuation
+//   MD034  bare-urls         steering refs use bare URLs intentionally
+//   MD036  emphasis-as-h     **bold:** used as inline section markers
+//   MD040  fenced-lang       legacy fences without lang; revisit Phase 2
+//   MD041  first-line-h1     frontmatter present in many files
+//   MD060  table-pipe-style  cosmetic; renders fine either compact or padded; revisit Phase 2
+{
+  "ignores": [
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/.git/**",
+    "**/.ruff_cache/**",
+    "**/.robocop_cache/**",
+    "**/.robotcode_cache/**",
+    "**/__pycache__/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/outputs/**",
+    "**/test-results/**",
+    "**/playwright-report/**",
+    "**/blob-report/**",
+    "**/performance-results/**",
+    "**/coverage/**",
+    "**/.cache/**",
+    "**/_archive/**",
+    "**/.obsidian/**",
+    "**/scripts/third-party/**",
+    "**/CHANGELOG.md"
+  ],
+
+  "config": {
+    // ── Disabled (see header) ───────────────────────────────────────────
+    "MD009": false,
+    "MD013": false,
+    "MD025": false,
+    "MD026": false,
+    "MD034": false,
+    "MD036": false,
+    "MD040": false,
+    "MD041": false,
+    "MD060": false,
+
+    // ── Inline HTML allowed (tags used in steering / specs) ─────────────
+    "MD033": {
+      "allowed_elements": [
+        "br",
+        "details",
+        "summary",
+        "kbd",
+        "sub",
+        "sup",
+        "a",
+        "img",
+        "file",
+        "file_tree",
+        "folder",
+        "user-rule",
+        "example",
+        "examples",
+        "EnvironmentContext",
+        "OPEN-EDITOR-FILES",
+        "ACTIVE-EDITOR-FILE",
+        "current_context"
+      ]
+    },
+
+    // ── Heading style ───────────────────────────────────────────────────
+    "MD003": { "style": "atx" },
+    "MD024": { "siblings_only": true },
+
+    // ── List style ──────────────────────────────────────────────────────
+    "MD004": { "style": "dash" },
+    "MD007": { "indent": 2 },
+    "MD030": { "ul_single": 1, "ol_single": 1, "ul_multi": 1, "ol_multi": 1 },
+
+    // ── Code fences ─────────────────────────────────────────────────────
+    "MD046": { "style": "fenced" },
+    "MD048": { "style": "backtick" },
+
+    // ── Blank lines ─────────────────────────────────────────────────────
+    "MD012": { "maximum": 2 }
+  }
+}
