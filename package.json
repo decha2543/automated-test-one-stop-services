@@ -17,27 +17,21 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.16",
+    "@biomejs/biome": "2.5.2",
     "@evilmartians/lefthook": "^2.1.9",
-    "@huggingface/transformers": "^4.2.0",
-    "@types/node": "^25.9.2",
+    "@types/node": "^26.1.0",
     "@types/prompts": "^2.4.9",
-    "@vitest/coverage-v8": "4.1.8",
+    "@vitest/coverage-v8": "4.1.9",
     "dayjs": "^1.11.21",
-    "docx": "9.5.1",
-    "exceljs": "^4.4.0",
     "fast-check": "^4.8.0",
-    "image-size": "^2.0.2",
-    "markdown-it": "^14.3.0",
-    "markdownlint-cli2": "0.22.1",
-    "pptxgenjs": "^4.0.1",
+    "markdownlint-cli2": "0.23.0",
     "prompts": "^2.4.2",
     "typescript": "^6.0.3",
-    "vitest": "4.1.8",
+    "vitest": "4.1.9",
     "zod": "^4.4.3"
   },
   "volta": {
-    "node": "25.9.0",
-    "pnpm": "11.1.0"
+    "node": "26.4.0",
+    "pnpm": "11.10.0"
   }
 }

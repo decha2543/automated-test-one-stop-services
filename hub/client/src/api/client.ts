@@ -1,4 +1,4 @@
-import axios, { type AxiosError } from 'axios';
+import axios, { type AxiosError, type AxiosRequestConfig } from 'axios';
 
 const instance = axios.create({
   baseURL: '',
@@ -20,8 +20,14 @@ instance.interceptors.response.use(
 );
 
 export const api = {
-  get: <T>(path: string) => instance.get<T>(path).then((r) => r.data),
-  post: <T>(path: string, body?: unknown) => instance.post<T>(path, body).then((r) => r.data),
-  put: <T>(path: string, body?: unknown) => instance.put<T>(path, body).then((r) => r.data),
-  delete: <T>(path: string) => instance.delete<T>(path).then((r) => r.data),
+  get: <T>(path: string, config?: AxiosRequestConfig) =>
+    instance.get<T>(path, config).then((r) => r.data),
+  // `config` lets a single call override defaults (e.g. a longer `timeout` for a
+  // slow install) without changing the shared instance.
+  post: <T>(path: string, body?: unknown, config?: AxiosRequestConfig) =>
+    instance.post<T>(path, body, config).then((r) => r.data),
+  put: <T>(path: string, body?: unknown, config?: AxiosRequestConfig) =>
+    instance.put<T>(path, body, config).then((r) => r.data),
+  delete: <T>(path: string, config?: AxiosRequestConfig) =>
+    instance.delete<T>(path, config).then((r) => r.data),
 };

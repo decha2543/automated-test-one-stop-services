@@ -1,4 +1,9 @@
-import type { DoctorCheck, DoctorReport, ProvisionResult } from '@hub/shared';
+import type {
+    DoctorCheck,
+    DoctorReport,
+    ProvisionResult,
+    PythonInstallResult,
+} from '@hub/shared';
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
@@ -32,8 +37,18 @@ let provisionReturn: {
   data: ProvisionResult | undefined;
 };
 
+// Control the install-python mutation the same way as provision. Tests mutate
+// `installReturn` before rendering to exercise idle / pending / failed states.
+const installMutate = vi.fn();
+let installReturn: {
+  mutate: typeof installMutate;
+  isPending: boolean;
+  data: PythonInstallResult | undefined;
+};
+
 vi.mock('~/hooks/useTools.js', () => ({
   useProvisionTool: () => provisionReturn,
+  useInstallPython: () => installReturn,
 }));
 
 // react-icons render anonymous <svg> elements with no accessible name, which
@@ -46,6 +61,7 @@ vi.mock('react-icons/tb', () => {
     TbChevronRight: makeIcon('TbChevronRight'),
     TbCircleCheck: makeIcon('TbCircleCheck'),
     TbCircleX: makeIcon('TbCircleX'),
+    TbDownload: makeIcon('TbDownload'),
     TbRefresh: makeIcon('TbRefresh'),
   };
 });
@@ -76,6 +92,12 @@ beforeEach(() => {
     mutate: provisionMutate,
     isPending: false,
     variables: undefined,
+    data: undefined,
+  };
+  installMutate.mockReset();
+  installReturn = {
+    mutate: installMutate,
+    isPending: false,
     data: undefined,
   };
 });
@@ -187,28 +209,26 @@ describe('DoctorPanel rendering', () => {
     const user = userEvent.setup();
     renderPanel(<DoctorPanel doctor={reportAllOk} isLoading={false} />);
 
-    // Collapsed by default: card contents (versions, group headers) are hidden,
-    // but the always-visible header summary badge is present.
-    expect(screen.getByText('2/2 OK')).toBeInTheDocument();
-    expect(screen.queryByText('srv-1.0.0')).not.toBeInTheDocument();
-    expect(screen.queryByText('Required')).not.toBeInTheDocument();
+    // Collapsed by default: the always-visible summary badge shows, but the card
+    // contents are hidden. Mantine 9.4 keeps Collapse children MOUNTED (hidden),
+    // so assert visibility, not DOM presence.
+    expect(screen.getByText('2/2 OK')).toBeVisible();
+    expect(screen.getByText('srv-1.0.0')).not.toBeVisible();
+    expect(screen.getByText('Required')).not.toBeVisible();
 
-    // Click header -> expand.
+    // Click header -> expand: the contents become visible.
     await user.click(screen.getByText('Environment Status'));
-    expect(screen.getByText('Required')).toBeInTheDocument();
-    expect(screen.getByText('srv-1.0.0')).toBeInTheDocument();
-    expect(screen.getByText('cli-1.0.0')).toBeInTheDocument();
-
-    // Click header again -> collapse.
-    await user.click(screen.getByText('Environment Status'));
-    expect(screen.queryByText('srv-1.0.0')).not.toBeInTheDocument();
-    expect(screen.queryByText('Required')).not.toBeInTheDocument();
+    expect(screen.getByText('Required')).toBeVisible();
+    expect(screen.getByText('srv-1.0.0')).toBeVisible();
+    expect(screen.getByText('cli-1.0.0')).toBeVisible();
   });
 });
 
-/** A report whose only failing check is the provisionable playwright-browsers. */
+/** A report whose only failing check is the provisionable playwright-browsers.
+ *  node + pnpm pass, so the provision prerequisites are satisfied. */
 const reportBrowsersMissing = report([
-  check({ name: 'node', ok: true, version: 'v25.0.0' }),
+  check({ name: 'node', ok: true, version: 'v26.0.0' }),
+  check({ name: 'pnpm', ok: true, version: '11.10.0' }),
   check({
     name: 'playwright-browsers',
     ok: false,
@@ -272,8 +292,9 @@ describe('DoctorPanel provisioning + guidance', () => {
     const user = userEvent.setup();
     renderPanel(<DoctorPanel doctor={reportBrowsersMissing} isLoading={false} />);
 
-    // Guidance is collapsed until "How to fix" is clicked.
-    expect(document.body.textContent).not.toContain('PLAYWRIGHT_BROWSERS_PATH');
+    // Guidance is collapsed (hidden) until "How to fix" is clicked. Mantine 9.4
+    // keeps Collapse children mounted, so assert it is not VISIBLE, not absent.
+    expect(screen.getByText(/if your organisation ever provides/i)).not.toBeVisible();
 
     await user.click(screen.getByRole('button', { name: /how to fix/i }));
 
@@ -288,5 +309,71 @@ describe('DoctorPanel provisioning + guidance', () => {
     expect(body).toMatch(/if your organisation ever provides/i);
     // No CDN URL is hardcoded into the guidance.
     expect(body).not.toMatch(/https?:\/\//);
+  });
+});
+
+/** A report whose failing check carries `install: 'python'`. uv passes, so the
+ *  install prerequisite is satisfied and the button is enabled. */
+const reportPythonMissing = report([
+  check({ name: 'node', ok: true, version: 'v26.0.0' }),
+  check({ name: 'uv', ok: true, version: 'uv 0.11.8' }),
+  check({
+    name: 'python',
+    ok: false,
+    hint: 'Python 3.14 not found — click Install Python',
+    category: 'required-install',
+    install: 'python',
+  }),
+]);
+
+describe('DoctorPanel — Install Python', () => {
+  it('renders an Install Python button on the failing python check and triggers the mutation', async () => {
+    const user = userEvent.setup();
+    renderPanel(<DoctorPanel doctor={reportPythonMissing} isLoading={false} />);
+
+    const installBtn = screen.getByRole('button', { name: /install python/i });
+    expect(installBtn).toBeInTheDocument();
+
+    await user.click(installBtn);
+    expect(installMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render an Install Python button when python passes', () => {
+    const ok = report([
+      check({ name: 'python', ok: true, version: '3.14', category: 'required-install' }),
+    ]);
+    renderPanel(<DoctorPanel doctor={ok} isLoading={false} />);
+    expect(screen.queryByRole('button', { name: /install python/i })).not.toBeInTheDocument();
+  });
+
+  it('shows a spinner while installing and surfaces the in-band failure message', () => {
+    installReturn = {
+      mutate: installMutate,
+      isPending: false,
+      data: {
+        ok: false,
+        version: '3.14',
+        error: { code: 'PYTHON_INSTALL_FAILED', message: 'uv python install failed' },
+      },
+    };
+    renderPanel(<DoctorPanel doctor={reportPythonMissing} isLoading={false} />);
+    expect(screen.getByText('uv python install failed')).toBeInTheDocument();
+  });
+
+  it('disables Install Python and names the prerequisite when uv is missing (ordered install)', () => {
+    const noUv = report([
+      check({ name: 'uv', ok: false, hint: 'Install uv', category: 'required-install' }),
+      check({
+        name: 'python',
+        ok: false,
+        hint: 'Python not found',
+        category: 'required-install',
+        install: 'python',
+      }),
+    ]);
+    renderPanel(<DoctorPanel doctor={noUv} isLoading={false} />);
+    const installBtn = screen.getByRole('button', { name: /install python/i });
+    expect(installBtn).toBeDisabled();
+    expect(screen.getByText(/install uv first/i)).toBeInTheDocument();
   });
 });

@@ -12,10 +12,11 @@
  *  WHAT THIS PROVES  (and why it is NOT in the default unit pass)
  * ─────────────────────────────────────────────────────────────────────────
  * These assertions describe the *end state* of a clean-OS `Installer` run:
- * the five Core tools resolve on PATH, the Hub is online under pm2, installs
- * stayed user-scope, the opt-in Android SDK landed, the Windows logon
- * Scheduled Task + saved pm2 dump exist so the Hub resurrects, and (Layer D)
- * `task` runs cross-shell. NONE of that can be observed without first running
+ * the five Core tools resolve on PATH, the Hub is online (under ANY supervisor),
+ * installs stayed user-scope, the opt-in Android SDK landed, an OS-appropriate
+ * PM2-independent boot auto-start (Windows logon task / systemd --user / launchd)
+ * is registered, and (Layer D) `task` runs cross-shell. NONE of that can be
+ * observed without first running
  * a *destructive* provisioning flow on a throwaway VM/CI runner — installing
  * toolchains, starting pm2, installing Android. That is unsafe in a dev
  * checkout and impossible in the unit-test sandbox (no clean VM, no Docker).
@@ -44,7 +45,7 @@
  *    (older Windows builds, non-apt Linux) is a manual checklist, not code.
  *    Two values below are forward-references to not-yet-implemented tasks and
  *    must be kept in lock-step when those land:
- *      • RESURRECT_TASK_NAME ← the Scheduled Task that Task 15 registers.
+ *      • HUB_TASK_NAME ← the logon Scheduled Task `hub-service.mjs enable-boot` registers.
  *      • the Layer D PATH coreutils ← exposed by Task 17 (optional, off by default).
  *
  * No `__dirname`/REPO_ROOT is computed: every probe targets the live
@@ -62,11 +63,13 @@ import { spawnSync } from 'node:child_process';
 // ── Live-environment facts (sourced from design.md, verified) ──────────────
 /** Core_Tool_Set — R4.1 (k6 is no longer Core; it self-provisions by folder). */
 const CORE_TOOLS = ['node', 'pnpm', 'uv', 'task', 'pm2'];
-/** pm2 application name — `hub/ecosystem.config.cjs` app id (design Source-grounding). */
-const HUB_PM2_APP = 'auto-qa-hub-service';
-/** Windows logon Scheduled Task registered by Task 15 (D4-A). Forward-reference:
- *  keep identical to the `schtasks /create /tn` name that task uses. */
-const RESURRECT_TASK_NAME = 'AutoQA Hub Resurrect';
+/** Hub health endpoint — manager-agnostic "is the Hub up" probe. The Hub may run
+ *  via PM2, a daemonless background process, or systemd/launchd, so we probe the
+ *  loopback port, not a specific process manager. */
+const HUB_HEALTH_URL = `http://127.0.0.1:${process.env.HUB_PORT || '5174'}/api/health`;
+/** Windows logon Scheduled Task registered by `hub-service.mjs enable-boot`.
+ *  Keep identical to TASK_NAME in hub/bin/hub-service.mjs. */
+const HUB_TASK_NAME = 'AutoQA Hub';
 /** The exact external commands the Taskfiles invoke — R11.1 (verbatim list). */
 const TASKFILE_COREUTILS = [
   'date', 'whoami', 'find', 'sed', 'cp', 'mv', 'mkdir', 'rm',
@@ -89,11 +92,6 @@ const SMOKE_OFF =
 function smokeSkip(extraReason) {
   if (!SMOKE) return SMOKE_OFF;
   return extraReason ?? false;
-}
-
-/** The pinned PM2_HOME for the current platform (design C8). */
-function pm2Home() {
-  return process.env.PM2_HOME || path.join(os.homedir(), '.pm2');
 }
 
 /**
@@ -140,20 +138,12 @@ describe('18.1 Core-install smoke (live VM — KIRO_SMOKE=1)', () => {
     }
   });
 
-  it('the Hub is online via pm2 (R1.2)', { skip: smokeSkip() }, () => {
-    // R1.2: a running Hub process is the success criterion (network reachability
-    // is explicitly NOT). `pm2 jlist` is the authoritative probe; an HTTP GET of
-    // the Hub port (http://localhost:5174) is an optional extra, deliberately
-    // omitted so a firewalled-but-running Hub still passes per R1.2.
-    const r = spawnSync('pm2', ['jlist'], { shell: true, encoding: 'utf8', timeout: 30_000 });
-    assert.equal(r.status, 0, `"pm2 jlist" must exit 0 — got ${r.status}\n${r.stderr}`);
-    // pm2 may print an update banner before the JSON array — slice from the first '['.
-    const jsonStart = r.stdout.indexOf('[');
-    assert.ok(jsonStart >= 0, 'pm2 jlist must emit a JSON array');
-    const list = JSON.parse(r.stdout.slice(jsonStart));
-    const hub = Array.isArray(list) ? list.find((p) => p?.name === HUB_PM2_APP) : undefined;
-    assert.ok(hub, `pm2 must have the Hub app "${HUB_PM2_APP}" registered`);
-    assert.equal(hub.pm2_env?.status, 'online', `"${HUB_PM2_APP}" must be online (R1.2)`);
+  it('the Hub is online (health endpoint responds) (R1.2)', { skip: smokeSkip() }, async () => {
+    // R1.2: a running Hub is the success criterion, independent of HOW it is
+    // supervised (PM2 / daemonless / systemd / launchd). The manager-agnostic
+    // probe is the health endpoint on the loopback port.
+    const res = await fetch(HUB_HEALTH_URL).catch(() => null);
+    assert.ok(res?.ok, `Hub health endpoint must respond 2xx at ${HUB_HEALTH_URL} (R1.2)`);
   });
 
   it('Core tools held user scope — no admin-only paths (R2.2)', { skip: smokeSkip() }, () => {
@@ -196,46 +186,53 @@ describe('18.2 opt-in & boot-survival smoke (live VM — KIRO_SMOKE=1)', () => {
   );
 
   it(
-    'Hub resurrect Scheduled Task + saved dump exist on Windows login (R10.3, R10.4)',
-    { skip: smokeSkip(IS_WIN ? false : 'Windows-only: pm2 logon Scheduled Task (R10.3/R10.4)') },
+    'Windows logon Scheduled Task starts the Hub, PM2-independently (R10.3, R10.4)',
+    { skip: smokeSkip(IS_WIN ? false : 'Windows-only: logon Scheduled Task (R10.3/R10.4)') },
     () => {
-      // R10.3 the saved Hub resurrects on login → the logon Scheduled Task must
-      // exist and a saved process dump must be present to resurrect FROM.
-      const q = spawnSync('schtasks', ['/query', '/tn', RESURRECT_TASK_NAME], {
+      // R10.3 the Hub auto-starts on login → the user-scope logon task must exist.
+      const q = spawnSync('schtasks', ['/query', '/tn', HUB_TASK_NAME], {
         encoding: 'utf8',
         timeout: 30_000,
       });
-      assert.equal(q.status, 0, `logon task "${RESURRECT_TASK_NAME}" must exist (R10.3)`);
-      const dump = path.join(pm2Home(), 'dump.pm2');
-      assert.ok(fs.existsSync(dump), `a saved pm2 dump must exist to resurrect from (R10.2/R10.3): ${dump}`);
-      // R10.4 pm2 + node must be on PATH in the auto-start context → the task's
-      // action must pin PM2_HOME and put node/Volta on PATH before calling pm2.
-      const xml = spawnSync('schtasks', ['/query', '/tn', RESURRECT_TASK_NAME, '/xml'], {
+      assert.equal(q.status, 0, `logon task "${HUB_TASK_NAME}" must exist (R10.3)`);
+      // R10.4 node must resolve in the bare logon context → the task action is
+      // hub-autostart.cmd, which seeds the Volta shim PATH before running node.
+      const xml = spawnSync('schtasks', ['/query', '/tn', HUB_TASK_NAME, '/xml'], {
         encoding: 'utf8',
         timeout: 30_000,
       });
-      assert.match(xml.stdout, /\.pm2/i, 'auto-start action must reference PM2_HOME (R10.4)');
-      assert.match(xml.stdout, /volta|node/i, 'auto-start action must put node/Volta on PATH (R10.4)');
+      assert.match(
+        xml.stdout,
+        /hub-autostart\.cmd/i,
+        'auto-start action must be hub-autostart.cmd (R10.4)',
+      );
     },
   );
 
-  it('pm2 has a saved, resurrectable state under the pinned PM2_HOME (R10.6)', { skip: smokeSkip() }, () => {
-    // R10.6 an OS-appropriate auto-start exists on EVERY platform. The portable,
-    // non-fragile evidence is the saved process dump under the single pinned
-    // PM2_HOME (Windows: %USERPROFILE%\.pm2 — posix: $HOME/.pm2). The OS wiring
-    // that consumes it (Windows Scheduled Task ↑, posix systemd/launchd `pm2
-    // startup`) is asserted on Windows above; on posix the unit registration is
-    // verified by the manual clean-OS checklist (ponytail ceiling), not probed
-    // here to avoid brittle systemd-vs-launchd branching.
-    //
-    // R10.5 (pre-login boot survival) is the DOCUMENTED optional escalation
-    // (D4-B: nssm / node-windows service) — only required WHERE explicitly
-    // requested, so it is intentionally NOT asserted by the default smoke.
-    const dump = path.join(pm2Home(), 'dump.pm2');
-    assert.ok(
-      fs.existsSync(dump),
-      `a saved pm2 process list must exist under the pinned PM2_HOME (R10.6): ${dump}`,
-    );
+  it('an OS-appropriate boot auto-start is registered (R10.6)', { skip: smokeSkip() }, () => {
+    // R10.6 a PM2-independent, OS-appropriate auto-start exists on EVERY platform,
+    // all registered by `hub-service.mjs enable-boot`:
+    //   Windows → user-scope logon Scheduled Task "AutoQA Hub"
+    //   Linux   → systemd --user unit ~/.config/systemd/user/autoqa-hub.service
+    //   macOS   → launchd agent ~/Library/LaunchAgents/dev.autoqa.hub.plist
+    if (IS_WIN) {
+      const q = spawnSync('schtasks', ['/query', '/tn', HUB_TASK_NAME], {
+        encoding: 'utf8',
+        timeout: 30_000,
+      });
+      assert.equal(q.status, 0, `logon task "${HUB_TASK_NAME}" must exist (R10.6)`);
+    } else if (process.platform === 'darwin') {
+      const plist = path.join(os.homedir(), 'Library', 'LaunchAgents', 'dev.autoqa.hub.plist');
+      assert.ok(fs.existsSync(plist), `launchd agent must exist (R10.6): ${plist}`);
+    } else {
+      const unit = path.join(
+        process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'),
+        'systemd',
+        'user',
+        'autoqa-hub.service',
+      );
+      assert.ok(fs.existsSync(unit), `systemd --user unit must exist (R10.6): ${unit}`);
+    }
   });
 
   it(

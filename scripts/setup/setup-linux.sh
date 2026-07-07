@@ -335,15 +335,30 @@ else
     echo "    [deps] $(basename "$d")"
     pnpm -C "$d" install --ignore-workspace || fail_step install-deps "install-deps 6/7" "pnpm install failed for $(basename "$d"). Re-run after fixing."
   done
+  # ---- Python toolchain (NON-FATAL) ----------------------------------------
+  # Python is needed ONLY by the robot-framework tool. A locked-down network
+  # (corporate proxy/policy) can fail the download — that must NOT abort setup.
+  # So we WARN and CONTINUE, leaving the Hub to start. The user finishes later
+  # with one click from the Hub: Environment > Install Python
+  # (POST /api/doctor/install-python), or by re-running the command shown.
   echo "  Installing Python toolchain (uv python install $PYTHON_VERSION)..."
-  uv python install "$PYTHON_VERSION" --native-tls || fail_step install-deps "install-deps 6/7" "uv python install failed. Check network/proxy, then re-run."
-  # uv sync only when a uv tool is present. robot-framework is a declared uv
-  # workspace member, so `uv sync` errors if its folder is absent (fresh clone).
-  if [ -d "$WORKSPACE_ROOT/tools/robot-framework" ]; then
-    echo "  Syncing Python dependencies (uv sync)..."
-    uv sync --all-packages --native-tls --project "$WORKSPACE_ROOT" || fail_step install-deps "install-deps 6/7" "uv sync failed. Check uv.lock and network, then re-run."
+  if uv python install "$PYTHON_VERSION" --native-tls; then
+    # uv sync only when a uv tool is present. robot-framework is a declared uv
+    # workspace member, so `uv sync` errors if its folder is absent (fresh clone).
+    if [ -d "$WORKSPACE_ROOT/tools/robot-framework" ]; then
+      echo "  Syncing Python dependencies (uv sync)..."
+      if ! uv sync --all-packages --native-tls --project "$WORKSPACE_ROOT"; then
+        echo "  [warn] uv sync failed — robot-framework Python deps are incomplete (non-fatal)."
+        echo "  [hint] Finish later from the Hub (Environment > Install Python) or re-run:"
+        echo "         uv sync --all-packages --native-tls --project \"$WORKSPACE_ROOT\""
+      fi
+    else
+      echo "  [skip] uv sync — no uv tool (tools/robot-framework) present"
+    fi
   else
-    echo "  [skip] uv sync — no uv tool (tools/robot-framework) present"
+    echo "  [warn] uv python install failed — SKIPPING Python for now (non-fatal)."
+    echo "  [hint] Finish later from the Hub (Environment > Install Python) or re-run:"
+    echo "         uv python install $PYTHON_VERSION --native-tls"
   fi
   uv tool install uv-up 2>/dev/null || true
   mark_done install-deps
@@ -359,16 +374,17 @@ if [ "${ST[start-hub]}" = "done" ]; then
 else
   echo "  Building Hub (shared + server + client)..."
   pnpm -C "$WORKSPACE_ROOT/hub" run build || fail_step start-hub "start-hub 7/7" "Hub build failed. Inspect the build output above, then re-run."
-  # Pin PM2_HOME so the `pm2 start`/`pm2 save` below and the systemd auto-start
-  # `pm2 resurrect` read ONE shared saved dump (R10.1, R10.6 parity).
-  # pm2's default already resolves to $HOME/.pm2; making it explicit keeps every
-  # pm2 context aligned with the Windows pin.
-  export PM2_HOME="$HOME/.pm2"
-  echo "  Starting Hub via pm2..."
-  pm2 delete "$WORKSPACE_ROOT/hub/ecosystem.config.cjs" 2>/dev/null || true
-  command -v kill-port &>/dev/null && { kill-port 5174 2>/dev/null || true; }
-  pm2 start "$WORKSPACE_ROOT/hub/ecosystem.config.cjs" || fail_step start-hub "start-hub 7/7" "pm2 start failed. Run 'pm2 logs' for details, then re-run."
-  pm2 save 2>/dev/null || true
+  # Delegate process management to the shared launcher: it pins PM2_HOME, frees
+  # the port, starts via PM2, and AUTOMATICALLY falls back to a daemonless
+  # background process when PM2 is unavailable/blocked. One code path, cross-OS.
+  echo "  Starting Hub (PM2 with automatic daemonless fallback)..."
+  node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" start \
+    || fail_step start-hub "start-hub 7/7" "Hub failed to start. Run 'node hub/bin/hub-service.mjs status' for details, then re-run."
+  # Register PM2-independent boot auto-start: a systemd --user unit (Restart=always)
+  # + lingering, so the Hub starts at boot even on a headless box with no login.
+  # Best-effort (|| true): never fails setup if systemd/linger is unavailable.
+  echo "  Enabling auto-start at boot (systemd --user)..."
+  node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" enable-boot || true
   mark_done start-hub
 fi
 

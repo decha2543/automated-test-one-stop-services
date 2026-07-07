@@ -1,4 +1,5 @@
 import type { DoctorCategory, DoctorCheck, DoctorReport } from '@hub/shared';
+import { missingPrerequisites } from '@hub/shared';
 import {
   Badge,
   Button,
@@ -17,9 +18,10 @@ import {
   TbChevronRight,
   TbCircleCheck,
   TbCircleX,
+  TbDownload,
   TbRefresh,
 } from 'react-icons/tb';
-import { useProvisionTool } from '~/hooks/useTools.js';
+import { useInstallPython, useProvisionTool } from '~/hooks/useTools.js';
 import {
   groupByCategory,
   provisionGuidance,
@@ -48,6 +50,22 @@ interface ProvisionState {
   failedId: string | undefined;
   /** Message from the last failed provision attempt, if any. */
   failedMessage: string | undefined;
+}
+
+/**
+ * One-click install UI state for the (single) Python check. Threaded like
+ * {@link ProvisionState}, but there is only one installable check so no id
+ * tracking is needed.
+ */
+interface InstallState {
+  /** Trigger the retroactive Python install. */
+  onInstall: () => void;
+  /** Whether the install is in flight (spinner). */
+  isPending: boolean;
+  /** Whether the last attempt failed. */
+  failed: boolean;
+  /** Error (on failure) or non-fatal warning (on success) to surface, if any. */
+  note: string | undefined;
 }
 
 interface CategoryConfig {
@@ -114,6 +132,14 @@ export function DoctorPanel({ doctor, isLoading }: DoctorPanelProps) {
     failedMessage: provision.data?.postInstallError?.message,
   };
 
+  const installPython = useInstallPython();
+  const installState: InstallState = {
+    onInstall: () => installPython.mutate(),
+    isPending: installPython.isPending,
+    failed: !!installPython.data && !installPython.data.ok,
+    note: installPython.data?.error?.message ?? installPython.data?.message,
+  };
+
   if (isLoading || !doctor) {
     return (
       <Paper p="md" withBorder>
@@ -176,7 +202,14 @@ export function DoctorPanel({ doctor, isLoading }: DoctorPanelProps) {
             const checks = groups[cat.key];
             if (!shouldShowGroup(checks)) return null;
             return (
-              <CategorySection key={cat.key} cat={cat} checks={checks} provision={provisionState} />
+              <CategorySection
+                key={cat.key}
+                cat={cat}
+                checks={checks}
+                allChecks={doctor.checks}
+                provision={provisionState}
+                install={installState}
+              />
             );
           })}
         </Stack>
@@ -188,11 +221,15 @@ export function DoctorPanel({ doctor, isLoading }: DoctorPanelProps) {
 function CategorySection({
   cat,
   checks,
+  allChecks,
   provision,
+  install,
 }: {
   cat: CategoryConfig;
   checks: DoctorCheck[];
+  allChecks: DoctorCheck[];
   provision: ProvisionState;
+  install: InstallState;
 }) {
   return (
     <div>
@@ -201,7 +238,14 @@ function CategorySection({
       </Text>
       <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
         {checks.map((check) => (
-          <CheckCard key={check.name} check={check} cat={cat} provision={provision} />
+          <CheckCard
+            key={check.name}
+            check={check}
+            cat={cat}
+            allChecks={allChecks}
+            provision={provision}
+            install={install}
+          />
         ))}
       </SimpleGrid>
     </div>
@@ -211,11 +255,15 @@ function CategorySection({
 function CheckCard({
   check,
   cat,
+  allChecks,
   provision,
+  install,
 }: {
   check: DoctorCheck;
   cat: CategoryConfig;
+  allChecks: DoctorCheck[];
   provision: ProvisionState;
+  install: InstallState;
 }) {
   const [showFix, setShowFix] = useState(false);
   const FailIcon = cat.failIcon === 'warn' ? TbAlertTriangle : TbCircleX;
@@ -228,6 +276,17 @@ function CheckCard({
   const provisionTarget = check.ok ? undefined : provisionTargetFor(check.name);
   const isProvisioning = provisionTarget !== undefined && provision.pendingId === provisionTarget;
   const provisionFailed = provisionTarget !== undefined && provision.failedId === provisionTarget;
+
+  // A failing check that carries an `install` kind (currently only `python`)
+  // offers a one-click Hub-driven install instead of a shell command.
+  const showInstall = !check.ok && check.install === 'python';
+
+  // Ordered install gate: an installable/provisionable check can only proceed
+  // once its prerequisite checks pass (python needs uv; browsers need node+pnpm).
+  // Block the action button and name what to install first — full gating.
+  const prereqMissing =
+    provisionTarget !== undefined || showInstall ? missingPrerequisites(check.name, allChecks) : [];
+  const prereqBlocked = prereqMissing.length > 0;
 
   return (
     <Card
@@ -266,6 +325,7 @@ function CheckCard({
               variant="light"
               leftSection={<TbRefresh size={12} />}
               loading={isProvisioning}
+              disabled={prereqBlocked}
               onClick={() => provision.onProvision(provisionTarget)}
             >
               Provision
@@ -279,6 +339,11 @@ function CheckCard({
               How to fix
             </Button>
           </Group>
+          {prereqBlocked && (
+            <Text size="xs" c="red">
+              Install {prereqMissing.join(', ')} first
+            </Text>
+          )}
           {provisionFailed && provision.failedMessage && (
             <Text size="xs" c="red" title={provision.failedMessage} lineClamp={2}>
               {provision.failedMessage}
@@ -296,6 +361,35 @@ function CheckCard({
               ))}
             </Stack>
           </Collapse>
+        </Stack>
+      )}
+      {showInstall && (
+        <Stack gap={4} mt={6}>
+          <Button
+            size="compact-xs"
+            variant="light"
+            leftSection={<TbDownload size={12} />}
+            loading={install.isPending}
+            disabled={prereqBlocked}
+            onClick={install.onInstall}
+          >
+            Install Python
+          </Button>
+          {prereqBlocked && (
+            <Text size="xs" c="red">
+              Install {prereqMissing.join(', ')} first
+            </Text>
+          )}
+          {install.note && (
+            <Text
+              size="xs"
+              c={install.failed ? 'red' : 'yellow.8'}
+              title={install.note}
+              lineClamp={2}
+            >
+              {install.note}
+            </Text>
+          )}
         </Stack>
       )}
     </Card>

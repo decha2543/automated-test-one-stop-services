@@ -179,6 +179,8 @@ export const en = {
   'run.appiumWarning': 'Mobile tests need the Appium server running on this machine.',
   'run.startAppium': 'Start Appium',
   'run.appiumStarting': 'Appium starting…',
+  'run.missingRequirements': 'Missing required tools',
+  'run.missingRequirementsHint': 'Install them from the Dashboard → Environment panel.',
   'run.loadingTags': 'Loading available tags...',
   'run.runTooltip': 'Run the test (Ctrl+Enter)',
   'run.runButton': 'Run (Ctrl+Enter)',

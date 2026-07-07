@@ -77,6 +77,7 @@ export function useRunTerminal({ visible, refitKey }: UseRunTerminalOptions): {
     terminalRef.current = term;
     fitAddonRef.current = fitAddon;
     searchAddonRef.current = searchAddon;
+    // biome-ignore lint/security/noSecrets: ANSI escape sequence for terminal output, not a secret
     term.writeln('\x1b[90m[Hub] Ready. Configure and click Run.\x1b[0m');
     const h = () => fitAddon.fit();
     window.addEventListener('resize', h);

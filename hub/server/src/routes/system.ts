@@ -342,17 +342,21 @@ function runUpdateInBackground(): void {
       }
 
       updateState.stage = 'restarting';
-      // Give the status endpoint one last poll opportunity before pm2 kills us.
+      // Give the status endpoint one last poll opportunity before we are killed.
       setTimeout(() => {
-        const child = spawn('pm2', ['restart', 'ecosystem.config.cjs'], {
+        // Restart through the shared Hub launcher so the swap works whether the
+        // Hub runs under PM2 or in daemonless fallback mode (PM2 may be blocked
+        // by policy/permission — see hub/bin/hub-service.mjs).
+        const launcher = path.join(hubDir, 'bin', 'hub-service.mjs');
+        const child = spawn(process.execPath, [launcher, 'restart'], {
           cwd: hubDir,
-          shell: buildShell,
           detached: true,
           stdio: 'ignore',
+          windowsHide: true,
         });
         child.on('error', (err) => {
-          // pm2 missing or PATH issue — leave the failure visible.
-          updateState.error = `pm2 restart failed: ${err.message}`;
+          // launcher/node missing or PATH issue — leave the failure visible.
+          updateState.error = `hub restart failed: ${err.message}`;
           updateState.running = false;
           updateState.stage = 'idle';
         });

@@ -13,11 +13,13 @@ const serverDir = path.resolve(__dirname, 'server');
  * access set HUB_HOST=0.0.0.0 in `scripts/.env` and pm2 will inherit it.
  *
  * App name is consumed by:
- *   - hub/bin/{windows,linux}-{start,stop}-hub.* indirectly via this file
- *     (those scripts call `pm2 ... ecosystem.config.cjs`, so renaming here
- *     is enough — no follow-up edits needed in the shell scripts).
- *   - hub/server/src/routes/system.ts (the in-app Update button) which also
- *     restarts via the ecosystem file.
+ *   - hub/bin/hub-service.mjs — the cross-platform launcher that ALL entry
+ *     points delegate to (the {windows,linux}-{start,stop}-hub.* scripts and the
+ *     setup bootstrap). It calls `pm2 <cmd> ecosystem.config.cjs` and reads the
+ *     app name from this file, so renaming here is enough — and it falls back to
+ *     a daemonless `node dist/index.js` when PM2 is blocked.
+ *   - hub/server/src/routes/system.ts + routes/git.ts (the in-app Update /
+ *     pull-all buttons), which restart via `hub-service.mjs restart`.
  */
 module.exports = {
   apps: [

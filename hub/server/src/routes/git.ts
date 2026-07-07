@@ -341,17 +341,20 @@ function runPullAllInBackground(): void {
               output: 'client: OK, server: OK',
             });
 
-            // Stage: restart pm2
+            // Stage: restart via the shared Hub launcher (works under PM2 or in
+            // daemonless fallback mode — PM2 may be blocked by policy/permission,
+            // see hub/bin/hub-service.mjs).
             pullAllState.stage = 'restarting';
             setTimeout(() => {
-              const child = spawn('pm2', ['restart', 'ecosystem.config.cjs'], {
+              const launcher = path.join(hubDir, 'bin', 'hub-service.mjs');
+              const child = spawn(process.execPath, [launcher, 'restart'], {
                 cwd: hubDir,
-                shell: buildShell,
                 detached: true,
                 stdio: 'ignore',
+                windowsHide: true,
               });
               child.on('error', (err: Error) => {
-                pullAllState.error = `pm2 restart failed: ${err.message}`;
+                pullAllState.error = `hub restart failed: ${err.message}`;
                 pullAllState.running = false;
                 pullAllState.stage = 'idle';
               });

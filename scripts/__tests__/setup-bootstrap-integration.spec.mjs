@@ -374,11 +374,23 @@ describe('Setup_Bootstrap clean-container contracts (structural, task 11.6)', ()
     assert.match(win, /uv sync/, 'windows uv sync');
   });
 
-  it('R19.3: starts the Hub via pm2 (both scripts)', () => {
+  it('R19.3: starts the Hub via the hub-service launcher (both scripts)', () => {
+    // start-hub now delegates to hub/bin/hub-service.mjs, which starts via PM2
+    // and AUTOMATICALLY falls back to a daemonless background process when PM2
+    // is blocked (EPERM named pipe on Node 25 / locked-down Windows). The
+    // requirement is "start the Hub"; the launcher is the mechanism.
     assert.match(linux, /\[step\] start-hub \(7\/7\)/, 'linux start-hub step');
-    assert.match(linux, /pm2 start "\$WORKSPACE_ROOT\/hub\/ecosystem\.config\.cjs"/, 'linux pm2 start');
+    assert.match(
+      linux,
+      /node "\$WORKSPACE_ROOT\/hub\/bin\/hub-service\.mjs" start/,
+      'linux must start the Hub via the launcher',
+    );
     assert.match(win, /\[step\] start-hub \(7\/7\)/, 'windows start-hub step');
-    assert.match(win, /pm2 start "%WORKSPACE_ROOT%\\hub\\ecosystem\.config\.cjs"/, 'windows pm2 start');
+    assert.match(
+      win,
+      /node "%WORKSPACE_ROOT%\\hub\\bin\\hub-service\.mjs" start/,
+      'windows must start the Hub via the launcher',
+    );
   });
 
   it('R19.4: strictly SKIPS a tool already on PATH (both scripts)', () => {

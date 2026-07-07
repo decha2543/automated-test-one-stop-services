@@ -479,10 +479,11 @@ call :scoopInstall task task || exit /b 1
 goto :eof
 
 REM ---------------------------------------------------------------------------
-REM :installPm2 -- pm2 (+ kill-port) via Volta, then register a user-scope
-REM logon Scheduled Task that resurrects the Hub. Best-effort: the
-REM auto-start registration only warns on failure, never aborts the step.
-REM <=3 install retries.
+REM :installPm2 -- pm2 (+ kill-port) via Volta. <=3 install retries.
+REM Boot auto-start is NOT tied to pm2 anymore: it is registered later in
+REM :startHub via the Hub launcher (hub-service.mjs enable-boot), which is
+REM PM2-independent -- no pm2 dump or `pm2 resurrect` needed, so the Hub
+REM auto-starts at login even when PM2 is blocked (EPERM named pipe).
 REM ---------------------------------------------------------------------------
 :installPm2
 call :ensureVolta || exit /b 1
@@ -491,26 +492,9 @@ set /a _try=0
 set /a _try+=1
 call volta install pm2 kill-port
 call :refreshPath
-where pm2 >nul 2>nul && goto :pm2_done
+where pm2 >nul 2>nul && goto :eof
 if %_try% LSS 3 ( echo   [retry %_try%/3] pm2 install failed - retrying & goto :installPm2_retry )
 exit /b 1
-:pm2_done
-REM Register a user-scope logon Scheduled Task to resurrect the Hub after
-REM logout/login or reboot-then-login. This replaces the flaky HKCU
-REM Run-key startup hook, which often failed after reboot/login because pm2 (a
-REM Volta shim) was not on PATH in the bare logon context and PM2_HOME could
-REM diverge from where `pm2 save` wrote the dump. The wrapper pins both (R10.3,
-REM R10.4). `/rl limited` keeps the task in the INSTALLING user's scope -- no
-REM admin, no elevation. Best-effort, like the old aux hook: a schtasks
-REM failure only warns and never aborts setup.
-set "PM2_RESURRECT_CMD=%SETUP_ROOT%windows\pm2-resurrect.cmd"
-schtasks /create /tn "AutoQA Hub Resurrect" /tr "\"%PM2_RESURRECT_CMD%\"" /sc onlogon /rl limited /f >nul 2>nul
-if errorlevel 1 (
-    echo   [warn] Could not register the "AutoQA Hub Resurrect" logon task ^(schtasks^). The Hub will not auto-start at login until this is fixed; re-run setup or create the task manually.
-) else (
-    echo   [ok] Registered user-scope logon auto-start task "AutoQA Hub Resurrect".
-)
-goto :eof
 
 REM ---------------------------------------------------------------------------
 REM :installDeps -- Workspace_Package deps (pnpm install) + Python_Tool deps
@@ -528,17 +512,32 @@ for /d %%T in ("%WORKSPACE_ROOT%\tools\*") do (
         call pnpm -C "%%T" install --ignore-workspace || ( echo   [error] pnpm install failed for %%~nxT. & exit /b 1 )
     )
 )
+REM ---- Python toolchain (NON-FATAL) -------------------------------------------
+REM Python is needed ONLY by the robot-framework tool. On a locked-down network
+REM (corporate proxy/policy) the download can fail -- that must NOT abort setup.
+REM So we WARN and CONTINUE, leaving the Hub to start. The user finishes later
+REM with one click from the Hub: Environment > Install Python
+REM (POST /api/doctor/install-python), or by re-running the command shown.
 echo   Installing Python toolchain (uv python install %PYTHON_VERSION%)...
 call uv python install %PYTHON_VERSION% --native-tls
-if errorlevel 1 ( echo   [error] uv python install failed. & exit /b 1 )
-REM uv sync only when a uv tool is present. robot-framework is a declared uv
-REM workspace member, so `uv sync` errors if its folder is absent (fresh clone).
-if exist "%WORKSPACE_ROOT%\tools\robot-framework\pyproject.toml" (
-    echo   Syncing Python dependencies (uv sync)...
-    call uv sync --all-packages --native-tls --project "%WORKSPACE_ROOT%"
-    if errorlevel 1 ( echo   [error] uv sync failed. & exit /b 1 )
+if errorlevel 1 (
+    echo   [warn] uv python install failed - SKIPPING Python for now ^(non-fatal^).
+    echo   [hint] Finish later from the Hub ^(Environment ^> Install Python^) or re-run:
+    echo          uv python install %PYTHON_VERSION% --native-tls
 ) else (
-    echo   [skip] uv sync -- no uv tool (tools/robot-framework) present
+    REM uv sync only when a uv tool is present. robot-framework is a declared uv
+    REM workspace member, so `uv sync` errors if its folder is absent (fresh clone).
+    if exist "%WORKSPACE_ROOT%\tools\robot-framework\pyproject.toml" (
+        echo   Syncing Python dependencies (uv sync)...
+        call uv sync --all-packages --native-tls --project "%WORKSPACE_ROOT%"
+        if errorlevel 1 (
+            echo   [warn] uv sync failed - robot-framework Python deps are incomplete ^(non-fatal^).
+            echo   [hint] Finish later from the Hub ^(Environment ^> Install Python^) or re-run:
+            echo          uv sync --all-packages --native-tls --project "%WORKSPACE_ROOT%"
+        )
+    ) else (
+        echo   [skip] uv sync -- no uv tool (tools/robot-framework) present
+    )
 )
 call uv tool install uv-up 2>nul
 goto :eof
@@ -552,19 +551,18 @@ REM ---------------------------------------------------------------------------
 echo   Building Hub (shared + server + client)...
 call pnpm -C "%WORKSPACE_ROOT%\hub" run build
 if errorlevel 1 ( echo   [error] Hub build failed. & exit /b 1 )
-REM Pin PM2_HOME so the `pm2 start`/`pm2 save` below and the logon auto-start
-REM `pm2 resurrect` read ONE shared saved dump. pm2's
-REM default already resolves to %USERPROFILE%\.pm2; making it explicit and
-REM persisting it via setx keeps the auto-start context from diverging. Task 15
-REM reuses this same value for its scheduled-task action.
-set "PM2_HOME=%USERPROFILE%\.pm2"
+REM Delegate process management to the shared launcher, which pins PM2_HOME,
+REM frees the port, starts via PM2, and AUTOMATICALLY falls back to a daemonless
+REM background process when PM2 is blocked (EPERM named pipe on Node 25/26 /
+REM locked-down Windows).
 setx PM2_HOME "%USERPROFILE%\.pm2" >nul 2>nul
-echo   Starting Hub via pm2...
-call pm2 delete "%WORKSPACE_ROOT%\hub\ecosystem.config.cjs" 2>nul
-where kill-port >nul 2>nul && ( call kill-port 5174 2>nul )
-call pm2 start "%WORKSPACE_ROOT%\hub\ecosystem.config.cjs"
-if errorlevel 1 ( echo   [error] pm2 start failed. & exit /b 1 )
-call pm2 save 2>nul
+echo   Starting Hub (PM2 with automatic daemonless fallback)...
+call node "%WORKSPACE_ROOT%\hub\bin\hub-service.mjs" start
+if errorlevel 1 ( echo   [error] Hub failed to start. Run "node hub\bin\hub-service.mjs status" for details. & exit /b 1 )
+REM Register PM2-independent boot auto-start (user-scope logon Scheduled Task).
+REM Best-effort: warns but never aborts setup if it cannot register.
+echo   Enabling auto-start at login...
+call node "%WORKSPACE_ROOT%\hub\bin\hub-service.mjs" enable-boot
 goto :eof
 
 REM ---------------------------------------------------------------------------

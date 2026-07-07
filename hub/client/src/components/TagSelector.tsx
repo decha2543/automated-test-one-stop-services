@@ -1,23 +1,23 @@
 import {
-  TAG_KIND_ORDER,
-  type TagGroup,
-  type TagGroupKind,
-  type TagsResponse,
-  type TestSummary,
+    TAG_KIND_ORDER,
+    type TagGroup,
+    type TagGroupKind,
+    type TagsResponse,
+    type TestSummary,
 } from '@hub/shared';
 import {
-  Badge,
-  Button,
-  Collapse,
-  Group,
-  Loader,
-  Paper,
-  ScrollArea,
-  Stack,
-  Text,
-  TextInput,
-  Tooltip,
-  UnstyledButton,
+    Badge,
+    Button,
+    Collapse,
+    Group,
+    Loader,
+    Paper,
+    ScrollArea,
+    Stack,
+    Text,
+    TextInput,
+    Tooltip,
+    UnstyledButton,
 } from '@mantine/core';
 import { useMemo, useState } from 'react';
 import { TbCheck, TbChevronDown, TbChevronRight, TbSearch, TbTag, TbX } from 'react-icons/tb';
@@ -163,6 +163,7 @@ export function TagSelector({ tags, isLoading, selectedTags, onChange }: TagSele
                   <TbChevronDown
                     size={14}
                     style={{
+                      // biome-ignore lint/security/noSecrets: CSS transform value, not a secret
                       transform: showMatchedTests ? 'rotate(180deg)' : 'rotate(0deg)',
                       transition: 'transform 150ms',
                     }}

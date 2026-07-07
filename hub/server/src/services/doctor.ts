@@ -1,9 +1,34 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { DoctorCategory, DoctorCheck, DoctorReport } from '@hub/shared';
-import { TOOLS_DIR, WORKSPACE_ROOT } from '../config.js';
+import { SCRIPTS_DIR, TOOLS_DIR, WORKSPACE_ROOT } from '../config.js';
 import { getComposeServiceStatus, isDockerRunning } from './docker.js';
 import { runChild } from './exec.js';
+
+/**
+ * The pinned Python version from `scripts/setup/versions.env` (the single
+ * source of truth shared with the setup scripts) — e.g. `"3.14"`. Returns
+ * `undefined` when the file or key is absent, so probes/installs degrade to
+ * "any Python" instead of hardcoding a version. Never throws.
+ */
+export function readPythonVersion(): string | undefined {
+  try {
+    const raw = fs.readFileSync(path.join(SCRIPTS_DIR, 'setup', 'versions.env'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      if (trimmed.slice(0, eq).trim() === 'PYTHON_VERSION') {
+        const value = trimmed.slice(eq + 1).trim();
+        return value || undefined;
+      }
+    }
+  } catch {
+    // Missing/unreadable versions.env → caller falls back to "any Python".
+  }
+  return undefined;
+}
 
 interface CheckDef {
   name: string;
@@ -191,30 +216,90 @@ async function checkK6(present: boolean): Promise<DoctorCheck> {
 }
 
 /**
- * Playwright browser check, folder-presence-gated on `tools/playwright/`
- *. Present → derived from the tool: a mandatory `required-install`
- * probe of `PLAYWRIGHT_BROWSERS_PATH`. Absent → a non-required self-check that
- * does not prevent another component from declaring Playwright required.
+ * Python-interpreter probe, folder-presence-gated on `tools/robot-framework`
+ * (the only tool that needs Python). Present → a mandatory `required-install`
+ * probe via `uv python find <version>`; when it fails (the toolchain was skipped
+ * during setup, e.g. behind a locked-down proxy) the check carries
+ * `install: 'python'` so the Doctor panel offers a one-click retroactive
+ * install. Absent → a benign non-required self-check, so a workstation without
+ * robot-framework never fails the doctor over Python.
+ */
+async function checkPython(present: boolean): Promise<DoctorCheck> {
+  if (!present) return absentToolCheck('python', 'robot-framework');
+  const version = readPythonVersion();
+  // `uv python find` exits 0 (printing the interpreter path) when a matching
+  // Python is installed, non-zero otherwise. `uv` owns Python here, so probing
+  // through uv is the source-of-truth check the setup script uses.
+  const args = version ? ['python', 'find', version] : ['python', 'find'];
+  const res = await runChild('uv', args, {
+    timeoutMs: 10_000,
+    shell: process.platform === 'win32',
+  });
+  if (res.ok) {
+    const label = version ? `${version} (${res.stdout.trim()})` : res.stdout.trim();
+    return { name: 'python', ok: true, version: label, category: 'required-install' };
+  }
+  return {
+    name: 'python',
+    ok: false,
+    hint: version
+      ? `Python ${version} not found — click Install Python (uv python install ${version})`
+      : 'Python not found — click Install Python (uv python install)',
+    category: 'required-install',
+    install: 'python',
+  };
+}
+
+/**
+/** True when `dir` exists and holds at least one installed browser (a non-dot
+ *  entry like `chromium-1223`). A bare-but-empty cache dir is NOT "installed",
+ *  so it correctly reads as missing. */
+function hasInstalledBrowsers(dir: string): boolean {
+  try {
+    return fs.readdirSync(dir).some((entry) => !entry.startsWith('.'));
+  } catch {
+    return false; // not a directory / does not exist
+  }
+}
+
+/**
+ * Playwright browser check, folder-presence-gated on `tools/playwright/`.
+ * Present → a mandatory `required-install` probe; absent → a non-required
+ * self-check.
+ *
+ * Resolution matters: the setup scripts install browsers into the
+ * **workspace-local** cache `<root>/.cache/playwright-browsers` and export
+ * `PLAYWRIGHT_BROWSERS_PATH` to point there, and the tool `.env` uses the
+ * relative `.cache/playwright-browsers`. But the Hub server may have been
+ * started WITHOUT that env var (Windows `setx` only affects new processes;
+ * Linux setup only `export`s it), so we must NOT depend on it. We therefore
+ * probe, in order: an explicit env value (resolved against the workspace root
+ * so a relative value works), then the workspace cache itself — and never the
+ * global `~/.cache/ms-playwright`, which the workspace does not use. This is why
+ * a machine with browsers present used to show a false "missing".
  */
 function checkPlaywrightBrowsers(present: boolean): DoctorCheck {
   if (!present) return absentToolCheck('playwright-browsers', 'playwright');
 
-  const envPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  const home = process.env.USERPROFILE || process.env.HOME || '';
-  const browsersPath = envPath || path.join(home, '.cache', 'ms-playwright');
-  const exists = fs.existsSync(browsersPath);
-  if (exists) {
+  const env = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  const candidates = [
+    env ? path.resolve(WORKSPACE_ROOT, env) : undefined,
+    path.join(WORKSPACE_ROOT, '.cache', 'playwright-browsers'),
+  ].filter((p): p is string => !!p);
+
+  const found = candidates.find(hasInstalledBrowsers);
+  if (found) {
     return {
       name: 'playwright-browsers',
       ok: true,
-      version: `path: ${browsersPath}`,
+      version: `path: ${found}`,
       category: 'required-install',
     };
   }
   return {
     name: 'playwright-browsers',
     ok: false,
-    hint: 'Run: pnpm exec playwright install',
+    hint: 'Run: pnpm exec playwright install (or click Provision)',
     category: 'required-install',
   };
 }
@@ -245,10 +330,12 @@ export async function runDoctor(): Promise<DoctorReport> {
 
   const k6Present = isToolFolderPresent('k6');
   const playwrightPresent = isToolFolderPresent('playwright');
+  const robotPresent = isToolFolderPresent('robot-framework');
 
   const checks = await Promise.all([
     ...CHECKS.map(runCheck),
     checkK6(k6Present),
+    checkPython(robotPresent),
     Promise.resolve(checkPlaywrightBrowsers(playwrightPresent)),
     checkDockerDaemon(),
     checkComposeService('influxdb', 8086),

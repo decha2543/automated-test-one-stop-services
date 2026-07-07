@@ -1,0 +1,4 @@
+# Hub runtime state written by the daemonless fallback (hub/bin/hub-service.mjs):
+# pid file + log. Never commit these.
+*
+!.gitignore

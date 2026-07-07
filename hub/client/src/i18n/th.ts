@@ -180,6 +180,8 @@ export const th: Record<TranslationKey, string> = {
   'run.appiumWarning': 'เทส mobile ต้องเปิด Appium server บนเครื่องนี้ก่อน',
   'run.startAppium': 'เปิด Appium',
   'run.appiumStarting': 'กำลังเปิด Appium…',
+  'run.missingRequirements': 'ขาดเครื่องมือที่ต้องติดตั้งก่อน',
+  'run.missingRequirementsHint': 'ติดตั้งได้ที่ Dashboard → แผง Environment',
   'run.loadingTags': 'กำลังโหลดแท็ก...',
   'run.runTooltip': 'รันเทส (Ctrl+Enter)',
   'run.runButton': 'รัน (Ctrl+Enter)',

@@ -57,6 +57,7 @@ export const ALLOWED_ORIGINS = process.env.HUB_ALLOWED_ORIGINS
 export const BASH_PATH = (() => {
   const candidates = [
     'C:\\Program Files\\Git\\bin\\bash.exe',
+    // biome-ignore lint/security/noSecrets: Windows Git Bash install path, not a credential
     'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
   ];
   for (const p of candidates) {

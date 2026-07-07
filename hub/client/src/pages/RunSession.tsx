@@ -8,6 +8,7 @@
  */
 // biome-ignore-all lint/correctness/useExhaustiveDependencies: remaining effects intentionally omit the stable prefs store; see note above.
 import type {
+  DoctorReport,
   HeadlessMode,
   PerformanceType,
   RunMode,
@@ -16,6 +17,7 @@ import type {
   RunStatus,
   ToolId,
 } from '@hub/shared';
+import { missingChecksForTool } from '@hub/shared';
 import {
   Badge,
   Button,
@@ -201,12 +203,12 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
     gcTime: Infinity,
   });
 
-  const doctorQ = useQuery<{ credentialsOk: boolean }>({
-    queryKey: ['doctor-credentials'],
+  // Full doctor report (shares the ['doctor'] cache with the Dashboard panel).
+  // Drives both the credentials notice and the per-tool run-requirement gate.
+  const doctorQ = useQuery<DoctorReport>({
+    queryKey: ['doctor'],
     queryFn: () => api.get('/api/doctor'),
-    gcTime: Infinity,
-    staleTime: 120_000,
-    select: (data: { credentialsOk: boolean }) => ({ credentialsOk: data.credentialsOk }),
+    staleTime: 10_000,
   });
 
   // Force mode to local if Docker is not running
@@ -223,6 +225,12 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   const sectionAxis = toolView?.projects.sectionAxis ?? false;
   const typeAxis = toolView?.projects.typeAxis ?? true;
   const fixedType = toolView?.projects.fixedType ?? null;
+
+  // Run-requirement gate: doctor checks this tool needs but that are missing
+  // (e.g. Robot → uv, python). Blocks Run up-front and lists exactly what to
+  // install, so the user never launches a doomed run.
+  const missingReqs =
+    toolView && doctorQ.data ? missingChecksForTool(toolView, doctorQ.data.checks) : [];
 
   const effectiveType = typeAxis ? type : (fixedType ?? '');
   const types = useProjectTypes(tool);
@@ -578,6 +586,13 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
               />
             )}
 
+            {missingReqs.length > 0 && (
+              <InlineAlert
+                icon={<TbAlertTriangle size={14} />}
+                message={`${t('run.missingRequirements')}: ${missingReqs.join(', ')}. ${t('run.missingRequirementsHint')}`}
+              />
+            )}
+
             {isMobile && !appiumRunning && (
               <InlineAlert
                 icon={<TbDeviceMobile size={14} />}
@@ -600,15 +615,18 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
             <Group gap="xs" grow>
               {(() => {
                 const tagsLoading = !sectionAxis && !!project && !!effectiveType && tags.isLoading;
-                const disabledReason = !project
-                  ? t('run.selectProjectFirst')
-                  : isRunning
-                    ? t('run.testRunning')
-                    : tagsLoading
-                      ? t('run.loadingTags')
-                      : isMobile && !appiumRunning
-                        ? t('run.appiumNotRunning')
-                        : null;
+                const disabledReason =
+                  missingReqs.length > 0
+                    ? `${t('run.missingRequirements')}: ${missingReqs.join(', ')}`
+                    : !project
+                      ? t('run.selectProjectFirst')
+                      : isRunning
+                        ? t('run.testRunning')
+                        : tagsLoading
+                          ? t('run.loadingTags')
+                          : isMobile && !appiumRunning
+                            ? t('run.appiumNotRunning')
+                            : null;
                 return (
                   <Tooltip
                     label={disabledReason ?? t('run.runTooltip')}

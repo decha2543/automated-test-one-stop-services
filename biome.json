@@ -26,18 +26,15 @@
     "rules": {
       "correctness": {
         "noEmptyPattern": "off",
-        "noUndeclaredDependencies": {
-          "options": {
-            "devDependencies": false,
-            "peerDependencies": false,
-            "optionalDependencies": false
-          }
-        },
+        "noUndeclaredDependencies": "off",
         "noUndeclaredVariables": "error",
         "noUnusedImports": "error",
         "noUnusedVariables": "error"
       },
-      "recommended": true,
+      "preset": "recommended",
+      "security": {
+        "noSecrets": "warn"
+      },
       "style": {
         "noNonNullAssertion": "warn",
         "useConst": "error",
@@ -101,6 +98,7 @@
       "!!**/.playwright-report",
       "!!**/.playwright-cli",
       "!!**/.kiro",
+      "!!**/tools",
       "!!**/hub/server/data",
       "!!**/selectorshub",
       "!!**/brain",

@@ -2,6 +2,7 @@ import type {
   LifecycleResult,
   ManifestPreview,
   ProvisionResult,
+  PythonInstallResult,
   ToolRegistryView,
   ToolView,
 } from '@hub/shared';
@@ -142,10 +143,39 @@ export function useUpdateTool() {
 export function useProvisionTool() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.post<ProvisionResult>(`/api/tools/${id}/provision`),
+    // Provisioning runs the tool's `setup` task server-side (browser download
+    // for Playwright), which can take minutes — the server caps it at 180s. The
+    // global 30s axios timeout would abort early with a false "timeout of
+    // 30000ms" while the install is still running, so use a long per-request
+    // timeout that outlasts the server cap.
+    mutationFn: (id: string) =>
+      api.post<ProvisionResult>(`/api/tools/${id}/provision`, undefined, { timeout: 300_000 }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['doctor'] });
       qc.invalidateQueries({ queryKey: ['tools'] });
+    },
+  });
+}
+
+/**
+ * Retroactively install the Python toolchain that setup skipped
+ * (POST /api/doctor/install-python). Backs the Doctor panel's "Install Python"
+ * button. The install can download a CPython build + sync deps, so it uses a
+ * long per-request timeout (the global axios default is far too short). The
+ * mutation always resolves; callers read `data.ok` / `data.error` / `data.message`
+ * to render the outcome. On completion both doctor queries are invalidated so the
+ * panel and the nav badge re-probe.
+ */
+export function useInstallPython() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<PythonInstallResult>('/api/doctor/install-python', undefined, {
+        timeout: 300_000,
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['doctor'] });
+      qc.invalidateQueries({ queryKey: ['doctor-nav'] });
     },
   });
 }
