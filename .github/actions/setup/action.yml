@@ -1,0 +1,26 @@
+# =============================================================================
+# Composite action: install pnpm + Node (matching package.json `volta`) and
+# install workspace deps with a frozen lockfile. Shared by the lint / typecheck
+# / test jobs so the setup block lives in ONE place.
+#
+# The caller must run actions/checkout FIRST — a local composite action is read
+# from the checked-out repo. The release job does not use this (it installs no
+# deps).
+# =============================================================================
+
+name: Setup Node + pnpm
+description: Install pnpm and Node (node 26.x / pnpm 11.10.0), then pnpm install --frozen-lockfile.
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 11.10.0
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '26'
+        cache: pnpm
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

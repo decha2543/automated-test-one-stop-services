@@ -32,14 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.10.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '26'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - name: Biome
         run: pnpm exec biome check .
       - name: Markdown
@@ -49,14 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.10.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '26'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - run: pnpm -C hub/shared run typecheck
       - run: pnpm -C hub/server run typecheck
       - run: pnpm -C hub/client run typecheck
@@ -65,14 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.10.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '26'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       # Best-effort clone of the built-in tool repos (still on GitLab). If they
       # are private/unreachable the clone is skipped and the manifest-integration
       # tests self-skip via the realToolsPresent guard — the run stays green.
