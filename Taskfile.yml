@@ -429,6 +429,13 @@ tasks:
             pnpm exec tsc --noEmit -p "$cfg" || exit 1
           fi
         done
+      - |
+        for tool_dir in tools/playwright tools/k6; do
+          if [ -f "$tool_dir/biome.json" ]; then
+            echo "[biome-lint] $tool_dir"
+            pnpm exec biome lint "$tool_dir" || exit 1
+          fi
+        done
       - task test
 
   hub:
