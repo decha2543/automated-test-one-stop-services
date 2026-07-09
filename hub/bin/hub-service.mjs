@@ -4,33 +4,31 @@
 //
 //  ONE place that owns "run the built Hub as a background service", used by the
 //  Windows/Linux start+stop scripts, the setup bootstrap, and the in-app Update
-//  button. It replaces the per-OS PM2 shell logic that used to be duplicated in
-//  five places.
+//  button. It replaces the per-OS process-manager shell logic that used to be
+//  duplicated in five places.
 //
-//  Why it exists: PM2 needs a background daemon reached over a local named pipe
-//  (`\\.\pipe\rpc.sock` on Windows). On Node 25 and/or locked-down corporate
-//  machines that connect fails with `EPERM`, and `pm2 start` dies — taking the
-//  whole Hub down with it. So this launcher PREFERS PM2 but automatically FALLS
-//  BACK to a daemonless detached `node dist/index.js` when PM2 is unavailable or
-//  fails. The Hub always comes up; PM2 is an optimisation, not a hard dependency.
+//  How it runs the Hub: a daemonless, detached `node dist/index.js` whose pid +
+//  log live under hub/.run/. `unref()` lets this launcher exit while the Hub
+//  keeps running — there is no background daemon of our own, so nothing can be
+//  blocked by locked-down/corporate policy (a privileged local daemon reached
+//  over a named pipe would be — the EPERM failure mode this design avoids). For
+//  auto-restart-on-crash + start-at-boot,
+//  `enable-boot` registers an OS-native user supervisor (see below); when one is
+//  installed it owns the process and start/stop/restart delegate to it instead
+//  of spawning a daemonless copy.
 //
 //  Usage:  node hub/bin/hub-service.mjs <start|stop|restart|status|enable-boot|disable-boot>
 //
 //  enable-boot registers the Hub to start automatically at login/boot, user-scope
-//  and PM2-independent: a logon Scheduled Task (Windows), a systemd --user unit
-//  with lingering (Linux, starts at boot with no interactive login), or a launchd
+//  (no admin): a logon Scheduled Task (Windows), a systemd --user unit with
+//  lingering (Linux, starts at boot with no interactive login), or a launchd
 //  user agent (macOS). When such a supervisor is installed it becomes the single
 //  owner of start/stop/restart, so we delegate to it instead of spawning a second
 //  daemonless copy.
 //
 //  Tunables (env, all optional):
-//    HUB_PROCESS_MANAGER  auto (default) | pm2 | none
-//                         auto = try PM2, fall back to daemonless
-//                         pm2  = require PM2 (no fallback; fail loudly)
-//                         none = always daemonless (never touch PM2)
 //    HUB_HOST             bind host   (default 127.0.0.1)
 //    HUB_PORT             bind port   (default 5174)
-//    PM2_HOME             PM2 data dir (default <home>/.pm2)
 //
 //  Build is NOT this script's job — the caller builds first (pnpm -C hub run
 //  build). `start` refuses to run daemonless if `server/dist/index.js` is absent.
@@ -38,19 +36,15 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const require = createRequire(import.meta.url);
-
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const HUB_DIR = path.resolve(HERE, '..');
 const SERVER_DIR = path.join(HUB_DIR, 'server');
 const DIST_INDEX = path.join(SERVER_DIR, 'dist', 'index.js');
-const ECOSYSTEM = path.join(HUB_DIR, 'ecosystem.config.cjs');
 const RUN_DIR = path.join(HUB_DIR, '.run');
 const PID_FILE = path.join(RUN_DIR, 'hub.pid');
 const LOG_FILE = path.join(RUN_DIR, 'hub.log');
@@ -60,8 +54,6 @@ const IS_LINUX = process.platform === 'linux';
 const IS_MAC = process.platform === 'darwin';
 const HOST = process.env.HUB_HOST || '127.0.0.1';
 const PORT = Number.parseInt(process.env.HUB_PORT || '5174', 10);
-// Pin PM2_HOME so every pm2 invocation (here and the setup script) shares one dump.
-const PM2_HOME = process.env.PM2_HOME || path.join(os.homedir(), '.pm2');
 
 // ── Boot auto-start identifiers (one mechanism per OS) ────────────────────────
 const TASK_NAME = 'AutoQA Hub'; // Windows: user-scope logon Scheduled Task
@@ -81,92 +73,9 @@ const LAUNCHD_PLIST_PATH = path.join(
   `${LAUNCHD_LABEL}.plist`,
 );
 
-/** Process-manager mode from the environment (validated). */
-function getMode() {
-  const m = (process.env.HUB_PROCESS_MANAGER || 'auto').toLowerCase();
-  return m === 'pm2' || m === 'none' ? m : 'auto';
-}
-
-/** App name from the single-source ecosystem file (fallback if unreadable). */
-function appName() {
-  try {
-    return require(ECOSYSTEM).apps?.[0]?.name ?? 'auto-qa-hub-service';
-  } catch {
-    return 'auto-qa-hub-service';
-  }
-}
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ── PM2 helpers ─────────────────────────────────────────────────────────────
-
-/** Environment for pm2 children (pinned PM2_HOME). */
-function pm2Env() {
-  return { ...process.env, PM2_HOME };
-}
-
-/**
- * Run a pm2 subcommand. `shell: true` on Windows lets the `pm2.cmd` Volta shim
- * resolve. Never throws — returns the spawnSync result for the caller to judge.
- */
-/** Quote a shell arg (double quotes handle spaces on both cmd and sh; our args
- *  are fixed/controlled and never contain embedded quotes). */
-function shArg(a) {
-  return /[\s"]/.test(a) ? `"${a.replace(/"/g, '')}"` : a;
-}
-
-function runPm2(args, { timeout = 60_000, capture = false } = {}) {
-  // String + shell:true (NOT args-array + shell) so the Volta `pm2` shim resolves
-  // on Windows without triggering Node's DEP0190 (array-args-with-shell) warning.
-  return spawnSync(['pm2', ...args.map(shArg)].join(' '), {
-    cwd: HUB_DIR,
-    env: pm2Env(),
-    stdio: capture ? 'pipe' : 'inherit',
-    timeout,
-    windowsHide: true,
-    shell: true,
-    encoding: 'utf8',
-  });
-}
-
-/** True when the pm2 CLI is on PATH (the CLI itself, not the daemon). */
-function pm2Available() {
-  const r = runPm2(['--version'], { timeout: 15_000, capture: true });
-  return !r.error && r.status === 0;
-}
-
-/**
- * Start via PM2. Returns true on success, false when PM2 is unavailable or the
- * daemon can't be reached (EPERM etc.) — the caller then falls back. Output is
- * captured so the raw EPERM stack never scares the user; a concise reason is
- * printed instead.
- */
-function pm2Start() {
-  if (!pm2Available()) {
-    console.log('  PM2 CLI not found — using daemonless mode.');
-    return false;
-  }
-  console.log('  Trying PM2...');
-  const r = runPm2(['start', ECOSYSTEM], { timeout: 90_000, capture: true });
-  if (!r.error && r.status === 0) {
-    runPm2(['save'], { timeout: 30_000, capture: true }); // best-effort persistence
-    console.log('  Hub started via PM2.');
-    return true;
-  }
-  const out = `${r.stdout || ''}${r.stderr || ''}`;
-  let reason;
-  if (/EPERM|pipe|rpc\.sock/i.test(out)) {
-    reason = 'PM2 daemon blocked (EPERM on named pipe — common on Node 25 / locked-down Windows)';
-  } else if (r.error) {
-    reason = `PM2 error: ${r.error.code || r.error.message}`;
-  } else {
-    reason = `PM2 exited with code ${r.status}`;
-  }
-  console.warn(`  PM2 unavailable: ${reason}.`);
-  return false;
-}
-
-// ── Daemonless (no-PM2) fallback ──────────────────────────────────────────────
+// ── Daemonless background process ─────────────────────────────────────────────
 
 /** Environment for the daemonless server child. */
 function daemonlessEnv() {
@@ -208,9 +117,10 @@ function clearPid() {
 /**
  * Start the built server as a detached background process, writing pid + log
  * under hub/.run/. `unref()` lets this launcher exit while the Hub keeps
- * running. ponytail: daemonless mode has NO auto-restart-on-crash (that is
- * PM2's job); the upgrade path is to fix PM2/Node compatibility or register an
- * OS service. Acceptable for a localhost dev tool.
+ * running. ponytail: daemonless mode has NO auto-restart-on-crash; the upgrade
+ * path is `enable-boot`, which registers an OS-native user supervisor
+ * (systemd --user / launchd with KeepAlive) that restarts it. Acceptable for a
+ * localhost dev tool.
  */
 async function daemonlessStart() {
   if (!fs.existsSync(DIST_INDEX)) {
@@ -333,7 +243,7 @@ function launchctl(args, { capture = false } = {}) {
   });
 }
 
-/** Kill only a daemonless instance (pid file), leaving PM2/supervisors alone. */
+/** Kill only a daemonless instance (pid file), leaving OS supervisors alone. */
 async function stopDaemonless() {
   const pid = readPid();
   if (pid !== null && isAlive(pid)) {
@@ -356,7 +266,7 @@ async function stopDaemonless() {
 }
 
 /**
- * Register the Hub to start at boot/login — user-scope, no admin, PM2-independent.
+ * Register the Hub to start at boot/login — user-scope, no admin, no daemon required.
  * Idempotent. Best-effort: never fails the caller (setup) over auto-start.
  */
 async function enableBoot() {
@@ -549,7 +459,7 @@ async function disableBoot() {
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
-/** Stop whatever is running (boot supervisor if any, else daemonless/PM2). */
+/** Stop whatever is running (boot supervisor if any, else the daemonless instance). */
 async function stop() {
   const sup = bootSupervisor();
   if (sup === 'systemd') {
@@ -560,13 +470,7 @@ async function stop() {
     launchctl(['unload', LAUNCHD_PLIST_PATH], { capture: true });
     return;
   }
-  const pid = readPid();
-  if (pid !== null) {
-    await stopDaemonless(); // we own a daemonless instance — authoritative
-  } else if (getMode() !== 'none' && pm2Available()) {
-    // No daemonless pid — a PM2-managed instance may exist. Fail-fast + bounded.
-    runPm2(['delete', ECOSYSTEM], { timeout: 20_000, capture: true });
-  }
+  await stopDaemonless(); // no-op when no pid file exists
   await freePortIfStuck();
 }
 
@@ -581,23 +485,11 @@ async function start() {
     launchctl(['load', '-w', LAUNCHD_PLIST_PATH], { capture: true });
     return 0;
   }
-  const mode = getMode();
   await stop();
-  if (mode === 'none') {
-    console.log('  HUB_PROCESS_MANAGER=none — starting daemonless.');
-    return daemonlessStart();
-  }
-  if (pm2Start()) return 0;
-  if (mode === 'pm2') {
-    console.error('  ERROR: PM2 start failed and HUB_PROCESS_MANAGER=pm2 forbids fallback.');
-    console.error('  Fix PM2, or set HUB_PROCESS_MANAGER=none (or auto) for daemonless mode.');
-    return 1;
-  }
-  console.warn('  Falling back to daemonless background mode (no PM2 daemon needed).');
   return daemonlessStart();
 }
 
-/** Restart: delegate to the boot supervisor, else PM2, else daemonless. */
+/** Restart: delegate to the boot supervisor, else full stop+start (daemonless). */
 async function restart() {
   const sup = bootSupervisor();
   if (sup === 'systemd') {
@@ -610,37 +502,18 @@ async function restart() {
     });
     return 0;
   }
-  const mode = getMode();
-  const pid = readPid();
-  if (mode !== 'none' && pid === null && pm2Available()) {
-    const r = runPm2(['restart', ECOSYSTEM], { timeout: 90_000, capture: true });
-    if (!r.error && r.status === 0) {
-      console.log('  Hub restarted via PM2.');
-      return 0;
-    }
-    console.warn('  PM2 restart failed — falling back to full stop+start.');
-  }
   await stop();
   await waitForPortClosed(HOST, PORT, 15_000);
   return start();
 }
 
-/** Report where the Hub stands (port + daemonless pid + PM2 view). */
+/** Report where the Hub stands (port + daemonless pid + boot auto-start). */
 async function status() {
   const up = await portOpen(HOST, PORT, 1500);
   console.log(`  Hub ${HOST}:${PORT} — ${up ? 'LISTENING' : 'not responding'}`);
   const pid = readPid();
   if (pid) {
     console.log(`  Daemonless pid ${pid} — ${isAlive(pid) ? 'alive' : 'dead (stale pidfile)'}`);
-  }
-  if (getMode() !== 'none' && pm2Available()) {
-    const r = runPm2(['jlist'], { timeout: 15_000, capture: true });
-    if (!r.error && r.status === 0 && typeof r.stdout === 'string') {
-      const managing = r.stdout.includes(appName());
-      console.log(`  PM2 — ${managing ? `managing ${appName()}` : 'not managing the Hub'}`);
-    } else {
-      console.log('  PM2 — CLI present but daemon not reachable (that is fine in daemonless mode).');
-    }
   }
   console.log(`  Boot auto-start: ${bootAutostartState()}`);
   return up ? 0 : 1;

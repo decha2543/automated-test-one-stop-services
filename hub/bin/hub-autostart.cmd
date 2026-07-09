@@ -6,12 +6,11 @@ REM Registered as the action of the user-scope logon Scheduled Task "AutoQA Hub"
 REM by `hub-service.mjs enable-boot`. It runs in the bare logon context where the
 REM Volta/scoop shims may not be on PATH yet, so it:
 REM   1. Prepends the Volta shim + scoop + user-local bin dirs so `node` resolves.
-REM   2. Runs the shared launcher `start`, which starts the Hub via PM2 and falls
-REM      back to a daemonless background process automatically (no PM2 needed).
+REM   2. Runs the shared launcher `start`, which starts the Hub as a daemonless
+REM      detached background process.
 REM
-REM PM2-independent by design: unlike the old pm2-resurrect action, this works
-REM even when PM2 is blocked (EPERM named pipe). User-scope only (schtasks
-REM /rl limited) - no admin.
+REM No privileged daemon by design: this works even on locked-down machines
+REM (nothing to be blocked). User-scope only (schtasks /rl limited) - no admin.
 REM ===========================================================================
 setlocal ENABLEEXTENSIONS
 

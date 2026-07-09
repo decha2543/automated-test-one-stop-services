@@ -425,7 +425,7 @@ export const en = {
   'settings.reset': 'Reset',
   'settings.systemUpdate': 'System Update',
   'settings.updateHub': 'Update Hub',
-  'settings.updateHubDesc': 'Build client & server, then restart pm2 to apply latest code',
+  'settings.updateHubDesc': 'Build client & server, then restart the Hub to apply the latest code',
   'settings.updating': 'Updating...',
   'settings.update': 'Update',
   'settings.allRightsReserved': 'All rights reserved.',

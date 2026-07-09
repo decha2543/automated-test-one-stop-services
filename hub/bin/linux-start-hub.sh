@@ -3,9 +3,9 @@
 #  AutoQA Hub — build, then start as a background service (Linux/macOS).
 #
 #  Thin wrapper: it builds the Hub and delegates process management to
-#  hub/bin/hub-service.mjs, which starts via PM2 and AUTOMATICALLY falls back to
-#  a daemonless background process when PM2 is unavailable or blocked. Force a
-#  mode with HUB_PROCESS_MANAGER=none|pm2.
+#  hub/bin/hub-service.mjs, which runs the Hub as a daemonless detached
+#  background process (optionally supervised by systemd --user / launchd when
+#  `hub-service.mjs enable-boot` has registered one).
 # ============================================================================
 set -euo pipefail
 

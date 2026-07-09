@@ -3,9 +3,9 @@ REM ============================================================================
 REM AutoQA Hub - build, then start as a background service (Windows).
 REM
 REM Thin wrapper: it builds the Hub and delegates process management to
-REM hub\bin\hub-service.mjs, which starts via PM2 and AUTOMATICALLY falls back to
-REM a daemonless background process when PM2 is blocked (EPERM named pipe under
-REM Node 25 / locked-down Windows). Force a mode with HUB_PROCESS_MANAGER=none|pm2.
+REM hub\bin\hub-service.mjs, which runs the Hub as a daemonless detached
+REM background process (optionally supervised by a user-scope logon task when
+REM `hub-service.mjs enable-boot` has registered one).
 REM ============================================================================
 setlocal ENABLEEXTENSIONS
 set "HUB_DIR=%~dp0.."

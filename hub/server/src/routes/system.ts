@@ -345,8 +345,8 @@ function runUpdateInBackground(): void {
       // Give the status endpoint one last poll opportunity before we are killed.
       setTimeout(() => {
         // Restart through the shared Hub launcher so the swap works whether the
-        // Hub runs under PM2 or in daemonless fallback mode (PM2 may be blocked
-        // by policy/permission — see hub/bin/hub-service.mjs).
+        // Hub runs daemonless or under an OS supervisor (systemd/launchd) —
+        // see hub/bin/hub-service.mjs.
         const launcher = path.join(hubDir, 'bin', 'hub-service.mjs');
         const child = spawn(process.execPath, [launcher, 'restart'], {
           cwd: hubDir,
@@ -363,8 +363,8 @@ function runUpdateInBackground(): void {
         child.unref();
       }, 500);
 
-      // We won't reach this in practice because pm2 kills the process,
-      // but mark "done" defensively for non-pm2 deployments.
+      // We won't reach this in practice because the launcher restart recycles
+      // the process, but mark "done" defensively in case it does not.
       updateState.stage = 'done';
       updateState.finishedAt = new Date().toISOString();
       updateState.running = false;

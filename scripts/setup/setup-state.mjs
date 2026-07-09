@@ -4,9 +4,11 @@
 //  Setup_Bootstrap scripts (setup-windows.bat / setup-linux.sh).
 //
 //  Ledger shape: { "steps": { <name>: "pending" | "done" | "failed" }, "updatedAt": ISO }
-//  with STEP_ORDER = node, pnpm, uv, task, pm2, install-deps, start-hub.
+//  with STEP_ORDER = node, pnpm, uv, task, install-deps, start-hub.
 //  (k6 is NOT a Core step — it is provisioned by the k6 tool's own setup task,
-//   folder-presence gated; see the install-and-provisioning-overhaul spec.)
+//   folder-presence gated; see the install-and-provisioning-overhaul spec.
+//   The Hub runs as a daemonless background process — optionally supervised by
+//   systemd --user / launchd — so no process manager is a Core install step.)
 //
 //  The shell scripts shell out to this once node exists (node is the first
 //  tool installed) so the canonical ledger is always written by the same JSON
@@ -36,7 +38,6 @@ export const STEP_ORDER = [
   'pnpm',
   'uv',
   'task',
-  'pm2',
   'install-deps',
   'start-hub',
 ];
@@ -50,8 +51,8 @@ export function coerce(value) {
 
 /**
  * Read the ledger, tolerating a missing/corrupt file by returning an empty
- * step map (mirrors readSetupState in setup-state.ts). Unknown statuses are
- * dropped here and surfaced as "pending" by the caller.
+ * step map (this .mjs is the canonical ledger reader/writer). Unknown statuses
+ * are dropped here and surfaced as "pending" by the caller.
  */
 export function readState(stateFile) {
   let raw;

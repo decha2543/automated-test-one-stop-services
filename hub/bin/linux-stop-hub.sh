@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================================
 #  AutoQA Hub — stop the background service (Linux/macOS).
-#  Delegates to hub/bin/hub-service.mjs, which stops both PM2-managed and
-#  daemonless instances and frees the port.
+#  Delegates to hub/bin/hub-service.mjs, which stops the daemonless instance
+#  (or the OS supervisor when one is registered) and frees the port.
 # ============================================================================
 set +e
 

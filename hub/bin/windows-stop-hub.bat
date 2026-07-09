@@ -1,8 +1,8 @@
 @echo off
 REM ============================================================================
 REM AutoQA Hub - stop the background service (Windows).
-REM Delegates to hub\bin\hub-service.mjs, which stops both PM2-managed and
-REM daemonless instances and frees the port.
+REM Delegates to hub\bin\hub-service.mjs, which stops the daemonless instance
+REM (or the OS supervisor when one is registered) and frees the port.
 REM ============================================================================
 setlocal ENABLEEXTENSIONS
 set "HUB_DIR=%~dp0.."

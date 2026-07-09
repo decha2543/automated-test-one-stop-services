@@ -12,13 +12,13 @@
  *  WHAT THIS PROVES  (and why it is NOT in the default unit pass)
  * ─────────────────────────────────────────────────────────────────────────
  * These assertions describe the *end state* of a clean-OS `Installer` run:
- * the five Core tools resolve on PATH, the Hub is online (under ANY supervisor),
+ * the four Core tools resolve on PATH, the Hub is online (under ANY supervisor),
  * installs stayed user-scope, the opt-in Android SDK landed, an OS-appropriate
- * PM2-independent boot auto-start (Windows logon task / systemd --user / launchd)
+ * daemon-free boot auto-start (Windows logon task / systemd --user / launchd)
  * is registered, and (Layer D) `task` runs cross-shell. NONE of that can be
  * observed without first running
  * a *destructive* provisioning flow on a throwaway VM/CI runner — installing
- * toolchains, starting pm2, installing Android. That is unsafe in a dev
+ * toolchains, starting the Hub, installing Android. That is unsafe in a dev
  * checkout and impossible in the unit-test sandbox (no clean VM, no Docker).
  *
  * So every live-machine check below is GUARDED: it SKIPS (never fails) unless
@@ -49,7 +49,7 @@
  *      • the Layer D PATH coreutils ← exposed by Task 17 (optional, off by default).
  *
  * No `__dirname`/REPO_ROOT is computed: every probe targets the live
- * environment (PATH, $HOME, $ANDROID_HOME, pm2, schtasks) — not a repo file —
+ * environment (PATH, $HOME, $ANDROID_HOME, schtasks) — not a repo file —
  * so there is nothing to resolve relative to this file or to cwd.
  */
 
@@ -62,10 +62,10 @@ import { spawnSync } from 'node:child_process';
 
 // ── Live-environment facts (sourced from design.md, verified) ──────────────
 /** Core_Tool_Set — R4.1 (k6 is no longer Core; it self-provisions by folder). */
-const CORE_TOOLS = ['node', 'pnpm', 'uv', 'task', 'pm2'];
+const CORE_TOOLS = ['node', 'pnpm', 'uv', 'task'];
 /** Hub health endpoint — manager-agnostic "is the Hub up" probe. The Hub may run
- *  via PM2, a daemonless background process, or systemd/launchd, so we probe the
- *  loopback port, not a specific process manager. */
+ *  as a daemonless background process or under systemd/launchd, so we probe the
+ *  loopback port, not a specific supervisor. */
 const HUB_HEALTH_URL = `http://127.0.0.1:${process.env.HUB_PORT || '5174'}/api/health`;
 /** Windows logon Scheduled Task registered by `hub-service.mjs enable-boot`.
  *  Keep identical to TASK_NAME in hub/bin/hub-service.mjs. */
@@ -128,7 +128,7 @@ function isAdminOnlyPath(p) {
 //  18.1 — Core-install smoke (R1.1, R1.2, R1.3, R2.2)
 // ===========================================================================
 describe('18.1 Core-install smoke (live VM — KIRO_SMOKE=1)', () => {
-  it('the five Core tools resolve and run on PATH (R1.1, R1.3)', { skip: smokeSkip() }, () => {
+  it('the four Core tools resolve and run on PATH (R1.1, R1.3)', { skip: smokeSkip() }, () => {
     // R1.1 every Core member installed; R1.3 each reported present on PATH.
     // `shell:true` so Windows `.cmd`/`.bat` shims (pnpm, task) resolve too.
     for (const tool of CORE_TOOLS) {
@@ -140,7 +140,7 @@ describe('18.1 Core-install smoke (live VM — KIRO_SMOKE=1)', () => {
 
   it('the Hub is online (health endpoint responds) (R1.2)', { skip: smokeSkip() }, async () => {
     // R1.2: a running Hub is the success criterion, independent of HOW it is
-    // supervised (PM2 / daemonless / systemd / launchd). The manager-agnostic
+    // supervised (daemonless / systemd / launchd). The manager-agnostic
     // probe is the health endpoint on the loopback port.
     const res = await fetch(HUB_HEALTH_URL).catch(() => null);
     assert.ok(res?.ok, `Hub health endpoint must respond 2xx at ${HUB_HEALTH_URL} (R1.2)`);
@@ -186,7 +186,7 @@ describe('18.2 opt-in & boot-survival smoke (live VM — KIRO_SMOKE=1)', () => {
   );
 
   it(
-    'Windows logon Scheduled Task starts the Hub, PM2-independently (R10.3, R10.4)',
+    'Windows logon Scheduled Task starts the Hub, no daemon required (R10.3, R10.4)',
     { skip: smokeSkip(IS_WIN ? false : 'Windows-only: logon Scheduled Task (R10.3/R10.4)') },
     () => {
       // R10.3 the Hub auto-starts on login → the user-scope logon task must exist.
@@ -210,7 +210,7 @@ describe('18.2 opt-in & boot-survival smoke (live VM — KIRO_SMOKE=1)', () => {
   );
 
   it('an OS-appropriate boot auto-start is registered (R10.6)', { skip: smokeSkip() }, () => {
-    // R10.6 a PM2-independent, OS-appropriate auto-start exists on EVERY platform,
+    // R10.6 a daemon-free, OS-appropriate auto-start exists on EVERY platform,
     // all registered by `hub-service.mjs enable-boot`:
     //   Windows → user-scope logon Scheduled Task "AutoQA Hub"
     //   Linux   → systemd --user unit ~/.config/systemd/user/autoqa-hub.service

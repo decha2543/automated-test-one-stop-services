@@ -11,7 +11,7 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Auto-reload once when a JS chunk fails to load (stale deploy).
-      // After rebuild + pm2 restart, old chunk hashes no longer exist.
+      // After a rebuild + Hub restart, old chunk hashes no longer exist.
       // This catches the error and reloads so the browser fetches fresh index.html.
       (function () {
         var reloaded = sessionStorage.getItem('__chunk_reload');

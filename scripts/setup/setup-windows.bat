@@ -5,15 +5,15 @@ chcp 65001 >nul
 REM ===========================================================================
 REM AUTOMATED TEST ENVIRONMENT SETUP (Windows) - Setup_Bootstrap (Area G)
 REM ===========================================================================
-REM Installs the 5 Core tools from the lowest baseline, installs deps,
+REM Installs the 4 Core tools from the lowest baseline, installs deps,
 REM starts the Hub, then verifies. Idempotent per tool and re-runnable via a
-REM state ledger ("<target>\.setup-state.json", same shape as
-REM hub/server/src/services/setup-state.ts):
+REM state ledger ("<target>\.setup-state.json", written by the canonical engine
+REM scripts\setup\setup-state.mjs):
 REM
 REM { "steps": { "node": "done"|"failed"|"pending", ... }, "updatedAt": "..." }
 REM
-REM STEP_ORDER (M = 7, progress shown as "name (N/7)"):
-REM 1 node 2 pnpm 3 uv 4 task 5 pm2 6 install-deps 7 start-hub
+REM STEP_ORDER (M = 6, progress shown as "name (N/6)"):
+REM 1 node 2 pnpm 3 uv 4 task 5 install-deps 6 start-hub
 REM
 REM Android is decoupled from Core: it is opt-in via `task setup-android`
 REM (scripts\setup\windows\set-android-home.ps1) and never installed here.
@@ -100,58 +100,47 @@ net session >nul 2>nul
 if errorlevel 1 ( set "IS_ADMIN=0" ) else ( set "IS_ADMIN=1" )
 
 REM ===========================================================================
-REM STEP 1/7 - node
+REM STEP 1/6 - node
 REM ===========================================================================
 echo.
-echo [step] node (1/7)
+echo [step] node (1/6)
 where node >nul 2>nul && ( echo   [SKIPPED] node already present on PATH ^(strict skip^) & call :done ST_node & goto :step_pnpm )
 call :installNode
-if errorlevel 1 ( call :fail ST_node "node 1/7" "Node install via Volta failed after 3 attempts. If behind a TLS proxy set KIRO_INSECURE_TLS=1 and re-run; otherwise check network/proxy." & exit /b 1 )
+if errorlevel 1 ( call :fail ST_node "node 1/6" "Node install via Volta failed after 3 attempts. If behind a TLS proxy set KIRO_INSECURE_TLS=1 and re-run; otherwise check network/proxy." & exit /b 1 )
 call :done ST_node
 :step_pnpm
 
 REM ===========================================================================
-REM STEP 2/7 - pnpm
+REM STEP 2/6 - pnpm
 REM ===========================================================================
 echo.
-echo [step] pnpm (2/7)
+echo [step] pnpm (2/6)
 where pnpm >nul 2>nul && ( echo   [SKIPPED] pnpm already present on PATH ^(strict skip^) & call :done ST_pnpm & goto :step_uv )
 call :installPnpm
-if errorlevel 1 ( call :fail ST_pnpm "pnpm 2/7" "pnpm install via Volta failed after 3 attempts. Ensure Volta is installed and VOLTA_FEATURE_PNPM is enabled, then re-run." & exit /b 1 )
+if errorlevel 1 ( call :fail ST_pnpm "pnpm 2/6" "pnpm install via Volta failed after 3 attempts. Ensure Volta is installed and VOLTA_FEATURE_PNPM is enabled, then re-run." & exit /b 1 )
 call :done ST_pnpm
 :step_uv
 
 REM ===========================================================================
-REM STEP 3/7 - uv
+REM STEP 3/6 - uv
 REM ===========================================================================
 echo.
-echo [step] uv (3/7)
+echo [step] uv (3/6)
 where uv >nul 2>nul && ( echo   [SKIPPED] uv already present on PATH ^(strict skip^) & call :done ST_uv & goto :step_task )
 call :installUv
-if errorlevel 1 ( call :fail ST_uv "uv 3/7" "uv install via Scoop failed after 3 attempts. Check network/proxy, then re-run." & exit /b 1 )
+if errorlevel 1 ( call :fail ST_uv "uv 3/6" "uv install via Scoop failed after 3 attempts. Check network/proxy, then re-run." & exit /b 1 )
 call :done ST_uv
 :step_task
 
 REM ===========================================================================
-REM STEP 4/7 - task
+REM STEP 4/6 - task
 REM ===========================================================================
 echo.
-echo [step] task (4/7)
-where task >nul 2>nul && ( echo   [SKIPPED] task already present on PATH ^(strict skip^) & call :done ST_task & goto :step_pm2 )
+echo [step] task (4/6)
+where task >nul 2>nul && ( echo   [SKIPPED] task already present on PATH ^(strict skip^) & call :done ST_task & goto :aux_steps )
 call :installTask
-if errorlevel 1 ( call :fail ST_task "task 4/7" "task install via Scoop failed after 3 attempts. Check network/proxy, then re-run." & exit /b 1 )
+if errorlevel 1 ( call :fail ST_task "task 4/6" "task install via Scoop failed after 3 attempts. Check network/proxy, then re-run." & exit /b 1 )
 call :done ST_task
-:step_pm2
-
-REM ===========================================================================
-REM STEP 5/7 - pm2
-REM ===========================================================================
-echo.
-echo [step] pm2 (5/7)
-where pm2 >nul 2>nul && ( echo   [SKIPPED] pm2 already present on PATH ^(strict skip^) & call :done ST_pm2 & goto :aux_steps )
-call :installPm2
-if errorlevel 1 ( call :fail ST_pm2 "pm2 5/7" "pm2 install via Volta failed after 3 attempts. Ensure Volta is installed, then re-run." & exit /b 1 )
-call :done ST_pm2
 :aux_steps
 
 REM ===========================================================================
@@ -168,30 +157,35 @@ call :refreshPath
 if exist "C:\Program Files\Git\bin\bash.exe" ( "C:\Program Files\Git\bin\bash.exe" "%SETUP_ROOT%windows\set-git-bash.sh" 2>nul ) else ( echo   [warn] Git Bash not found at default path - skipping profile tweaks )
 
 echo.
+echo [aux] Installing kill-port (best-effort; the Hub launcher uses it to free a stuck port)
+call volta install kill-port >nul 2>nul || echo   [warn] kill-port install skipped ^(non-fatal^)
+call :refreshPath
+
+echo.
 echo [aux] Android is opt-in and NOT part of core setup. Run "task setup-android" to install the Android SDK + emulator.
 
 echo.
 call :shellDecouple
 
 REM ===========================================================================
-REM STEP 6/7 - install-deps (Workspace_Package + Python_Tool)
+REM STEP 5/6 - install-deps (Workspace_Package + Python_Tool)
 REM ===========================================================================
 echo.
-echo [step] install-deps (6/7)
+echo [step] install-deps (5/6)
 if /I "%ST_install_deps%"=="done" ( echo   [SKIPPED] dependencies already installed ^(state: done^) & goto :step_starthub )
 call :installDeps
-if errorlevel 1 ( call :fail ST_install_deps "install-deps 6/7" "Dependency install failed. Check the failing command above; verify network and that pnpm-lock.yaml/uv.lock match, then re-run." & exit /b 1 )
+if errorlevel 1 ( call :fail ST_install_deps "install-deps 5/6" "Dependency install failed. Check the failing command above; verify network and that pnpm-lock.yaml/uv.lock match, then re-run." & exit /b 1 )
 call :done ST_install_deps
 :step_starthub
 
 REM ===========================================================================
-REM STEP 7/7 - start-hub
+REM STEP 6/6 - start-hub
 REM ===========================================================================
 echo.
-echo [step] start-hub (7/7)
+echo [step] start-hub (6/6)
 if /I "%ST_start_hub%"=="done" ( echo   [SKIPPED] Hub already started ^(state: done^) & goto :verify_all )
 call :startHub
-if errorlevel 1 ( call :fail ST_start_hub "start-hub 7/7" "Hub failed to build or start. Inspect the build/pm2 output above; run 'pm2 logs' for details, then re-run." & exit /b 1 )
+if errorlevel 1 ( call :fail ST_start_hub "start-hub 6/6" "Hub failed to build or start. Inspect the build output above; run 'node hub\bin\hub-service.mjs status' for details, then re-run." & exit /b 1 )
 call :done ST_start_hub
 :verify_all
 
@@ -200,7 +194,7 @@ REM VERIFY - only AFTER every step above completed. Missing tool ->
 REM report names + exit non-zero.
 REM ===========================================================================
 echo.
-echo [verify] Verifying all 5 Core tools on PATH (post-setup)
+echo [verify] Verifying all 4 Core tools on PATH (post-setup)
 echo ---------------------------------------------------
 call :refreshPath
 set "MISSING="
@@ -208,7 +202,6 @@ call :verify node "node -v"
 call :verify pnpm "pnpm -v"
 call :verify uv "uv --version"
 call :verify task "task --version"
-call :verify pm2 "pm2 -v"
 echo ---------------------------------------------------
 if defined MISSING (
     echo.
@@ -219,7 +212,7 @@ if defined MISSING (
 
 echo.
 echo ===================================================
-echo   SETUP COMPLETED - Hub started, all 5 Core tools verified
+echo   SETUP COMPLETED - Hub started, all 4 Core tools verified
 echo ===================================================
 echo   Open http://localhost:5174
 echo ===================================================
@@ -244,7 +237,6 @@ set "ST_node="
 set "ST_pnpm="
 set "ST_uv="
 set "ST_task="
-set "ST_pm2="
 set "ST_install_deps="
 set "ST_start_hub="
 if not exist "%STATE_FILE%" goto :eof
@@ -255,7 +247,6 @@ if not errorlevel 1 (
         if /I "%%A"=="pnpm" set "ST_pnpm=%%B"
         if /I "%%A"=="uv" set "ST_uv=%%B"
         if /I "%%A"=="task" set "ST_task=%%B"
-        if /I "%%A"=="pm2" set "ST_pm2=%%B"
         if /I "%%A"=="install-deps" set "ST_install_deps=%%B"
         if /I "%%A"=="start-hub" set "ST_start_hub=%%B"
     )
@@ -266,7 +257,6 @@ call :scanState node ST_node
 call :scanState pnpm ST_pnpm
 call :scanState uv ST_uv
 call :scanState task ST_task
-call :scanState pm2 ST_pm2
 call :scanState install-deps ST_install_deps
 call :scanState start-hub ST_start_hub
 goto :eof
@@ -288,7 +278,7 @@ REM ---------------------------------------------------------------------------
 :writeState
 where node >nul 2>nul
 if not errorlevel 1 (
-    node "%SETUP_ROOT%setup-state.mjs" write "%STATE_FILE%" "node=%ST_node%" "pnpm=%ST_pnpm%" "uv=%ST_uv%" "task=%ST_task%" "pm2=%ST_pm2%" "install-deps=%ST_install_deps%" "start-hub=%ST_start_hub%" >nul 2>nul
+    node "%SETUP_ROOT%setup-state.mjs" write "%STATE_FILE%" "node=%ST_node%" "pnpm=%ST_pnpm%" "uv=%ST_uv%" "task=%ST_task%" "install-deps=%ST_install_deps%" "start-hub=%ST_start_hub%" >nul 2>nul
     goto :eof
 )
 call :stOr ST_node
@@ -299,8 +289,6 @@ call :stOr ST_uv
 set "_u=%_v%"
 call :stOr ST_task
 set "_t=%_v%"
-call :stOr ST_pm2
-set "_m=%_v%"
 call :stOr ST_install_deps
 set "_d=%_v%"
 call :stOr ST_start_hub
@@ -313,7 +301,6 @@ for /f "usebackq delims=" %%T in (`powershell -NoProfile -Command "(Get-Date).To
   echo     "pnpm": "%_p%",
   echo     "uv": "%_u%",
   echo     "task": "%_t%",
-  echo     "pm2": "%_m%",
   echo     "install-deps": "%_d%",
   echo     "start-hub": "%_h%"
   echo   },
@@ -422,7 +409,7 @@ if %_try% LSS 3 ( echo   [retry %_try%/3] %_pkg% install failed - retrying & got
 exit /b 1
 
 REM ---------------------------------------------------------------------------
-REM :ensureVolta -- node/pnpm/pm2 come from Volta; install it via scoop first.
+REM :ensureVolta -- node/pnpm come from Volta; install it via scoop first.
 REM ---------------------------------------------------------------------------
 :ensureVolta
 where volta >nul 2>nul
@@ -479,24 +466,6 @@ call :scoopInstall task task || exit /b 1
 goto :eof
 
 REM ---------------------------------------------------------------------------
-REM :installPm2 -- pm2 (+ kill-port) via Volta. <=3 install retries.
-REM Boot auto-start is NOT tied to pm2 anymore: it is registered later in
-REM :startHub via the Hub launcher (hub-service.mjs enable-boot), which is
-REM PM2-independent -- no pm2 dump or `pm2 resurrect` needed, so the Hub
-REM auto-starts at login even when PM2 is blocked (EPERM named pipe).
-REM ---------------------------------------------------------------------------
-:installPm2
-call :ensureVolta || exit /b 1
-set /a _try=0
-:installPm2_retry
-set /a _try+=1
-call volta install pm2 kill-port
-call :refreshPath
-where pm2 >nul 2>nul && goto :eof
-if %_try% LSS 3 ( echo   [retry %_try%/3] pm2 install failed - retrying & goto :installPm2_retry )
-exit /b 1
-
-REM ---------------------------------------------------------------------------
 REM :installDeps -- Workspace_Package deps (pnpm install) + Python_Tool deps
 REM (uv python install + uv sync). Any failure aborts without
 REM starting later steps. Playwright browsers handled by `task setup` later.
@@ -543,23 +512,21 @@ call uv tool install uv-up 2>nul
 goto :eof
 
 REM ---------------------------------------------------------------------------
-REM :startHub -- build the Hub bundle and start it under pm2 using the shared
-REM ecosystem file (single source of truth for app name/port). Any failure
-REM aborts.
+REM :startHub -- build the Hub bundle and start it via the shared launcher
+REM (hub-service.mjs), which runs it as a daemonless background process. Any
+REM failure aborts.
 REM ---------------------------------------------------------------------------
 :startHub
 echo   Building Hub (shared + server + client)...
 call pnpm -C "%WORKSPACE_ROOT%\hub" run build
 if errorlevel 1 ( echo   [error] Hub build failed. & exit /b 1 )
-REM Delegate process management to the shared launcher, which pins PM2_HOME,
-REM frees the port, starts via PM2, and AUTOMATICALLY falls back to a daemonless
-REM background process when PM2 is blocked (EPERM named pipe on Node 25/26 /
-REM locked-down Windows).
-setx PM2_HOME "%USERPROFILE%\.pm2" >nul 2>nul
-echo   Starting Hub (PM2 with automatic daemonless fallback)...
+REM Delegate process management to the shared launcher, which frees the port and
+REM starts the Hub as a daemonless detached background process (no daemon of our
+REM own, so nothing to be blocked by locked-down/corporate policy).
+echo   Starting Hub (daemonless background process)...
 call node "%WORKSPACE_ROOT%\hub\bin\hub-service.mjs" start
 if errorlevel 1 ( echo   [error] Hub failed to start. Run "node hub\bin\hub-service.mjs status" for details. & exit /b 1 )
-REM Register PM2-independent boot auto-start (user-scope logon Scheduled Task).
+REM Register boot auto-start (user-scope logon Scheduled Task; no admin).
 REM Best-effort: warns but never aborts setup if it cannot register.
 echo   Enabling auto-start at login...
 call node "%WORKSPACE_ROOT%\hub\bin\hub-service.mjs" enable-boot

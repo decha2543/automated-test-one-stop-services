@@ -9,7 +9,7 @@ import { register } from 'tsx/esm/api';
 // Use tsx's own register() API rather than node:module's register('tsx/esm', …).
 // The latter calls tsx's `initialize` hook with no data payload, which makes tsx
 // throw "tsx must be loaded with --import instead of --loader" and crash-loops the
-// hub under pm2. tsx/esm/api's register() sets up the MessagePort/data internally.
+// hub in the built runtime. tsx/esm/api's register() sets up the MessagePort/data internally.
 register();
 
 import autoload from '@fastify/autoload';
@@ -176,8 +176,9 @@ async function main(): Promise<void> {
   }
 
   // Surface async crashes to the structured logger instead of the default
-  // Node stderr dump. PM2 still restarts on uncaughtException; we just want
-  // the root cause to appear in the same log stream.
+  // Node stderr dump. An OS supervisor (systemd/launchd) restarts the Hub after
+  // the exit-on-uncaughtException below; we just want the root cause to appear
+  // in the same log stream.
   process.on('unhandledRejection', (reason) => {
     app.log.error({ reason }, 'Unhandled promise rejection');
   });
@@ -186,7 +187,7 @@ async function main(): Promise<void> {
     process.exit(1);
   });
 
-  // Graceful shutdown — pm2 sends SIGINT, container runtimes send SIGTERM.
+  // Graceful shutdown — systemd/launchd send SIGTERM; Ctrl+C in dev sends SIGINT.
   let shuttingDown = false;
   async function shutdown(signal: string): Promise<void> {
     if (shuttingDown) return;

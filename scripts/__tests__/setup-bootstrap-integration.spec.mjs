@@ -10,8 +10,8 @@
  * WHY a full clean-container run is OUT OF SCOPE here
  * ─────────────────────────────────────────────────────────────────────────
  * R19/R20 describe a *destructive* clean-machine flow: install node, pnpm,
- * uv, task and pm2 (the 5 Core tools — k6 is no longer Core) user-scope, then
- * install workspace + Python deps, then start the Hub. Exercising that for real
+ * uv and task (the 4 Core tools — k6 is no longer Core) user-scope,
+ * then install workspace + Python deps, then start the Hub. Exercising that for real
  * requires (a) a throwaway container/VM (no Docker is available in this test
  * runner) and (b) live network downloads that would mutate the host. Both are
  * infeasible and unsafe in this environment. This suite therefore
@@ -24,7 +24,7 @@
  *         read/write engine both bootstrap scripts shell out to). We write a
  *         partial ledger, read it back, and assert only-remaining-steps
  *         semantics and that STEP_ORDER is exactly
- *         node,pnpm,uv,task,pm2,install-deps,start-hub (start-hub last, so
+ *         node,pnpm,uv,task,install-deps,start-hub (start-hub last, so
  *         verify can only run after every step).
  *       - R18.2 / R18.3 / R18.5 launcher contract, by running a *copy* of the
  *         real `install.sh` in a throwaway sandbox next to a STUB
@@ -38,7 +38,7 @@
  *     without real installs, asserted by grepping the REAL script content of
  *     BOTH `setup-linux.sh` and `setup-windows.bat` (and both launchers for
  *     R18.x). These are content/ordering contracts, not behavioural runs:
- *       - R19.1 install the 5 Core tools; R19.2 deps (pnpm install + uv
+ *       - R19.1 install the 4 Core tools; R19.2 deps (pnpm install + uv
  *         sync); R19.3 start Hub; R19.4 strict SKIP when already on PATH;
  *         R19.5 verify block sits AFTER the final step.
  *       - R20.2 network retry ≤3 @ 30s timeout; R20.3 after retries → no Hub,
@@ -74,14 +74,15 @@ const STATE_HELPER_MJS = path.join(SETUP_DIR, 'setup-state.mjs');
 
 /** The canonical, ordered Setup_Bootstrap steps (R19.1 tools → R19.2 deps →
  *  R19.3 Hub). start-hub MUST be last so verify can only run after all steps.
- *  k6 was removed from Core (it is now provisioned by the k6 tool's own setup
- *  task, folder-presence gated), leaving 5 Core tools + deps + Hub = 7 steps. */
+ *  k6 was removed from Core (provisioned by the k6 tool's own setup task),
+ *  leaving 4 Core tools + deps + Hub = 6 steps. The Hub runs as a daemonless
+ *  background process (optionally OS-supervised), so no process manager is a
+ *  Core step. */
 const EXPECTED_STEP_ORDER = [
   'node',
   'pnpm',
   'uv',
   'task',
-  'pm2',
   'install-deps',
   'start-hub',
 ];
@@ -207,7 +208,7 @@ describe('Setup_State ledger idempotency (execution-verified, task 11.6)', () =>
     assert.deepEqual(
       ledger.map((s) => s.name),
       EXPECTED_STEP_ORDER,
-      'STEP_ORDER must be node,pnpm,uv,task,pm2,install-deps,start-hub',
+      'STEP_ORDER must be node,pnpm,uv,task,install-deps,start-hub',
     );
     assert.equal(ledger.at(-1)?.name, 'start-hub', 'start-hub must be the final step');
     assert.ok(
@@ -232,7 +233,7 @@ describe('Setup_State ledger idempotency (execution-verified, task 11.6)', () =>
     const remaining = ledger.filter((s) => s.status !== 'done').map((s) => s.name);
     assert.deepEqual(
       remaining,
-      ['task', 'pm2', 'install-deps', 'start-hub'],
+      ['task', 'install-deps', 'start-hub'],
       'a re-run must skip done steps and plan only the remaining ones',
     );
   });
@@ -279,7 +280,7 @@ describe('Setup_State ledger idempotency (execution-verified, task 11.6)', () =>
     assert.deepEqual(
       ENGINE_STEP_ORDER,
       EXPECTED_STEP_ORDER,
-      'setup-state.mjs STEP_ORDER must be node,pnpm,uv,task,pm2,install-deps,start-hub',
+      'setup-state.mjs STEP_ORDER must be node,pnpm,uv,task,install-deps,start-hub',
     );
   });
 });
@@ -338,14 +339,13 @@ describe('Setup_Bootstrap clean-container contracts (structural, task 11.6)', ()
     launcherBat = fs.readFileSync(LAUNCHER_BAT, 'utf8');
   });
 
-  it('R19.1: installs each of the 5 Core tools (both scripts)', () => {
-    // Each Core tool has a numbered step header on both platforms (k6 removed).
+  it('R19.1: installs each of the 4 Core tools (both scripts)', () => {
+    // Each Core tool has a numbered step header on both platforms (k6 removed from Core).
     for (const step of [
-      'node \\(1/7\\)',
-      'pnpm \\(2/7\\)',
-      'uv \\(3/7\\)',
-      'task \\(4/7\\)',
-      'pm2 \\(5/7\\)',
+      'node \\(1/6\\)',
+      'pnpm \\(2/6\\)',
+      'uv \\(3/6\\)',
+      'task \\(4/6\\)',
     ]) {
       assert.match(linux, new RegExp(`\\[step\\] ${step}`), `linux missing step ${step}`);
       assert.match(win, new RegExp(`\\[step\\] ${step}`), `windows missing step ${step}`);
@@ -355,37 +355,35 @@ describe('Setup_Bootstrap clean-container contracts (structural, task 11.6)', ()
     assert.match(linux, /volta install pnpm/, 'linux must install pnpm via volta');
     assert.match(linux, /astral\.sh\/uv\/install\.sh|brew_install uv/, 'linux must install uv');
     assert.match(linux, /taskfile\.dev\/install\.sh|brew_install go-task/, 'linux must install task');
-    assert.match(linux, /volta install pm2/, 'linux must install pm2 via volta');
     // Windows installers (scoop/volta).
     assert.match(win, /:installNode\b/, 'windows must install node');
     assert.match(win, /:installPnpm\b/, 'windows must install pnpm');
     assert.match(win, /:installUv\b/, 'windows must install uv');
     assert.match(win, /:installTask\b/, 'windows must install task');
-    assert.match(win, /:installPm2\b/, 'windows must install pm2');
     assert.match(win, /scoop install|volta install/, 'windows installs come from scoop/volta');
   });
 
   it('R19.2: installs workspace + Python deps (pnpm install + uv sync) (both scripts)', () => {
-    assert.match(linux, /\[step\] install-deps \(6\/7\)/, 'linux deps step');
+    assert.match(linux, /\[step\] install-deps \(5\/6\)/, 'linux deps step');
     assert.match(linux, /pnpm -C "\$WORKSPACE_ROOT" install/, 'linux pnpm install');
     assert.match(linux, /uv sync/, 'linux uv sync');
-    assert.match(win, /\[step\] install-deps \(6\/7\)/, 'windows deps step');
+    assert.match(win, /\[step\] install-deps \(5\/6\)/, 'windows deps step');
     assert.match(win, /pnpm -C "%WORKSPACE_ROOT%" install/, 'windows pnpm install');
     assert.match(win, /uv sync/, 'windows uv sync');
   });
 
   it('R19.3: starts the Hub via the hub-service launcher (both scripts)', () => {
-    // start-hub now delegates to hub/bin/hub-service.mjs, which starts via PM2
-    // and AUTOMATICALLY falls back to a daemonless background process when PM2
-    // is blocked (EPERM named pipe on Node 25 / locked-down Windows). The
-    // requirement is "start the Hub"; the launcher is the mechanism.
-    assert.match(linux, /\[step\] start-hub \(7\/7\)/, 'linux start-hub step');
+    // start-hub now delegates to hub/bin/hub-service.mjs, which runs the Hub as
+    // a daemonless detached background process (no daemon of its own, so nothing
+    // can be blocked by locked-down/corporate policy). The requirement is
+    // "start the Hub"; the launcher is the mechanism.
+    assert.match(linux, /\[step\] start-hub \(6\/6\)/, 'linux start-hub step');
     assert.match(
       linux,
       /node "\$WORKSPACE_ROOT\/hub\/bin\/hub-service\.mjs" start/,
       'linux must start the Hub via the launcher',
     );
-    assert.match(win, /\[step\] start-hub \(7\/7\)/, 'windows start-hub step');
+    assert.match(win, /\[step\] start-hub \(6\/6\)/, 'windows start-hub step');
     assert.match(
       win,
       /node "%WORKSPACE_ROOT%\\hub\\bin\\hub-service\.mjs" start/,
@@ -396,25 +394,25 @@ describe('Setup_Bootstrap clean-container contracts (structural, task 11.6)', ()
   it('R19.4: strictly SKIPS a tool already on PATH (both scripts)', () => {
     // One strict-skip branch per tool → at least 5 on each platform.
     assert.ok(
-      countOccurrences(linux, 'strict skip') >= 5,
-      'linux must strict-skip each of the 5 Core tools when already present',
+      countOccurrences(linux, 'strict skip') >= 4,
+      'linux must strict-skip each of the 4 Core tools when already present',
     );
     assert.ok(
-      countOccurrences(win, 'strict skip') >= 5,
-      'windows must strict-skip each of the 5 Core tools when already present',
+      countOccurrences(win, 'strict skip') >= 4,
+      'windows must strict-skip each of the 4 Core tools when already present',
     );
     assert.match(linux, /command -v node &>\/dev\/null/, 'linux detects an already-present tool via command -v');
     assert.match(win, /where node >nul 2>nul/, 'windows detects an already-present tool via where');
   });
 
   it('R19.5: the verify block runs only AFTER the final step (both scripts)', () => {
-    const lxStart = linux.indexOf('[step] start-hub (7/7)');
-    const lxVerify = linux.indexOf('[verify] Verifying all 5 Core tools');
+    const lxStart = linux.indexOf('[step] start-hub (6/6)');
+    const lxVerify = linux.indexOf('[verify] Verifying all 4 Core tools');
     assert.ok(lxStart > 0 && lxVerify > 0, 'linux must have both the start-hub step and verify block');
     assert.ok(lxVerify > lxStart, 'linux verify must come after the start-hub step (R19.5)');
 
-    const winStart = win.indexOf('[step] start-hub (7/7)');
-    const winVerify = win.indexOf('[verify] Verifying all 5 Core tools');
+    const winStart = win.indexOf('[step] start-hub (6/6)');
+    const winVerify = win.indexOf('[verify] Verifying all 4 Core tools');
     assert.ok(winStart > 0 && winVerify > 0, 'windows must have both the start-hub step and verify block');
     assert.ok(winVerify > winStart, 'windows verify must come after the start-hub step (R19.5)');
   });

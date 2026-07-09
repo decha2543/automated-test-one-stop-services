@@ -96,7 +96,7 @@ export interface CoreInstallReport {
 /**
  * Report a Core_Tool_Set install given the Core steps' own result and a browser-
  * provisioning outcome. Browser provisioning is NOT a Core member (Core = node,
- * pnpm, uv, task, pm2), so its outcome — success OR failure — is surfaced for
+ * pnpm, uv, task), so its outcome — success OR failure — is surfaced for
  * reporting but NEVER changes `coreOk`. This is the pure encoding of
  * Property 6: provisioning is non-fatal to the Core install. If `coreOk` ever
  * folded in the provisioning result, Property 6 would fail.

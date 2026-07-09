@@ -43,7 +43,7 @@ interface PullAllStatus {
 
 /**
  * Poll /api/health until it succeeds or timeout. Used during pull-all
- * to detect when the server is back online after pm2 restart.
+ * to detect when the server is back online after a Hub restart.
  */
 async function waitForHealth(timeoutMs: number): Promise<boolean> {
   const start = Date.now();

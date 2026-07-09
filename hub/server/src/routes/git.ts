@@ -144,7 +144,7 @@ export async function gitRoutes(app: FastifyInstance): Promise<void> {
   // ---------------------------------------------------------------------------
   // POST /api/git/pull-all — non-blocking. Pulls workspace root + all
   // git-repo projects, then rebuilds hub (client → server) if hub-related
-  // files changed, and restarts pm2 on successful rebuild.
+  // files changed, and restarts the Hub on successful rebuild.
   // Mirrors the staged approach of /api/system/update.
   // ---------------------------------------------------------------------------
 
@@ -341,9 +341,9 @@ function runPullAllInBackground(): void {
               output: 'client: OK, server: OK',
             });
 
-            // Stage: restart via the shared Hub launcher (works under PM2 or in
-            // daemonless fallback mode — PM2 may be blocked by policy/permission,
-            // see hub/bin/hub-service.mjs).
+            // Stage: restart via the shared Hub launcher, which runs the Hub as
+            // a daemonless / OS-supervised background process — see
+            // hub/bin/hub-service.mjs.
             pullAllState.stage = 'restarting';
             setTimeout(() => {
               const launcher = path.join(hubDir, 'bin', 'hub-service.mjs');

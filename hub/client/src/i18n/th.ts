@@ -423,7 +423,7 @@ export const th: Record<TranslationKey, string> = {
   'settings.reset': 'รีเซ็ต',
   'settings.systemUpdate': 'อัปเดตระบบ',
   'settings.updateHub': 'อัปเดต Hub',
-  'settings.updateHubDesc': 'build client & server แล้วรีสตาร์ท pm2 เพื่อใช้โค้ดล่าสุด',
+  'settings.updateHubDesc': 'build client & server แล้วรีสตาร์ท Hub เพื่อใช้โค้ดล่าสุด',
   'settings.updating': 'กำลังอัปเดต...',
   'settings.update': 'อัปเดต',
   'settings.allRightsReserved': 'สงวนลิขสิทธิ์',

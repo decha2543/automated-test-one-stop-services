@@ -156,5 +156,5 @@ fi
 
 echo ""
 echo "  [error] Hub did not start within 60s."
-echo "  [hint]  Run: pm2 logs   (in the workspace)"
+echo "  [hint]  Check the Hub status: node hub/bin/hub-service.mjs status (logs: hub/.run/hub.log)"
 exit 1

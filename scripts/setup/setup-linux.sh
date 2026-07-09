@@ -2,15 +2,15 @@
 # ============================================================================
 # AUTOMATED TEST ENVIRONMENT SETUP (Linux/macOS) — Setup_Bootstrap (Area G)
 # ----------------------------------------------------------------------------
-# Installs the 5 Core tools from the lowest baseline, installs deps,
+# Installs the 4 Core tools from the lowest baseline, installs deps,
 # starts the Hub, then verifies. Idempotent per tool and re-runnable via a
-# state ledger ("<target>/.setup-state.json", same shape as
-# hub/server/src/services/setup-state.ts):
+# state ledger ("<target>/.setup-state.json", written by the canonical engine
+# scripts/setup/setup-state.mjs):
 #
 # { "steps": { "node": "done"|"failed"|"pending", ... }, "updatedAt": "..." }
 #
-# STEP_ORDER (M = 7, progress shown as "name (N/7)"):
-# 1 node 2 pnpm 3 uv 4 task 5 pm2 6 install-deps 7 start-hub
+# STEP_ORDER (M = 6, progress shown as "name (N/6)"):
+# 1 node 2 pnpm 3 uv 4 task 5 install-deps 6 start-hub
 #
 # Tools come from brew (macOS) or curl (Linux), all user-scope. No Core
 # step needs root. k6 is NOT a Core tool — it is provisioned by the k6 tool's
@@ -86,12 +86,12 @@ STATE_HELPER="$SETUP_ROOT/setup-state.mjs"
 
 declare -A ST=(
   [node]=pending [pnpm]=pending [uv]=pending [task]=pending
-  [pm2]=pending [install-deps]=pending [start-hub]=pending
+  [install-deps]=pending [start-hub]=pending
 )
-STEP_ORDER=(node pnpm uv task pm2 install-deps start-hub)
+STEP_ORDER=(node pnpm uv task install-deps start-hub)
 
 # ===========================================================================
-# Ledger helpers (read/write the SAME shape as setup-state.ts)
+# Ledger helpers (read/write via the canonical engine setup-state.mjs)
 # ===========================================================================
 
 # load_state — read the ledger into ST[]. Prefers node (canonical JSON parse,
@@ -120,7 +120,7 @@ write_state() {
   if command -v node &>/dev/null && [ -f "$STATE_HELPER" ]; then
     node "$STATE_HELPER" write "$STATE_FILE" \
       "node=${ST[node]}" "pnpm=${ST[pnpm]}" "uv=${ST[uv]}" "task=${ST[task]}" \
-      "pm2=${ST[pm2]}" "install-deps=${ST[install-deps]}" \
+      "install-deps=${ST[install-deps]}" \
       "start-hub=${ST[start-hub]}" >/dev/null 2>&1 && return 0
   fi
   local ts tmp
@@ -132,7 +132,6 @@ write_state() {
     printf '    "pnpm": "%s",\n' "${ST[pnpm]}"
     printf '    "uv": "%s",\n' "${ST[uv]}"
     printf '    "task": "%s",\n' "${ST[task]}"
-    printf '    "pm2": "%s",\n' "${ST[pm2]}"
     printf '    "install-deps": "%s",\n' "${ST[install-deps]}"
     printf '    "start-hub": "%s"\n' "${ST[start-hub]}"
     printf '  },\n  "updatedAt": "%s"\n}\n' "$ts"
@@ -183,7 +182,7 @@ retry() {
 # Per-tool installers (defined before use)
 # ===========================================================================
 
-# ensure_volta — node/pnpm/pm2 come from Volta; install it user-scope via the
+# ensure_volta — node/pnpm come from Volta; install it user-scope via the
 # official curl installer (Linux) or brew (macOS). Idempotent.
 ensure_volta() {
   command -v volta &>/dev/null && return 0
@@ -219,121 +218,110 @@ load_state
 write_state
 
 # ===========================================================================
-# STEP 1/7 — node (Volta, user-scope)
+# STEP 1/6 — node (Volta, user-scope)
 # ===========================================================================
 echo ""
-echo "[step] node (1/7)"
+echo "[step] node (1/6)"
 if command -v node &>/dev/null; then
   echo "  [SKIPPED] node already present on PATH (strict skip)"; mark_done node
 elif [ "${ST[node]}" = "done" ]; then
   echo "  [SKIPPED] node already installed (state: done)"
 else
-  ensure_volta || fail_step node "node 1/7" "Volta bootstrap failed. Check network/proxy (set KIRO_INSECURE_TLS=1 if behind a TLS proxy), then re-run."
+  ensure_volta || fail_step node "node 1/6" "Volta bootstrap failed. Check network/proxy (set KIRO_INSECURE_TLS=1 if behind a TLS proxy), then re-run."
   if [ "${KIRO_INSECURE_TLS:-}" = "1" ]; then
     echo "  [warn] KIRO_INSECURE_TLS=1 — prefetching Node tarball via curl -k"
     inv="$VOLTA_HOME/tools/inventory/node"; mkdir -p "$inv"
     tarf="node-v${NODE_VERSION}-${NODE_OS}-${NODE_ARCH}.tar.gz"
     retry 3 30 curl -k -L -o "$inv/$tarf" "https://nodejs.org/dist/v${NODE_VERSION}/${tarf}" || true
   fi
-  retry 3 30 volta install "node@${NODE_VERSION}" || fail_step node "node 1/7" "Node install via Volta failed after 3 attempts. Check network/proxy, then re-run."
-  command -v node &>/dev/null || fail_step node "node 1/7" "Node still not on PATH after install. Open a new shell to refresh PATH, then re-run."
+  retry 3 30 volta install "node@${NODE_VERSION}" || fail_step node "node 1/6" "Node install via Volta failed after 3 attempts. Check network/proxy, then re-run."
+  command -v node &>/dev/null || fail_step node "node 1/6" "Node still not on PATH after install. Open a new shell to refresh PATH, then re-run."
   mark_done node
 fi
 
 # ===========================================================================
-# STEP 2/7 — pnpm (Volta)
+# STEP 2/6 — pnpm (Volta)
 # ===========================================================================
 echo ""
-echo "[step] pnpm (2/7)"
+echo "[step] pnpm (2/6)"
 if command -v pnpm &>/dev/null; then
   echo "  [SKIPPED] pnpm already present on PATH (strict skip)"; mark_done pnpm
 elif [ "${ST[pnpm]}" = "done" ]; then
   echo "  [SKIPPED] pnpm already installed (state: done)"
 else
-  ensure_volta || fail_step pnpm "pnpm 2/7" "Volta bootstrap failed. Check network/proxy, then re-run."
-  retry 3 30 volta install pnpm || fail_step pnpm "pnpm 2/7" "pnpm install via Volta failed after 3 attempts. Ensure VOLTA_FEATURE_PNPM=1, then re-run."
-  command -v pnpm &>/dev/null || fail_step pnpm "pnpm 2/7" "pnpm still not on PATH after install. Open a new shell to refresh PATH, then re-run."
+  ensure_volta || fail_step pnpm "pnpm 2/6" "Volta bootstrap failed. Check network/proxy, then re-run."
+  retry 3 30 volta install pnpm || fail_step pnpm "pnpm 2/6" "pnpm install via Volta failed after 3 attempts. Ensure VOLTA_FEATURE_PNPM=1, then re-run."
+  command -v pnpm &>/dev/null || fail_step pnpm "pnpm 2/6" "pnpm still not on PATH after install. Open a new shell to refresh PATH, then re-run."
   mark_done pnpm
 fi
 
 # ===========================================================================
-# STEP 3/7 — uv (curl installer on Linux / brew on macOS, user-scope)
+# STEP 3/6 — uv (curl installer on Linux / brew on macOS, user-scope)
 # ===========================================================================
 echo ""
-echo "[step] uv (3/7)"
+echo "[step] uv (3/6)"
 if command -v uv &>/dev/null; then
   echo "  [SKIPPED] uv already present on PATH (strict skip)"; mark_done uv
 elif [ "${ST[uv]}" = "done" ]; then
   echo "  [SKIPPED] uv already installed (state: done)"
 else
   if [ "$OS" = "Darwin" ]; then
-    brew_install uv || fail_step uv "uv 3/7" "brew install uv failed after 3 attempts. Check network/proxy, then re-run."
+    brew_install uv || fail_step uv "uv 3/6" "brew install uv failed after 3 attempts. Check network/proxy, then re-run."
   else
-    retry 3 30 sh -c "curl -LsSf https://astral.sh/uv/install.sh | sh" || fail_step uv "uv 3/7" "uv install script failed after 3 attempts. Check network/proxy, then re-run."
+    retry 3 30 sh -c "curl -LsSf https://astral.sh/uv/install.sh | sh" || fail_step uv "uv 3/6" "uv install script failed after 3 attempts. Check network/proxy, then re-run."
   fi
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-  command -v uv &>/dev/null || fail_step uv "uv 3/7" "uv still not on PATH after install. Open a new shell to refresh PATH, then re-run."
+  command -v uv &>/dev/null || fail_step uv "uv 3/6" "uv still not on PATH after install. Open a new shell to refresh PATH, then re-run."
   mark_done uv
 fi
 
 # ===========================================================================
-# STEP 4/7 — task (curl installer on Linux / brew go-task on macOS)
+# STEP 4/6 — task (curl installer on Linux / brew go-task on macOS)
 # ===========================================================================
 echo ""
-echo "[step] task (4/7)"
+echo "[step] task (4/6)"
 if command -v task &>/dev/null; then
   echo "  [SKIPPED] task already present on PATH (strict skip)"; mark_done task
 elif [ "${ST[task]}" = "done" ]; then
   echo "  [SKIPPED] task already installed (state: done)"
 else
   if [ "$OS" = "Darwin" ]; then
-    brew_install go-task || fail_step task "task 4/7" "brew install go-task failed after 3 attempts. Check network/proxy, then re-run."
+    brew_install go-task || fail_step task "task 4/6" "brew install go-task failed after 3 attempts. Check network/proxy, then re-run."
   else
     # Install user-scope to ~/.local/bin (no root needed, R20.5).
     mkdir -p "$HOME/.local/bin"
-    retry 3 30 sh -c "curl --location https://taskfile.dev/install.sh | sh -s -- -d -b \"$HOME/.local/bin\"" || fail_step task "task 4/7" "task install script failed after 3 attempts. Check network/proxy, then re-run."
+    retry 3 30 sh -c "curl --location https://taskfile.dev/install.sh | sh -s -- -d -b \"$HOME/.local/bin\"" || fail_step task "task 4/6" "task install script failed after 3 attempts. Check network/proxy, then re-run."
   fi
-  command -v task &>/dev/null || fail_step task "task 4/7" "task still not on PATH after install. Open a new shell to refresh PATH, then re-run."
+  command -v task &>/dev/null || fail_step task "task 4/6" "task still not on PATH after install. Open a new shell to refresh PATH, then re-run."
   mark_done task
 fi
 
 # ===========================================================================
-# STEP 5/7 — pm2 (Volta, user-scope)
+# AUX (not part of the 4-tool verify) — kill-port + Android (opt-in, decoupled)
 # ===========================================================================
 echo ""
-echo "[step] pm2 (5/7)"
-if command -v pm2 &>/dev/null; then
-  echo "  [SKIPPED] pm2 already present on PATH (strict skip)"; mark_done pm2
-elif [ "${ST[pm2]}" = "done" ]; then
-  echo "  [SKIPPED] pm2 already installed (state: done)"
-else
-  ensure_volta || fail_step pm2 "pm2 5/7" "Volta bootstrap failed. Check network/proxy, then re-run."
-  retry 3 30 volta install pm2 kill-port || fail_step pm2 "pm2 5/7" "pm2 install via Volta failed after 3 attempts. Check network/proxy, then re-run."
-  command -v pm2 &>/dev/null || fail_step pm2 "pm2 5/7" "pm2 still not on PATH after install. Open a new shell to refresh PATH, then re-run."
-  mark_done pm2
+echo "[aux] Installing kill-port (best-effort; the Hub launcher uses it to free a stuck port)"
+if command -v volta &>/dev/null; then
+  volta install kill-port >/dev/null 2>&1 || echo "  [warn] kill-port install skipped (non-fatal)"
 fi
-
-# ===========================================================================
-# AUX (not part of the 5-tool verify) — Android is opt-in (decoupled)
-# ===========================================================================
 echo ""
 echo "[aux] Android is opt-in and NOT part of core setup. Run 'task setup-android' to install the Android SDK + emulator."
 
 # ===========================================================================
-# STEP 6/7 — install-deps (Workspace_Package + Python_Tool)
+# STEP 5/6 — install-deps (Workspace_Package + Python_Tool)
 # ===========================================================================
 echo ""
-echo "[step] install-deps (6/7)"
+echo "[step] install-deps (5/6)"
 if [ "${ST[install-deps]}" = "done" ]; then
   echo "  [SKIPPED] dependencies already installed (state: done)"
 else
   echo "  Installing Node workspace dependencies (pnpm install)..."
-  pnpm -C "$WORKSPACE_ROOT" install || fail_step install-deps "install-deps 6/7" "pnpm install failed. Check network and that pnpm-lock.yaml matches package.json, then re-run."
+  pnpm -C "$WORKSPACE_ROOT" install || fail_step install-deps "install-deps 5/6" "pnpm install failed. Check network and that pnpm-lock.yaml matches package.json, then re-run."
   echo "  Installing per-tool dependencies (isolated, pnpm)..."
   for d in "$WORKSPACE_ROOT"/tools/*/; do
     [ -f "${d}package.json" ] || continue
     echo "    [deps] $(basename "$d")"
-    pnpm -C "$d" install --ignore-workspace || fail_step install-deps "install-deps 6/7" "pnpm install failed for $(basename "$d"). Re-run after fixing."
+    pnpm -C "$d" install --ignore-workspace || fail_step install-deps "install-deps 5/6" "pnpm install failed for $(basename "$d"). Re-run after fixing."
   done
   # ---- Python toolchain (NON-FATAL) ----------------------------------------
   # Python is needed ONLY by the robot-framework tool. A locked-down network
@@ -365,24 +353,25 @@ else
 fi
 
 # ===========================================================================
-# STEP 7/7 — start-hub (build + pm2 via the shared ecosystem file)
+# STEP 6/6 — start-hub (build + daemonless launch via the shared launcher)
 # ===========================================================================
 echo ""
-echo "[step] start-hub (7/7)"
+echo "[step] start-hub (6/6)"
 if [ "${ST[start-hub]}" = "done" ]; then
   echo "  [SKIPPED] Hub already started (state: done)"
 else
   echo "  Building Hub (shared + server + client)..."
-  pnpm -C "$WORKSPACE_ROOT/hub" run build || fail_step start-hub "start-hub 7/7" "Hub build failed. Inspect the build output above, then re-run."
-  # Delegate process management to the shared launcher: it pins PM2_HOME, frees
-  # the port, starts via PM2, and AUTOMATICALLY falls back to a daemonless
-  # background process when PM2 is unavailable/blocked. One code path, cross-OS.
-  echo "  Starting Hub (PM2 with automatic daemonless fallback)..."
+  pnpm -C "$WORKSPACE_ROOT/hub" run build || fail_step start-hub "start-hub 6/6" "Hub build failed. Inspect the build output above, then re-run."
+  # Delegate process management to the shared launcher: it frees the port and
+  # starts the Hub as a daemonless detached background process (no daemon of our
+  # own, so nothing to be blocked by locked-down/corporate policy). One code
+  # path, cross-OS.
+  echo "  Starting Hub (daemonless background process)..."
   node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" start \
-    || fail_step start-hub "start-hub 7/7" "Hub failed to start. Run 'node hub/bin/hub-service.mjs status' for details, then re-run."
-  # Register PM2-independent boot auto-start: a systemd --user unit (Restart=always)
-  # + lingering, so the Hub starts at boot even on a headless box with no login.
-  # Best-effort (|| true): never fails setup if systemd/linger is unavailable.
+    || fail_step start-hub "start-hub 6/6" "Hub failed to start. Run 'node hub/bin/hub-service.mjs status' for details, then re-run."
+  # Register boot auto-start: a systemd --user unit (Restart=always) + lingering,
+  # so the Hub starts at boot even on a headless box with no login. Best-effort
+  # (|| true): never fails setup if systemd/linger is unavailable.
   echo "  Enabling auto-start at boot (systemd --user)..."
   node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" enable-boot || true
   mark_done start-hub
@@ -392,7 +381,7 @@ fi
 # VERIFY — only AFTER every step completed. Missing → non-zero.
 # ===========================================================================
 echo ""
-echo "[verify] Verifying all 5 Core tools on PATH (post-setup)"
+echo "[verify] Verifying all 4 Core tools on PATH (post-setup)"
 echo "---------------------------------------------------"
 MISSING=""
 verify() {
@@ -407,7 +396,6 @@ verify node "-v"
 verify pnpm "-v"
 verify uv "--version"
 verify task "--version"
-verify pm2 "-v"
 echo "---------------------------------------------------"
 if [ -n "$MISSING" ]; then
   echo ""
@@ -418,7 +406,7 @@ fi
 
 echo ""
 echo "==================================================="
-echo "  SETUP COMPLETED — Hub started, all 5 Core tools verified"
+echo "  SETUP COMPLETED — Hub started, all 4 Core tools verified"
 echo "==================================================="
 echo "  Open http://localhost:5174"
 echo "==================================================="

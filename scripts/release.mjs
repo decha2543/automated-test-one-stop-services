@@ -148,7 +148,7 @@ function main(argv) {
   if (doPush) {
     console.log(`[release] pushing ${BRANCH} + tags to ${REMOTE}`);
     git(['push', REMOTE, BRANCH, '--follow-tags']);
-    console.log(`[release] done — CI will publish the GitLab Release for ${tag}.`);
+    console.log(`[release] done — CI will publish the GitHub Release for ${tag}.`);
   } else {
     console.log(`[release] local commit + tag created. Push when ready:`);
     console.log(`          git push ${REMOTE} ${BRANCH} --follow-tags`);

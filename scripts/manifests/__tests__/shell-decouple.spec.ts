@@ -37,7 +37,7 @@ import { describe, expect, it } from 'vitest';
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 const WIN = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'setup', 'setup-windows.bat'), 'utf8');
 
-const CORE_TOOL_SET = ['node', 'pnpm', 'uv', 'task', 'pm2'];
+const CORE_TOOL_SET = ['node', 'pnpm', 'uv', 'task'];
 const EXPECTED_STEP_ORDER = [...CORE_TOOL_SET, 'install-deps', 'start-hub'];
 
 /** Ordered `[step] <name> (n/total)` step names the script declares. */

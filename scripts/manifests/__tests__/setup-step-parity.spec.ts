@@ -21,7 +21,7 @@ const SETUP_DIR = path.join(REPO_ROOT, 'scripts', 'setup');
 const WIN = fs.readFileSync(path.join(SETUP_DIR, 'setup-windows.bat'), 'utf8');
 const NIX = fs.readFileSync(path.join(SETUP_DIR, 'setup-linux.sh'), 'utf8');
 
-const CORE_TOOL_SET = ['node', 'pnpm', 'uv', 'task', 'pm2'];
+const CORE_TOOL_SET = ['node', 'pnpm', 'uv', 'task'];
 const EXPECTED_STEP_ORDER = [...CORE_TOOL_SET, 'install-deps', 'start-hub'];
 
 /** Ordered `[step] <name> (n/total)` step names a script declares. */
@@ -79,7 +79,6 @@ describe('Core step failure: ledger failed, no start-hub, hint printed (R1.4, R2
         pnpm: 'failed',
         uv: 'pending',
         task: 'pending',
-        pm2: 'pending',
         'install-deps': 'pending',
         'start-hub': 'pending',
       };
@@ -101,12 +100,12 @@ describe('Core step failure: ledger failed, no start-hub, hint printed (R1.4, R2
     expect(NIX).toMatch(/fail_step\(\)\s*\{/);
     expect(NIX).toMatch(/\[hint\]/);
     expect(NIX).toMatch(/exit 1/);
-    expect(NIX).toMatch(/fail_step node "node 1\/7"/);
+    expect(NIX).toMatch(/fail_step node "node 1\/6"/);
 
     // Windows: :fail records the failure, prints a [hint], and the step exits.
     expect(WIN).toMatch(/:fail\b/);
     expect(WIN).toMatch(/\[hint\]/);
-    expect(WIN).toMatch(/call :fail ST_node "node 1\/7"/);
+    expect(WIN).toMatch(/call :fail ST_node "node 1\/6"/);
 
     // start-hub is the LAST step on both (verify can only run after every step).
     expect(stepLabels(NIX).at(-1)).toBe('start-hub');

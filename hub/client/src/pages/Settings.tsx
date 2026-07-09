@@ -37,7 +37,7 @@ import { usePreferences } from '~/stores/hub.js';
 
 /**
  * Poll /api/health until it succeeds or timeout. Used during system update
- * to detect when the server is back online after pm2 restart.
+ * to detect when the server is back online after a Hub restart.
  */
 async function waitForHealth(timeoutMs: number): Promise<boolean> {
   const start = Date.now();
