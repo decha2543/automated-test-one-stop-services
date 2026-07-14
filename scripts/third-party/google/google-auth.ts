@@ -15,6 +15,15 @@ const CREDENTIALS_DIR = path.resolve(__dirname, 'credentials');
 const CREDENTIALS_PATH = path.join(CREDENTIALS_DIR, 'credentials.json');
 const TOKEN_PATH = path.join(CREDENTIALS_DIR, 'token.json');
 
+/**
+ * Non-throwing check: is a Google `credentials.json` present? Usage logging is a
+ * best-effort side effect that must never crash a run, so it (and preflight
+ * status) use this to skip gracefully instead of relying on authorize()'s throw.
+ */
+export function credentialsReady(): boolean {
+  return fs.existsSync(CREDENTIALS_PATH);
+}
+
 export async function authorize(): Promise<OAuth2Client> {
   if (fs.existsSync(TOKEN_PATH)) {
     try {
@@ -27,7 +36,10 @@ export async function authorize(): Promise<OAuth2Client> {
       // Attempt to retrieve a valid access token (refreshes if needed and possible)
       await oAuth2Client.getAccessToken();
 
-      return oAuth2Client;
+      // googleapis bundles google-auth-library@10.5.0 while local-auth pulls
+      // 10.9.0; the OAuth2Client types clash nominally (private `redirectUri`)
+      // though they're the same class. Bridge — same cast the fallback path uses.
+      return oAuth2Client as unknown as OAuth2Client;
     } catch (_err) {
       console.warn('Token expired or invalid, re-authenticating...');
     }

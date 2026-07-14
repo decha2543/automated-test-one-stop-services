@@ -18,6 +18,7 @@ import {
 import { ProjectRow } from '~/components/projects/ProjectRow.js';
 import { ToolSection } from '~/components/projects/ToolSection.js';
 import { ToolSectionActions } from '~/components/projects/ToolSectionActions.js';
+import { UsageLoggingPanel } from '~/components/projects/UsageLoggingPanel.js';
 import { toast } from '~/components/Toast.js';
 import { TypeToConfirmModal } from '~/components/TypeToConfirmModal.js';
 import { useTools } from '~/hooks/useTools.js';
@@ -299,6 +300,9 @@ export function ProjectsPage() {
       setEditingEnv(null);
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['env'] });
+      // Editing scripts/.env (SPREADSHEET_ID / FORCE_TRACK) changes usage-logging
+      // readiness — refresh its badge/toggle too.
+      queryClient.invalidateQueries({ queryKey: ['usage-logging'] });
     },
     onError: () => toast.error(t('projects.envSaveFailed')),
   });
@@ -418,6 +422,7 @@ export function ProjectsPage() {
               onEdit={() => startEditEnv('scripts', '', '')}
             />
             <CredentialsPanel />
+            <UsageLoggingPanel />
           </ToolSection>
 
           {(tools.data ?? []).map((tool) => {

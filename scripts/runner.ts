@@ -264,9 +264,11 @@ async function runManifestCLI(): Promise<void> {
       type: 'select',
       name: 'trackUsage',
       message: 'Enable Google Sheet Usage Logging?',
+      // 'No' first so it is the default (Enter) — a non-technical user must not
+      // enable logging (which needs credentials + SPREADSHEET_ID) by accident.
       choices: [
-        { title: 'Yes', value: 'yes' },
         { title: 'No', value: 'no' },
+        { title: 'Yes', value: 'yes' },
         { title: '< Go Back', value: 'BACK' },
       ],
     });

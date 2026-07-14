@@ -301,6 +301,14 @@ export const en = {
   'creds.missing': 'credentials missing',
   'creds.replace': 'Replace',
   'creds.upload': 'Upload credentials.json',
+  'usage.title': 'Force Usage logging',
+  'usage.on': 'on',
+  'usage.readyOff': 'ready (off)',
+  'usage.needCreds': 'needs credentials',
+  'usage.needSheetId': 'needs SPREADSHEET_ID',
+  'usage.enabled': 'Force Usage logging enabled',
+  'usage.disabled': 'Force Usage logging disabled',
+  'usage.toggleFailed': 'Could not change Force usage logging',
 
   // More-menu + bookmarks
   'common.remove': 'Remove',

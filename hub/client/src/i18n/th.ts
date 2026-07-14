@@ -301,6 +301,14 @@ export const th: Record<TranslationKey, string> = {
   'creds.missing': 'ยังไม่มี credentials',
   'creds.replace': 'แทนที่',
   'creds.upload': 'อัปโหลด credentials.json',
+  'usage.title': 'บังคับบันทึกการใช้งาน',
+  'usage.on': 'เปิด',
+  'usage.readyOff': 'พร้อม (ปิดอยู่)',
+  'usage.needCreds': 'ต้องมี credentials',
+  'usage.needSheetId': 'ต้องตั้ง SPREADSHEET_ID',
+  'usage.enabled': 'เปิดการบังคับบันทึกการใช้งานแล้ว',
+  'usage.disabled': 'ปิดการบังคับบันทึกการใช้งานแล้ว',
+  'usage.toggleFailed': 'เปลี่ยนสถานะการบังคับบันทึกการใช้งานไม่สำเร็จ',
 
   // More-menu + bookmarks
   'common.remove': 'ลบ',
