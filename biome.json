@@ -98,7 +98,6 @@
       "!!**/.playwright-report",
       "!!**/.playwright-cli",
       "!!**/.kiro",
-      "!!**/tools",
       "!!**/hub/server/data",
       "!!**/selectorshub",
       "!!**/brain",
