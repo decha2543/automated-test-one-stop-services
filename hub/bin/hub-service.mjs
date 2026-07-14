@@ -17,7 +17,13 @@
 //  installed it owns the process and start/stop/restart delegate to it instead
 //  of spawning a daemonless copy.
 //
-//  Usage:  node hub/bin/hub-service.mjs <start|stop|restart|status|enable-boot|disable-boot>
+//  Usage:  node hub/bin/hub-service.mjs <start|stop|restart|status|enable-boot|disable-boot|open|install-shortcut>
+//
+//  open            wait for readiness, then open the Hub in the default browser.
+//  install-shortcut  drop a native "Test Hub" desktop shortcut (Win .url / mac
+//                  .webloc / Linux .desktop) that opens the Hub URL. Both are
+//                  best-effort, cross-OS, and used by the setup/installer scripts
+//                  so the end-user experience is identical on every OS.
 //
 //  enable-boot registers the Hub to start automatically at login/boot, user-scope
 //  (no admin): a logon Scheduled Task (Windows), a systemd --user unit with
@@ -29,6 +35,7 @@
 //  Tunables (env, all optional):
 //    HUB_HOST             bind host   (default 127.0.0.1)
 //    HUB_PORT             bind port   (default 5174)
+//    KIRO_SHORTCUT_DIR    where `install-shortcut` writes (default: ~/Desktop)
 //
 //  Build is NOT this script's job — the caller builds first (pnpm -C hub run
 //  build). `start` refuses to run daemonless if `server/dist/index.js` is absent.
@@ -457,6 +464,130 @@ async function disableBoot() {
   return 0;
 }
 
+// ── Browser open + desktop shortcut (non-tech UX, cross-OS) ───────────────────
+
+/**
+ * The browser-facing URL. Loopback/wildcard bind hosts are shown as `localhost`
+ * (friendlier, and what the installers print); a real bind host is used as-is.
+ */
+function hubUrl() {
+  const loopback = HOST === '127.0.0.1' || HOST === '0.0.0.0' || HOST === '::1' || HOST === '::';
+  return `http://${loopback ? 'localhost' : HOST}:${PORT}`;
+}
+
+/**
+ * `open` — wait briefly for the Hub to accept connections, then open it in the
+ * default browser (cross-OS: start / open / xdg-open). Best-effort: failing to
+ * open a browser must never fail setup, so this always resolves 0. The wait lets
+ * a standalone `setup` run (which does not poll) open only once the server is
+ * actually up; the installer already polled, so it returns immediately.
+ */
+async function openBrowser() {
+  const url = hubUrl();
+  const deadline = Date.now() + 20_000;
+  let ready = false;
+  while (Date.now() < deadline) {
+    if (await portOpen(HOST, PORT, 1000)) {
+      ready = true;
+      break;
+    }
+    await sleep(500);
+  }
+  if (!ready) {
+    console.warn(`  [warn] Hub not confirmed on ${url} yet — opening anyway (refresh if the page is blank).`);
+  }
+  // stdio ignored + windowsHide so no console window flashes for a non-tech user.
+  let r;
+  if (IS_WIN) {
+    // `start` is a cmd builtin; the empty "" is its (required) window-title arg.
+    r = spawnSync('cmd', ['/c', 'start', '', url], { stdio: 'ignore', windowsHide: true, timeout: 15_000 });
+  } else if (IS_MAC) {
+    r = spawnSync('open', [url], { stdio: 'ignore', timeout: 15_000 });
+  } else {
+    r = spawnSync('xdg-open', [url], { stdio: 'ignore', timeout: 15_000 });
+  }
+  if (r?.error) {
+    console.warn(`  [warn] Could not open a browser automatically. Open ${url} manually.`);
+  } else {
+    console.log(`  Opened ${url} in your default browser.`);
+  }
+  return 0;
+}
+
+/** Where `install-shortcut` writes. Env override, else the user's Desktop. */
+function shortcutDir() {
+  if (process.env.KIRO_SHORTCUT_DIR) return process.env.KIRO_SHORTCUT_DIR;
+  if (IS_LINUX && process.env.XDG_DESKTOP_DIR) return process.env.XDG_DESKTOP_DIR;
+  return path.join(os.homedir(), 'Desktop');
+}
+
+/**
+ * `install-shortcut` — drop a native "Test Hub" shortcut on the Desktop that
+ * opens the Hub URL in the default browser. One clickable icon so a non-tech
+ * user can reopen the Hub after closing the tab (the boot supervisor keeps the
+ * server itself running). Per-OS native formats, so there is no console flash:
+ * Windows `.url`, macOS `.webloc`, Linux `.desktop`. Best-effort: a missing
+ * Desktop (headless box) or a write error only warns.
+ *
+ * ponytail: a pure-URL shortcut shows the browser's connect-error page if the
+ * Hub happens to be down; acceptable since `enable-boot` keeps it up. Upgrade
+ * path if that ever bites: point the shortcut at `hub-service open` instead.
+ */
+function installShortcut() {
+  const url = hubUrl();
+  const dir = shortcutDir();
+  try {
+    if (!fs.existsSync(dir)) {
+      console.warn(`  [warn] No Desktop folder at ${dir}; skipping the "Test Hub" shortcut (non-fatal).`);
+      return 0;
+    }
+    let file;
+    let content;
+    let makeExecutable = false;
+    if (IS_WIN) {
+      file = path.join(dir, 'Test Hub.url');
+      content = `[InternetShortcut]\r\nURL=${url}\r\nIconIndex=0\r\n`;
+    } else if (IS_MAC) {
+      file = path.join(dir, 'Test Hub.webloc');
+      content = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>URL</key>
+  <string>${url}</string>
+</dict>
+</plist>
+`;
+    } else {
+      file = path.join(dir, 'Test Hub.desktop');
+      content = [
+        '[Desktop Entry]',
+        'Version=1.0',
+        'Type=Application',
+        'Name=Test Hub',
+        'Comment=Open the AutoQA Test Hub',
+        `Exec=xdg-open ${url}`,
+        'Icon=web-browser',
+        'Terminal=false',
+        'Categories=Development;',
+        '',
+      ].join('\n');
+      makeExecutable = true;
+    }
+    fs.writeFileSync(file, content, 'utf8');
+    if (makeExecutable) {
+      fs.chmodSync(file, 0o755);
+      // GNOME flags unknown .desktop files "untrusted" until this metadata is set.
+      // Best-effort; `gio` may be absent on non-GNOME desktops.
+      spawnSync('gio', ['set', file, 'metadata::trusted', 'true'], { stdio: 'ignore', timeout: 5_000 });
+    }
+    console.log(`  Created desktop shortcut: ${file}`);
+  } catch (e) {
+    console.warn(`  [warn] Could not create the desktop shortcut (${e.message}); non-fatal.`);
+  }
+  return 0;
+}
+
 // ── Commands ──────────────────────────────────────────────────────────────────
 
 /** Stop whatever is running (boot supervisor if any, else the daemonless instance). */
@@ -560,9 +691,13 @@ async function main() {
       return enableBoot();
     case 'disable-boot':
       return disableBoot();
+    case 'open':
+      return openBrowser();
+    case 'install-shortcut':
+      return installShortcut();
     default:
       console.error(
-        `Unknown command: ${cmd}. Use: start | stop | restart | status | enable-boot | disable-boot`,
+        `Unknown command: ${cmd}. Use: start | stop | restart | status | enable-boot | disable-boot | open | install-shortcut`,
       );
       return 2;
   }

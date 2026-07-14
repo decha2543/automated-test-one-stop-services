@@ -19,8 +19,13 @@ set "REPO_URL=https://github.com/decha2543/automated-test-one-stop-services.git"
 echo ===================================================
 echo   AUTOMATED TEST ONE-STOP SERVICE - INSTALLER
 echo ===================================================
-echo   This will clone the workspace and install
-echo   everything needed to run the test automation Hub.
+echo   Welcome! This sets everything up for you automatically -
+echo   no technical knowledge needed. It installs the test
+echo   automation Hub and opens it in your browser when done.
+echo.
+echo   * It usually takes about 5-15 minutes the first time.
+echo   * You'll see technical messages scroll by - that's normal.
+echo   * Please just keep this window open until it finishes.
 echo ===================================================
 
 REM --------------------------------------------------------------------------
@@ -115,17 +120,23 @@ REM --------------------------------------------------------------------------
 echo.
 echo ===================================================
 echo   Running setup (toolchain + deps + Hub start)...
+echo   The technical messages below are normal - please keep this window open.
 echo ===================================================
 
 set "KIRO_SETUP_STATE_DIR=!WORKSPACE!"
 set "KIRO_NO_PAUSE=1"
+REM Let the installer open the browser once, AFTER the readiness poll below, so
+REM setup itself does not open too early. install-shortcut still runs in setup.
+set "KIRO_NO_OPEN=1"
 call "!WORKSPACE!\scripts\setup\setup-windows.bat"
 set "SETUP_RC=!ERRORLEVEL!"
 
 if not "!SETUP_RC!"=="0" (
     echo.
-    echo   [error] Setup failed ^(exit code !SETUP_RC!^).
-    echo   See messages above. Fix the issue and re-run this installer.
+    echo   [error] Setup did not finish ^(code !SETUP_RC!^).
+    echo   Don't worry - just run this installer again. It continues
+    echo   where it left off; finished steps are skipped.
+    echo   If it keeps failing, the messages above show what to fix.
     pause
     exit /b 1
 )
@@ -148,12 +159,18 @@ goto :poll_loop
 :hub_ok
 echo.
 echo ===================================================
-echo   DONE! Hub is running.
-echo   Open: http://localhost:5174
+echo   ALL SET! Your Test Hub is ready to use.
 echo ===================================================
+echo   Open: http://localhost:5174
+echo.
+echo   Opening it in your browser now...
+call node "!WORKSPACE!\hub\bin\hub-service.mjs" open
+echo.
+echo   Next time, just double-click the "Test Hub" icon on your
+echo   desktop to open it again.
 echo.
 echo   Workspace: !WORKSPACE!
-echo   Update:    git -C "!WORKSPACE!" pull
+echo ===================================================
 echo.
 pause
 exit /b 0
@@ -161,6 +178,7 @@ exit /b 0
 :hub_fail
 echo.
 echo   [error] Hub did not start within 60s.
+echo   Try running this installer again - it resumes where it left off.
 echo   [hint]  Check the Hub status: node hub\bin\hub-service.mjs status ^(logs: hub\.run\hub.log^)
 pause
 exit /b 1

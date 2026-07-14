@@ -315,6 +315,8 @@ echo "[step] install-deps (5/6)"
 if [ "${ST[install-deps]}" = "done" ]; then
   echo "  [SKIPPED] dependencies already installed (state: done)"
 else
+  echo "  This downloads dependencies and can take several minutes on the first run."
+  echo "  Please keep this window open - it is working, not frozen."
   echo "  Installing Node workspace dependencies (pnpm install)..."
   pnpm -C "$WORKSPACE_ROOT" install || fail_step install-deps "install-deps 5/6" "pnpm install failed. Check network and that pnpm-lock.yaml matches package.json, then re-run."
   echo "  Installing per-tool dependencies (isolated, pnpm)..."
@@ -360,7 +362,7 @@ echo "[step] start-hub (6/6)"
 if [ "${ST[start-hub]}" = "done" ]; then
   echo "  [SKIPPED] Hub already started (state: done)"
 else
-  echo "  Building Hub (shared + server + client)..."
+  echo "  Building the Hub (shared + server + client) - this can take a couple of minutes..."
   pnpm -C "$WORKSPACE_ROOT/hub" run build || fail_step start-hub "start-hub 6/6" "Hub build failed. Inspect the build output above, then re-run."
   # Delegate process management to the shared launcher: it frees the port and
   # starts the Hub as a daemonless detached background process (no daemon of our
@@ -410,3 +412,10 @@ echo "  SETUP COMPLETED — Hub started, all 4 Core tools verified"
 echo "==================================================="
 echo "  Open http://localhost:5174"
 echo "==================================================="
+
+echo ""
+echo "  [setup] Creating \"Test Hub\" desktop shortcut..."
+node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" install-shortcut || true
+if [ "${KIRO_NO_OPEN:-}" != "1" ]; then
+  node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" open || true
+fi

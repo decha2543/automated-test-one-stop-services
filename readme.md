@@ -19,6 +19,32 @@ workspace, installs the toolchain + dependencies, and starts the Hub:
 
 Then open the Hub at <http://localhost:5174>.
 
+### "Is this safe?" — the security warning
+
+The installer is **not code-signed yet**, so on a fresh machine your operating
+system may warn that it doesn't recognize it. This is expected for a new tool —
+it's a reputation check, not a virus report. Download it **only** from the
+official repository, then allow it to run. The steps are the same shape on every
+OS:
+
+1. **Windows** — double-click the `.bat`. If you see **"Windows protected your
+   PC"**, click **More info**, then **Run anyway**.
+2. **macOS** — if double-clicking is blocked, **Control-click (right-click) →
+   Open → Open**, or run `bash <installer>.sh` in Terminal.
+3. **Linux** — make it executable, then run it:
+   `chmod +x <installer>.sh && ./<installer>.sh` (or just `bash <installer>.sh`).
+
+> The real warning is always a **system dialog**, never a web page. Ignore any
+> browser pop-up that imitates it, and only run the file you downloaded from the
+> official link.
+
+### What happens next (so nothing looks "stuck")
+
+A console window opens and shows progress — **keep it open**. The first run
+installs tools and can take several minutes (it's working, not frozen). When it
+finishes it **opens the Hub in your browser automatically** and adds a **"Test
+Hub"** shortcut to your desktop so you can reopen it anytime.
+
 ## CLI (no Hub required)
 
 ```bash

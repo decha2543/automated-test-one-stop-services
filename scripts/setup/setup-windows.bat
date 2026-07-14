@@ -173,6 +173,8 @@ REM ===========================================================================
 echo.
 echo [step] install-deps (5/6)
 if /I "%ST_install_deps%"=="done" ( echo   [SKIPPED] dependencies already installed ^(state: done^) & goto :step_starthub )
+echo   This downloads dependencies and can take several minutes on the first run.
+echo   Please keep this window open - it is working, not frozen.
 call :installDeps
 if errorlevel 1 ( call :fail ST_install_deps "install-deps 5/6" "Dependency install failed. Check the failing command above; verify network and that pnpm-lock.yaml/uv.lock match, then re-run." & exit /b 1 )
 call :done ST_install_deps
@@ -216,6 +218,10 @@ echo   SETUP COMPLETED - Hub started, all 4 Core tools verified
 echo ===================================================
 echo   Open http://localhost:5174
 echo ===================================================
+echo.
+echo   [setup] Creating "Test Hub" desktop shortcut...
+call node "%WORKSPACE_ROOT%\hub\bin\hub-service.mjs" install-shortcut
+if not defined KIRO_NO_OPEN call node "%WORKSPACE_ROOT%\hub\bin\hub-service.mjs" open
 if not defined KIRO_NO_PAUSE pause
 exit /b 0
 
@@ -517,7 +523,7 @@ REM (hub-service.mjs), which runs it as a daemonless background process. Any
 REM failure aborts.
 REM ---------------------------------------------------------------------------
 :startHub
-echo   Building Hub (shared + server + client)...
+echo   Building the Hub (shared + server + client) - this can take a couple of minutes...
 call pnpm -C "%WORKSPACE_ROOT%\hub" run build
 if errorlevel 1 ( echo   [error] Hub build failed. & exit /b 1 )
 REM Delegate process management to the shared launcher, which frees the port and
