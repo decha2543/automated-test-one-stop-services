@@ -12,7 +12,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TbCopy, TbDots, TbFolder, TbPlayerPlay, TbRoute } from 'react-icons/tb';
 import { api } from '~/api/client.js';
 import { toast } from '~/components/Toast.js';
@@ -49,6 +49,23 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
     queryFn: () => api.post('/api/reports/artifacts', { path: reportPath }),
     enabled: artifactOpen,
   });
+
+  // Default-open the groups that contain a trace (the high-value artifact you
+  // usually open first); groups with only videos stay collapsed to keep the list
+  // scannable. Seeded once per modal-open (via the ref) so the user can still
+  // expand/collapse any group freely afterward, and it re-seeds on reopen.
+  const seededExpand = useRef(false);
+  useEffect(() => {
+    if (!artifactOpen) {
+      seededExpand.current = false;
+      return;
+    }
+    if (seededExpand.current || !artifacts.data) return;
+    seededExpand.current = true;
+    setExpandedGroups(
+      new Set(artifacts.data.groups.filter((g) => g.traces.length > 0).map((g) => g.name)),
+    );
+  }, [artifactOpen, artifacts.data]);
 
   function toggleGroup(name: string) {
     setExpandedGroups((prev) => {
@@ -216,6 +233,7 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
                     variant="subtle"
                     fullWidth
                     justify="space-between"
+                    aria-expanded={isExpanded}
                     onClick={() => toggleGroup(group.name)}
                     rightSection={
                       <Badge size="xs" color="gray" variant="light">
