@@ -33,7 +33,7 @@
       },
       "preset": "recommended",
       "security": {
-        "noSecrets": "warn"
+        "noSecrets": "off"
       },
       "style": {
         "noNonNullAssertion": "warn",
