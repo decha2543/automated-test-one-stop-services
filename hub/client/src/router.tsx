@@ -9,6 +9,7 @@ import {
 import { qActiveRuns, qDoctor, qProjects, qRunsHistory } from './api/queries.js';
 import { queryClient } from './api/query-client.js';
 import { AppLayout } from './components/AppLayout.js';
+import { PageLoader } from './components/PageLoader.js';
 
 // ---------------------------------------------------------------------------
 // Router context — gives every route loader access to the shared QueryClient
@@ -145,6 +146,13 @@ export const router = createRouter({
   // stale time to 0 means loaders always re-run `ensureQueryData`, which is a
   // cache hit when the query is still fresh per its own `staleTime`.
   defaultPreloadStaleTime: 0,
+  // Without a pending fallback the router paints nothing while the initial
+  // route's loaders resolve — a blank dark page that looks like the app failed
+  // to load. Render a loader instead, and with `defaultPendingMs: 0` show it
+  // immediately rather than after the 1s default (navigations are local cache
+  // hits, so this won't flash on route changes).
+  defaultPendingComponent: () => <PageLoader boot />,
+  defaultPendingMs: 0,
   context: { queryClient },
 });
 

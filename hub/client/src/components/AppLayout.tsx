@@ -3,10 +3,8 @@ import {
   AppShell,
   Badge,
   Burger,
-  Center,
   Group,
   Kbd,
-  Loader,
   NavLink,
   ScrollArea,
   Text,
@@ -42,6 +40,7 @@ import { FloatingRunsWindow } from '~/components/FloatingRunsWindow.js';
 import { KeyboardShortcuts } from '~/components/KeyboardShortcuts.js';
 import { LanguageToggle } from '~/components/LanguageToggle.js';
 import { NotificationCenter } from '~/components/NotificationCenter.js';
+import { PageLoader } from '~/components/PageLoader.js';
 import { SpotlightSearch } from '~/components/SpotlightSearch.js';
 import { useScheduleToasts } from '~/hooks/useScheduleToasts.js';
 import type { TranslationKey } from '~/i18n/en';
@@ -169,20 +168,6 @@ const NAV_CATEGORIES: NavCategory[] = [
 /** Max content width. Caps line length on ultrawide screens; pages still go
  * full width below this. One knob to widen/narrow every page at once. */
 const CONTENT_MAX_WIDTH = 1600;
-
-function PageFallback() {
-  const t = useT();
-  return (
-    <Center h="100%" mih={200}>
-      <Group gap="sm">
-        <Loader size="sm" />
-        <Text c="dimmed" size="sm">
-          {t('common.loading')}
-        </Text>
-      </Group>
-    </Center>
-  );
-}
 
 export function AppLayout() {
   const t = useT();
@@ -401,7 +386,7 @@ export function AppLayout() {
             )}
             <div style={{ flex: 1, minHeight: 0 }}>
               <ErrorBoundary>
-                <Suspense fallback={<PageFallback />}>
+                <Suspense fallback={<PageLoader />}>
                   <Outlet />
                 </Suspense>
               </ErrorBoundary>
