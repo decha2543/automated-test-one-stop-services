@@ -666,6 +666,7 @@ export const en = {
   // Reports (page body)
   'reports.advancedSearch': 'Advanced search',
   'reports.reportsWord': 'reports',
+  'reports.cases': 'Cases',
   'reports.open': 'Open',
   'reports.selectRow': 'Select',
   'reports.lockHint': 'Lock (prevent cleanup)',

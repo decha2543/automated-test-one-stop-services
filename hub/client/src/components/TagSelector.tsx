@@ -172,7 +172,7 @@ export function TagSelector({ tags, isLoading, selectedTags, onChange }: TagSele
               )}
             </Group>
             <Collapse expanded={showMatchedTests && matchingCount > 0}>
-              <ScrollArea.Autosize mah={200}>
+              <ScrollArea.Autosize mah="25vh">
                 <Stack gap={2}>
                   {matchedTests.map((t, idx) => (
                     <Group
@@ -231,7 +231,7 @@ export function TagSelector({ tags, isLoading, selectedTags, onChange }: TagSele
 
       {/* ─── Category groups (flat) ─── */}
       <Paper withBorder style={{ overflow: 'hidden' }}>
-        <ScrollArea.Autosize mah={360}>
+        <ScrollArea.Autosize mah="40vh">
           <Stack gap={0}>
             {filteredGroups.map((group) => {
               const color = GROUP_COLORS[group.kind] ?? 'teal';

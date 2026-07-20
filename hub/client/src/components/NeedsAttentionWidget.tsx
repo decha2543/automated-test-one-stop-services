@@ -92,7 +92,7 @@ export function NeedsAttentionWidget({ onNavigate }: { onNavigate: (page: string
       <Title order={5} mb="sm">
         {t('dashboard.needsAttention')}
       </Title>
-      <ScrollArea h={300}>
+      <ScrollArea h="35vh">
         <Stack gap="xs" h="100%">
           {items.slice(0, 5).map((item) => (
             <Alert key={item.message} color={item.severity} variant="light" icon={item.icon}>

@@ -474,7 +474,7 @@ function PreviewModal({
           </Group>
 
           {isImage && (
-            <Image src={serveUrl(file.path)} alt={file.name} mah={500} fit="contain" radius="sm" />
+            <Image src={serveUrl(file.path)} alt={file.name} mah="55vh" fit="contain" radius="sm" />
           )}
 
           {isVideo && (
@@ -482,7 +482,7 @@ function PreviewModal({
             <video
               src={serveUrl(file.path)}
               controls
-              style={{ maxHeight: 500, width: '100%', borderRadius: 8 }}
+              style={{ maxHeight: '55vh', width: '100%', borderRadius: 8 }}
             />
           )}
 
@@ -496,7 +496,7 @@ function PreviewModal({
           )}
 
           {isText && textContent.data && (
-            <ScrollArea.Autosize mah={500}>
+            <ScrollArea.Autosize mah="55vh">
               <Code block style={{ fontSize: 12 }}>
                 {textContent.data.content}
               </Code>
@@ -802,7 +802,7 @@ export function ArtifactsPage() {
         </SimpleGrid>
       ) : (
         <Paper withBorder radius="md">
-          <ScrollArea.Autosize mah={600}>
+          <ScrollArea.Autosize mah="65vh">
             {folders.map((folder) => (
               <FolderRow
                 key={folder.path}

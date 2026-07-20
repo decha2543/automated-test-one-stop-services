@@ -113,7 +113,7 @@ export function SectionSelect({
           onChange={(e) => setSearch(e.currentTarget.value)}
           placeholder={t('common.search')}
         />
-        <Combobox.Options mah={240} style={{ overflowY: 'auto' }}>
+        <Combobox.Options mah="30vh" style={{ overflowY: 'auto' }}>
           {visibleUngrouped.map(renderOption)}
           {visibleGroups.map((g) => {
             const isCollapsed = query === '' && collapsed.has(g.name);

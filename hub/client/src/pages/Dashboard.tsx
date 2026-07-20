@@ -207,7 +207,7 @@ export function DashboardPage() {
                 </Text>
               )}
               {recentRuns.length > 0 && (
-                <ScrollArea h={300}>
+                <ScrollArea h="35vh">
                   <Stack gap={6} h="100%">
                     {recentRuns.map((run) => (
                       <Tooltip
@@ -274,7 +274,7 @@ export function DashboardPage() {
                 </Group>
               )}
               {projects.data && (
-                <ScrollArea h={300}>
+                <ScrollArea h="35vh">
                   <Stack gap="xs">
                     <SimpleGrid cols={1} spacing="md">
                       {enabledTools.map((tool) => (

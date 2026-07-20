@@ -152,6 +152,11 @@ export function openLocalDb(dbPath: string): LocalDb {
   // Prepare the normalized schema (idempotent).
   db.exec(SCHEMA_DDL);
 
+  // Additive migration: `CREATE TABLE IF NOT EXISTS` never alters an existing
+  // table, so add the summary columns to history DBs created before they
+  // existed. Guarded by `hasColumn`, so this is a no-op on current DBs.
+  ensureHistorySummaryColumns(db);
+
   // --- repo dispatch helpers -------------------------------------------------
   function writeDataset(name: string, rows: unknown[] | unknown): void {
     if (name === HISTORY_COLLECTION) {
@@ -248,6 +253,20 @@ export function openLocalDb(dbPath: string): LocalDb {
       });
     },
   };
+}
+
+/**
+ * Add the `summary_*` columns to an existing `history` table when missing.
+ * Idempotent: each `ALTER TABLE` runs only when `hasColumn` reports the column
+ * absent, so this is a no-op once the columns exist (or for a fresh DB where
+ * SCHEMA_DDL already created them).
+ */
+function ensureHistorySummaryColumns(db: DatabaseSync): void {
+  for (const col of ['summary_passed', 'summary_failed', 'summary_skipped']) {
+    if (!hasColumn(db, 'history', col)) {
+      db.exec(`ALTER TABLE history ADD COLUMN ${col} INTEGER`);
+    }
+  }
 }
 
 /**

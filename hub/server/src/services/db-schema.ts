@@ -61,6 +61,9 @@ export const SCHEMA_DDL = `
     ended_at    TEXT,
     exit_code   INTEGER,
     report_path TEXT,
+    summary_passed  INTEGER,
+    summary_failed  INTEGER,
+    summary_skipped INTEGER,
     ${RUN_REQUEST_DDL}
   );
   CREATE INDEX IF NOT EXISTS idx_history_started_at ON history(started_at DESC);

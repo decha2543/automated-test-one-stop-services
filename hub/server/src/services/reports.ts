@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ReportEntry, ToolId } from '@hub/shared';
+import type { ReportEntry, RunRecord, RunStatus, ToolId } from '@hub/shared';
 import { nanoid } from 'nanoid';
 import { OUTPUTS_DIR } from '../config.js';
+import { historyStore } from './history-store.js';
 import { getEnabledTools, getManifestModule } from './manifest-registry.js';
 
 /**
@@ -53,7 +54,78 @@ async function buildAllEntries(): Promise<ReportEntry[]> {
   const toolConfigs = await resolveToolWalkConfigs();
   const entries: ReportEntry[] = [];
   walkOutputs(OUTPUTS_DIR, toolConfigs, entries);
+  attachSummaries(entries);
   return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+/** Report status ↔ run status compatibility, used to disambiguate two runs of
+ * the same project that are close in time (e.g. a pass then a re-run failure). */
+function statusCompatible(reportStatus: ReportEntry['status'], runStatus: RunStatus): boolean {
+  if (reportStatus === 'success') return runStatus === 'passed';
+  if (reportStatus === 'error') {
+    return runStatus === 'failed' || runStatus === 'error' || runStatus === 'cancelled';
+  }
+  return true; // 'unknown' matches any
+}
+
+/**
+ * Enrich each report with the test-case summary of the run that produced it.
+ *
+ * The runner persists `{passed, failed, skipped}` on every finished (non-silent)
+ * run. There is no stored report↔run id, so we match on `tool/type/project`
+ * plus time proximity: a report directory is stamped around run end, so the
+ * report timestamp sits within (or right next to) the run's [startedAt, endedAt]
+ * window. This is a heuristic — an old report whose run has aged out of the
+ * capped history simply gets no summary, and two runs of the same project within
+ * the match window resolve to the nearest. Advisory only: any failure to read
+ * history leaves reports un-enriched rather than breaking the listing.
+ */
+function attachSummaries(entries: ReportEntry[]): void {
+  let history: RunRecord[];
+  try {
+    history = historyStore.getAll();
+  } catch {
+    return; // enrichment is best-effort; never block the report listing
+  }
+
+  const byKey = new Map<string, RunRecord[]>();
+  for (const r of history) {
+    if (!r.summary) continue;
+    const key = `${r.request.tool}/${r.request.type}/${r.request.project}`;
+    const list = byKey.get(key);
+    if (list) list.push(r);
+    else byKey.set(key, [r]);
+  }
+  if (byKey.size === 0) return;
+
+  // Report time and run end can differ by clock rounding (legacy dirs omit
+  // seconds) plus a little processing lag; 5 minutes covers that comfortably
+  // while staying far below typical spacing between distinct runs.
+  const MATCH_WINDOW_MS = 5 * 60_000;
+
+  for (const e of entries) {
+    const candidates = byKey.get(`${e.tool}/${e.type}/${e.project}`);
+    if (!candidates) continue;
+    const reportMs = Date.parse(e.timestamp);
+    if (Number.isNaN(reportMs)) continue;
+
+    let best: RunRecord | undefined;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const run of candidates) {
+      if (!statusCompatible(e.status, run.status)) continue;
+      const startMs = Date.parse(run.startedAt);
+      const endMs = run.endedAt ? Date.parse(run.endedAt) : startMs;
+      const dist =
+        reportMs >= startMs && reportMs <= endMs
+          ? 0
+          : Math.min(Math.abs(reportMs - startMs), Math.abs(reportMs - endMs));
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = run;
+      }
+    }
+    if (best?.summary && bestDist <= MATCH_WINDOW_MS) e.summary = best.summary;
+  }
 }
 
 /** Drop the cache so the next listReports call re-walks `outputs/`. */

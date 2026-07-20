@@ -340,8 +340,22 @@ export function AppLayout() {
               }
               onClick={() => setShowAdvanced((v) => !v)}
               variant="subtle"
+              c={showAdvanced ? undefined : 'dimmed'}
             />
-            {showAdvanced && NAV_CATEGORIES.filter((cat) => cat.advanced).map(renderCategory)}
+            {/* Nest the advanced categories under the toggle with an indented
+                left rail so items like Docker Services read as "inside
+                Advanced" rather than as their own top-level section. */}
+            {showAdvanced && (
+              <div
+                style={{
+                  marginLeft: 12,
+                  paddingLeft: 8,
+                  borderLeft: '2px solid var(--mantine-color-default-border)',
+                }}
+              >
+                {NAV_CATEGORIES.filter((cat) => cat.advanced).map(renderCategory)}
+              </div>
+            )}
           </AppShell.Section>
           <AppShell.Section>
             <Tooltip
@@ -363,7 +377,15 @@ export function AppLayout() {
           </AppShell.Section>
         </AppShell.Navbar>
 
-        <AppShell.Main style={{ display: 'flex', flexDirection: 'column' }}>
+        {/* Pin the shell to the viewport height (dvh, not a fixed px) and clip
+            it, so the app frame never triggers the browser's own scrollbar. The
+            content region below becomes the scroll container instead — pages
+            that fill 100% height scroll internally (tables, terminal), and
+            taller pages scroll within the content area while the header/navbar
+            stay put. */}
+        <AppShell.Main
+          style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        >
           {/* Centered, width-capped content column. Keeps line lengths readable
           on ultrawide monitors instead of stretching forms/tables edge-to-edge,
           while preserving the full-height flex chain that pages like Run rely on.
@@ -384,7 +406,10 @@ export function AppLayout() {
                 <ActiveRunsBanner runs={activeRuns.data ?? []} />
               </div>
             )}
-            <div style={{ flex: 1, minHeight: 0 }}>
+            {/* Default scroll container: full-height pages fill this exactly
+                (no scroll here, they scroll inside), while ordinary tall pages
+                scroll here rather than the window. */}
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Outlet />

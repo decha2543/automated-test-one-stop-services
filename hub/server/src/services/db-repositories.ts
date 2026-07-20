@@ -76,6 +76,14 @@ const REQ_PLACEHOLDERS = RUN_REQUEST_COLUMNS.map(() => '?').join(', ');
 // --- history ----------------------------------------------------------------
 
 function rowToRunRecord(row: Row): RunRecord {
+  // Reconstruct the summary only when at least one count was stored, so a run
+  // with no parsed summary round-trips as `summary: undefined` (not zeros).
+  const passed = readNum(row.summary_passed);
+  const failed = readNum(row.summary_failed);
+  const summary =
+    passed !== undefined || failed !== undefined
+      ? { passed: passed ?? 0, failed: failed ?? 0, skipped: readNum(row.summary_skipped) }
+      : undefined;
   return {
     id: readReqStr(row.id),
     request: readRunRequest(row),
@@ -85,12 +93,13 @@ function rowToRunRecord(row: Row): RunRecord {
     endedAt: readStr(row.ended_at),
     exitCode: readNum(row.exit_code),
     reportPath: readStr(row.report_path),
+    summary,
   };
 }
 
 const HISTORY_INSERT = `INSERT OR REPLACE INTO history
-  (id, status, command, started_at, ended_at, exit_code, report_path, ${REQ_COLS})
-  VALUES (?, ?, ?, ?, ?, ?, ?, ${REQ_PLACEHOLDERS})`;
+  (id, status, command, started_at, ended_at, exit_code, report_path, summary_passed, summary_failed, summary_skipped, ${REQ_COLS})
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${REQ_PLACEHOLDERS})`;
 
 function historyValues(rec: RunRecord): SqlValue[] {
   return [
@@ -101,6 +110,9 @@ function historyValues(rec: RunRecord): SqlValue[] {
     strCol(rec.endedAt),
     numCol(rec.exitCode),
     strCol(rec.reportPath),
+    numCol(rec.summary?.passed),
+    numCol(rec.summary?.failed),
+    numCol(rec.summary?.skipped),
     ...runRequestValues(rec.request),
   ];
 }

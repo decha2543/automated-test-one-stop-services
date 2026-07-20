@@ -72,7 +72,7 @@ export function TrendChart() {
 
   return (
     <AreaChart
-      h={220}
+      h="28vh"
       data={data}
       dataKey="date"
       type="stacked"

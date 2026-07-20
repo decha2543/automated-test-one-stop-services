@@ -379,295 +379,309 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
       style={{
         display: visible ? 'flex' : 'none',
         flexDirection: 'row',
-        height: '100%',
         flexWrap: 'wrap',
+        gap: 'var(--mantine-spacing-sm)',
+        height: '100%',
+        minHeight: 0,
       }}
     >
-      {/* Left: Form — 55% width (min 320px) */}
-      <ScrollArea
-        scrollbarSize={6}
-        type="auto"
-        miw={{ xs: '100%', lg: '40%' }}
-        maw={{ lg: '40%' }}
-        offsetScrollbars
+      {/* Left column: the form scrolls on its own (flex:1), while the Run/Stop
+          actions are pinned to the bottom of this column (below the scroll
+          area) so they stay level with the command bar on the right and never
+          scroll out of reach. Explicit height:100% (against the bounded row)
+          keeps the scroll internal instead of growing the page. */}
+      <Stack
+        gap="sm"
+        w={{ base: '100%', lg: '40%' }}
+        style={{ flexShrink: 0, height: '100%', minHeight: 0 }}
       >
-        <Paper p="md" withBorder style={{ opacity: isRunning ? 0.85 : 1 }}>
-          <Stack gap="sm">
-            <SimpleGrid cols={2} spacing="xs">
-              <Select
-                label={t('run.tool')}
-                size="xs"
-                disabled={isRunning}
-                value={tool}
-                onChange={(v) => {
-                  if (!v) return;
-                  setTool(v as ToolId);
-                  setType('');
-                  setProject('');
-                  setSelectedTags([]);
-                }}
-                data={toolSelectData(toolsQuery.data ?? [])}
-                allowDeselect={false}
-              />
-              <Select
-                label={t('run.mode')}
-                size="xs"
-                disabled={isRunning}
-                value={mode}
-                onChange={(v) => v && setMode(v as RunMode)}
-                data={[
-                  { value: 'local', label: t('run.modeLocal') },
-                  {
-                    value: 'docker',
-                    label: `Docker${!config.data?.dockerRunning ? ` (${t('run.notRunning')})` : ''}`,
-                    disabled: !config.data?.dockerRunning,
-                  },
-                ]}
-                allowDeselect={false}
-              />
-            </SimpleGrid>
-
-            <SimpleGrid cols={typeAxis ? 2 : 1} spacing="xs">
-              {typeAxis && (
+        <ScrollArea
+          scrollbarSize={6}
+          type="auto"
+          offsetScrollbars
+          style={{ flex: 1, minHeight: 0 }}
+        >
+          <Paper p="md" withBorder style={{ opacity: isRunning ? 0.85 : 1 }}>
+            <Stack gap="sm">
+              <SimpleGrid cols={2} spacing="xs">
                 <Select
-                  label={t('run.type')}
+                  label={t('run.tool')}
                   size="xs"
                   disabled={isRunning}
-                  value={type || null}
+                  value={tool}
                   onChange={(v) => {
-                    setType(v ?? '');
+                    if (!v) return;
+                    setTool(v as ToolId);
+                    setType('');
                     setProject('');
                     setSelectedTags([]);
                   }}
-                  placeholder={t('common.select')}
-                  data={types.data ?? []}
-                  searchable
-                />
-              )}
-              <Select
-                label={t('run.project')}
-                size="xs"
-                disabled={isRunning}
-                value={project || null}
-                onChange={(v) => {
-                  setProject(v ?? '');
-                  setSelectedTags([]);
-                }}
-                placeholder={projectsQ.isLoading ? t('common.loading') : t('common.select')}
-                data={projectsQ.data ?? []}
-                searchable
-              />
-            </SimpleGrid>
-
-            {sectionAxis && project && (
-              <SimpleGrid cols={2} spacing="xs">
-                <SectionSelect
-                  label={t('run.section')}
-                  disabled={isRunning}
-                  value={section}
-                  onChange={setSection}
-                  placeholder={t('common.select')}
-                  sections={sectionsQ.data ?? []}
-                />
-                <Select
-                  label={t('run.perfType')}
-                  size="xs"
-                  disabled={isRunning}
-                  value={perfType}
-                  onChange={(v) => v && setPerfType(v as PerformanceType)}
-                  data={perfTypeData}
+                  data={toolSelectData(toolsQuery.data ?? [])}
                   allowDeselect={false}
                 />
-              </SimpleGrid>
-            )}
-
-            {!sectionAxis && project && !isRunning && (
-              <TagSelector
-                tags={tags.data}
-                isLoading={tags.isLoading}
-                selectedTags={selectedTags}
-                onChange={setSelectedTags}
-              />
-            )}
-            {!sectionAxis && project && isRunning && selectedTags.length > 0 && (
-              <Stack gap={4}>
-                <Text size="xs" c="dimmed">
-                  {t('run.tags')}
-                </Text>
-                <Group gap={4}>
-                  {selectedTags.map((tag) => (
-                    <Badge key={tag} size="sm" color="blue" variant="filled">
-                      {tag}
-                    </Badge>
-                  ))}
-                </Group>
-              </Stack>
-            )}
-
-            {!sectionAxis && (
-              <SimpleGrid cols={2} spacing="xs">
                 <Select
-                  label={t('run.display')}
+                  label={t('run.mode')}
                   size="xs"
                   disabled={isRunning}
-                  value={headless}
-                  onChange={(v) => v && setHeadless(v as HeadlessMode)}
+                  value={mode}
+                  onChange={(v) => v && setMode(v as RunMode)}
                   data={[
-                    { value: 'headless', label: t('run.headless') },
-                    { value: 'headed', label: t('run.headed') },
+                    { value: 'local', label: t('run.modeLocal') },
+                    {
+                      value: 'docker',
+                      label: `Docker${!config.data?.dockerRunning ? ` (${t('run.notRunning')})` : ''}`,
+                      disabled: !config.data?.dockerRunning,
+                    },
                   ]}
                   allowDeselect={false}
                 />
-                <TextInput
-                  label={t('run.extraArgs')}
+              </SimpleGrid>
+
+              <SimpleGrid cols={typeAxis ? 2 : 1} spacing="xs">
+                {typeAxis && (
+                  <Select
+                    label={t('run.type')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={type || null}
+                    onChange={(v) => {
+                      setType(v ?? '');
+                      setProject('');
+                      setSelectedTags([]);
+                    }}
+                    placeholder={t('common.select')}
+                    data={types.data ?? []}
+                    searchable
+                  />
+                )}
+                <Select
+                  label={t('run.project')}
                   size="xs"
                   disabled={isRunning}
-                  value={extraArgs}
-                  onChange={(e) => setExtraArgs(e.currentTarget.value)}
-                  placeholder="--workers=4"
+                  value={project || null}
+                  onChange={(v) => {
+                    setProject(v ?? '');
+                    setSelectedTags([]);
+                  }}
+                  placeholder={projectsQ.isLoading ? t('common.loading') : t('common.select')}
+                  data={projectsQ.data ?? []}
+                  searchable
                 />
               </SimpleGrid>
-            )}
 
-            <Group gap="lg" wrap="wrap">
-              {!config.data?.forceTrack && (
+              {sectionAxis && project && (
+                <SimpleGrid cols={2} spacing="xs">
+                  <SectionSelect
+                    label={t('run.section')}
+                    disabled={isRunning}
+                    value={section}
+                    onChange={setSection}
+                    placeholder={t('common.select')}
+                    sections={sectionsQ.data ?? []}
+                  />
+                  <Select
+                    label={t('run.perfType')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={perfType}
+                    onChange={(v) => v && setPerfType(v as PerformanceType)}
+                    data={perfTypeData}
+                    allowDeselect={false}
+                  />
+                </SimpleGrid>
+              )}
+
+              {!sectionAxis && project && !isRunning && (
+                <TagSelector
+                  tags={tags.data}
+                  isLoading={tags.isLoading}
+                  selectedTags={selectedTags}
+                  onChange={setSelectedTags}
+                />
+              )}
+              {!sectionAxis && project && isRunning && selectedTags.length > 0 && (
+                <Stack gap={4}>
+                  <Text size="xs" c="dimmed">
+                    {t('run.tags')}
+                  </Text>
+                  <Group gap={4}>
+                    {selectedTags.map((tag) => (
+                      <Badge key={tag} size="sm" color="blue" variant="filled">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </Group>
+                </Stack>
+              )}
+
+              {!sectionAxis && (
+                <SimpleGrid cols={2} spacing="xs">
+                  <Select
+                    label={t('run.display')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={headless}
+                    onChange={(v) => v && setHeadless(v as HeadlessMode)}
+                    data={[
+                      { value: 'headless', label: t('run.headless') },
+                      { value: 'headed', label: t('run.headed') },
+                    ]}
+                    allowDeselect={false}
+                  />
+                  <TextInput
+                    label={t('run.extraArgs')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={extraArgs}
+                    onChange={(e) => setExtraArgs(e.currentTarget.value)}
+                    placeholder="--workers=4"
+                  />
+                </SimpleGrid>
+              )}
+
+              <Group gap="lg" wrap="wrap">
+                {!config.data?.forceTrack && (
+                  <Checkbox
+                    size="xs"
+                    label={t('run.skipUsageLogging')}
+                    disabled={isRunning}
+                    checked={noTrack}
+                    onChange={(e) => setNoTrack(e.currentTarget.checked)}
+                  />
+                )}
+
                 <Checkbox
                   size="xs"
-                  label={t('run.skipUsageLogging')}
+                  label={t('run.silentMode')}
                   disabled={isRunning}
-                  checked={noTrack}
-                  onChange={(e) => setNoTrack(e.currentTarget.checked)}
+                  checked={silent}
+                  onChange={(e) => setSilent(e.currentTarget.checked)}
+                />
+              </Group>
+
+              {doctorQ.data && !doctorQ.data.credentialsOk && !noTrack && (
+                <InlineAlert
+                  icon={<TbAlertTriangle size={14} />}
+                  message={t('run.credentialsMissing')}
+                  action={
+                    <Button
+                      size="compact-xs"
+                      variant="light"
+                      color="yellow"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.json';
+                        input.onchange = async () => {
+                          const file = input.files?.[0];
+                          if (!file) return;
+                          const content = await file.text();
+                          try {
+                            await api.post('/api/doctor/upload-credentials', {
+                              content,
+                              filename: file.name,
+                            });
+                            toast.success(t('run.credentialsUploaded'));
+                            doctorQ.refetch();
+                          } catch {
+                            toast.error(t('run.credentialsUploadFailed'));
+                          }
+                        };
+                        input.click();
+                      }}
+                    >
+                      {t('run.uploadCredentials')}
+                    </Button>
+                  }
                 />
               )}
 
-              <Checkbox
-                size="xs"
-                label={t('run.silentMode')}
-                disabled={isRunning}
-                checked={silent}
-                onChange={(e) => setSilent(e.currentTarget.checked)}
-              />
-            </Group>
-
-            {doctorQ.data && !doctorQ.data.credentialsOk && !noTrack && (
-              <InlineAlert
-                icon={<TbAlertTriangle size={14} />}
-                message={t('run.credentialsMissing')}
-                action={
-                  <Button
-                    size="compact-xs"
-                    variant="light"
-                    color="yellow"
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = '.json';
-                      input.onchange = async () => {
-                        const file = input.files?.[0];
-                        if (!file) return;
-                        const content = await file.text();
-                        try {
-                          await api.post('/api/doctor/upload-credentials', {
-                            content,
-                            filename: file.name,
-                          });
-                          toast.success(t('run.credentialsUploaded'));
-                          doctorQ.refetch();
-                        } catch {
-                          toast.error(t('run.credentialsUploadFailed'));
-                        }
-                      };
-                      input.click();
-                    }}
-                  >
-                    {t('run.uploadCredentials')}
-                  </Button>
-                }
-              />
-            )}
-
-            {missingReqs.length > 0 && (
-              <InlineAlert
-                icon={<TbAlertTriangle size={14} />}
-                message={`${t('run.missingRequirements')}: ${missingReqs.join(', ')}. ${t('run.missingRequirementsHint')}`}
-              />
-            )}
-
-            {isMobile && !appiumRunning && (
-              <InlineAlert
-                icon={<TbDeviceMobile size={14} />}
-                message={t('run.appiumWarning')}
-                action={
-                  <Button
-                    size="compact-xs"
-                    variant="light"
-                    color="yellow"
-                    onClick={() => startAppium.mutate()}
-                    loading={startAppium.isPending}
-                    disabled={appiumQ.data ? !appiumQ.data.installed : false}
-                  >
-                    {t('run.startAppium')}
-                  </Button>
-                }
-              />
-            )}
-
-            <Group gap="xs" grow>
-              {(() => {
-                const tagsLoading = !sectionAxis && !!project && !!effectiveType && tags.isLoading;
-                const disabledReason =
-                  missingReqs.length > 0
-                    ? `${t('run.missingRequirements')}: ${missingReqs.join(', ')}`
-                    : !project
-                      ? t('run.selectProjectFirst')
-                      : isRunning
-                        ? t('run.testRunning')
-                        : tagsLoading
-                          ? t('run.loadingTags')
-                          : isMobile && !appiumRunning
-                            ? t('run.appiumNotRunning')
-                            : null;
-                return (
-                  <Tooltip
-                    label={disabledReason ?? t('run.runTooltip')}
-                    disabled={!disabledReason}
-                    withArrow
-                  >
-                    {/* Wrapper div is required so Tooltip can show on a disabled button. */}
-                    <div style={{ flex: 1 }}>
-                      <Button
-                        size="sm"
-                        color="green"
-                        fullWidth
-                        onClick={handleRun}
-                        loading={runMutation.isPending}
-                        disabled={!!disabledReason}
-                        leftSection={<TbPlayerPlay size={16} />}
-                      >
-                        {t('run.runButton')}
-                      </Button>
-                    </div>
-                  </Tooltip>
-                );
-              })()}
-              {isRunning && (
-                <Button
-                  size="sm"
-                  color="red"
-                  onClick={handleCancel}
-                  leftSection={<TbPlayerStop size={16} />}
-                  style={{ flex: 'none' }}
-                >
-                  {t('run.stop')}
-                </Button>
+              {missingReqs.length > 0 && (
+                <InlineAlert
+                  icon={<TbAlertTriangle size={14} />}
+                  message={`${t('run.missingRequirements')}: ${missingReqs.join(', ')}. ${t('run.missingRequirementsHint')}`}
+                />
               )}
-            </Group>
-          </Stack>
-        </Paper>
-      </ScrollArea>
 
-      {/* Right: Terminal + command — takes remaining space */}
-      <Stack gap="sm" miw={{ xs: '100%', lg: '60%' }} maw={{ lg: '60%' }}>
+              {isMobile && !appiumRunning && (
+                <InlineAlert
+                  icon={<TbDeviceMobile size={14} />}
+                  message={t('run.appiumWarning')}
+                  action={
+                    <Button
+                      size="compact-xs"
+                      variant="light"
+                      color="yellow"
+                      onClick={() => startAppium.mutate()}
+                      loading={startAppium.isPending}
+                      disabled={appiumQ.data ? !appiumQ.data.installed : false}
+                    >
+                      {t('run.startAppium')}
+                    </Button>
+                  }
+                />
+              )}
+            </Stack>
+          </Paper>
+        </ScrollArea>
+
+        {/* Pinned action footer — stays level with the command bar on the right;
+            the form above scrolls independently behind it. */}
+        <Group gap="xs" grow style={{ flexShrink: 0 }}>
+          {(() => {
+            const tagsLoading = !sectionAxis && !!project && !!effectiveType && tags.isLoading;
+            const disabledReason =
+              missingReqs.length > 0
+                ? `${t('run.missingRequirements')}: ${missingReqs.join(', ')}`
+                : !project
+                  ? t('run.selectProjectFirst')
+                  : isRunning
+                    ? t('run.testRunning')
+                    : tagsLoading
+                      ? t('run.loadingTags')
+                      : isMobile && !appiumRunning
+                        ? t('run.appiumNotRunning')
+                        : null;
+            return (
+              <Tooltip
+                label={disabledReason ?? t('run.runTooltip')}
+                disabled={!disabledReason}
+                withArrow
+              >
+                {/* Wrapper div is required so Tooltip can show on a disabled button. */}
+                <div style={{ flex: 1 }}>
+                  <Button
+                    size="sm"
+                    color="green"
+                    fullWidth
+                    onClick={handleRun}
+                    loading={runMutation.isPending}
+                    disabled={!!disabledReason}
+                    leftSection={<TbPlayerPlay size={16} />}
+                  >
+                    {t('run.runButton')}
+                  </Button>
+                </div>
+              </Tooltip>
+            );
+          })()}
+          {isRunning && (
+            <Button
+              size="sm"
+              color="red"
+              onClick={handleCancel}
+              leftSection={<TbPlayerStop size={16} />}
+              style={{ flex: 'none' }}
+            >
+              {t('run.stop')}
+            </Button>
+          )}
+        </Group>
+      </Stack>
+
+      {/* Right column: terminal scrolls internally (flex:1); the command bar is
+          pinned at the bottom, level with the Run button on the left. */}
+      <Stack gap="sm" style={{ flex: 1, minWidth: 0, height: '100%', minHeight: 0 }}>
         <Paper
           withBorder
           style={{

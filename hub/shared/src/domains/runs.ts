@@ -1,3 +1,4 @@
+import type { RunSummary } from './run-summary.js';
 import type { ToolId } from './tools.js';
 
 export type RunMode = 'local' | 'docker';
@@ -49,6 +50,8 @@ export interface RunRecord {
   exitCode?: number;
   /** Path to primary HTML report, if produced. */
   reportPath?: string;
+  /** Test-case counts parsed from the run output, when a summary was present. */
+  summary?: RunSummary;
 }
 
 /**

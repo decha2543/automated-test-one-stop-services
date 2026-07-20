@@ -18,6 +18,7 @@ export * from './domains/health.js';
 export * from './domains/import-export.js';
 export * from './domains/projects.js';
 export * from './domains/reports.js';
+export * from './domains/run-summary.js';
 export * from './domains/runs.js';
 export * from './domains/schedules.js';
 export * from './domains/tags.js';

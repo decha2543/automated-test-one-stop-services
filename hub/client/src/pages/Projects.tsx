@@ -1,5 +1,15 @@
 import type { EnvFile, ProjectSummary, ToolId } from '@hub/shared';
-import { Button, Group, Indicator, Loader, Paper, Skeleton, Stack, Text } from '@mantine/core';
+import {
+  Button,
+  Group,
+  Indicator,
+  Loader,
+  Paper,
+  SimpleGrid,
+  Skeleton,
+  Stack,
+  Text,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -425,68 +435,78 @@ export function ProjectsPage() {
             <UsageLoggingPanel />
           </ToolSection>
 
-          {(tools.data ?? []).map((tool) => {
-            const toolId = tool.id as ToolId;
-            const typeMap = grouped.get(toolId);
-            return (
-              <ToolSection
-                key={tool.id}
-                label={tool.title}
-                expanded={expandedTools.has(tool.id)}
-                onToggle={() => toggleTool(tool.id)}
-                headerRight={
-                  <ToolSectionActions tool={tool} onCloneProject={() => openCloneFor(toolId)} />
-                }
-              >
-                {!typeMap || typeMap.size === 0 ? (
-                  <Text size="xs" c="dimmed" px={4}>
-                    {t('projects.emptyTool')}
-                  </Text>
-                ) : (
-                  [...typeMap.entries()].map(([type, projs]) => (
-                    <Stack gap={4} key={type} mb="xs">
-                      <Text size="xs" c="dimmed" fw={600} tt="uppercase" px={4}>
-                        {type}
-                      </Text>
-                      <Stack gap={4}>
-                        {projs.map((p) => (
-                          <ProjectRow
-                            key={p.name}
-                            name={p.name}
-                            isGit={p.isGitRepo}
-                            gitRemoteUrl={p.gitRemoteUrl}
-                            projectPath={p.path}
-                            status={
-                              !p.hasEnv && p.hasEnvTemplate
-                                ? 'no-env'
-                                : p.missingEnvKeys.length > 0
-                                  ? 'missing'
-                                  : 'ready'
-                            }
-                            lastRun={lastRunStatus.data?.[`${p.tool}/${p.type}/${p.name}`]}
-                            onEdit={() => startEditEnv(p.tool, p.type, p.name)}
-                            onPull={
-                              p.isGitRepo
-                                ? () =>
-                                    pullOneMutation.mutate({
-                                      tool: p.tool,
-                                      type: p.type,
-                                      project: p.name,
-                                    })
-                                : undefined
-                            }
-                            isPulling={pullingProject === `${p.tool}/${p.type}/${p.name}`}
-                            hasUpdate={updateLookup.get(`${p.tool}/${p.type}/${p.name}`) ?? false}
-                            onRemove={() => setRemoveTarget(p)}
-                          />
-                        ))}
+          {/* Tool sections flow into two columns on desktop (left/right),
+              single column on smaller screens. `alignItems: start` stops short
+              sections from stretching to match a taller neighbour. */}
+          <SimpleGrid
+            cols={{ base: 1, lg: 2 }}
+            spacing="md"
+            verticalSpacing="md"
+            style={{ alignItems: 'start' }}
+          >
+            {(tools.data ?? []).map((tool) => {
+              const toolId = tool.id as ToolId;
+              const typeMap = grouped.get(toolId);
+              return (
+                <ToolSection
+                  key={tool.id}
+                  label={tool.title}
+                  expanded={expandedTools.has(tool.id)}
+                  onToggle={() => toggleTool(tool.id)}
+                  headerRight={
+                    <ToolSectionActions tool={tool} onCloneProject={() => openCloneFor(toolId)} />
+                  }
+                >
+                  {!typeMap || typeMap.size === 0 ? (
+                    <Text size="xs" c="dimmed" px={4}>
+                      {t('projects.emptyTool')}
+                    </Text>
+                  ) : (
+                    [...typeMap.entries()].map(([type, projs]) => (
+                      <Stack gap={4} key={type} mb="xs">
+                        <Text size="xs" c="dimmed" fw={600} tt="uppercase" px={4}>
+                          {type}
+                        </Text>
+                        <Stack gap={4}>
+                          {projs.map((p) => (
+                            <ProjectRow
+                              key={p.name}
+                              name={p.name}
+                              isGit={p.isGitRepo}
+                              gitRemoteUrl={p.gitRemoteUrl}
+                              projectPath={p.path}
+                              status={
+                                !p.hasEnv && p.hasEnvTemplate
+                                  ? 'no-env'
+                                  : p.missingEnvKeys.length > 0
+                                    ? 'missing'
+                                    : 'ready'
+                              }
+                              lastRun={lastRunStatus.data?.[`${p.tool}/${p.type}/${p.name}`]}
+                              onEdit={() => startEditEnv(p.tool, p.type, p.name)}
+                              onPull={
+                                p.isGitRepo
+                                  ? () =>
+                                      pullOneMutation.mutate({
+                                        tool: p.tool,
+                                        type: p.type,
+                                        project: p.name,
+                                      })
+                                  : undefined
+                              }
+                              isPulling={pullingProject === `${p.tool}/${p.type}/${p.name}`}
+                              hasUpdate={updateLookup.get(`${p.tool}/${p.type}/${p.name}`) ?? false}
+                              onRemove={() => setRemoveTarget(p)}
+                            />
+                          ))}
+                        </Stack>
                       </Stack>
-                    </Stack>
-                  ))
-                )}
-              </ToolSection>
-            );
-          })}
+                    ))
+                  )}
+                </ToolSection>
+              );
+            })}
+          </SimpleGrid>
         </>
       )}
 

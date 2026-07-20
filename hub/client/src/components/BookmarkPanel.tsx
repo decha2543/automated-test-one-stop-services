@@ -251,7 +251,7 @@ export function BookmarkPanel({ getConfig, onLoad, disabled }: BookmarkPanelProp
         )}
 
         {groups.length > 0 && (
-          <ScrollArea.Autosize mah={260} type="auto">
+          <ScrollArea.Autosize mah="30vh" type="auto">
             <Stack gap="md">
               {groups.map((g) => (
                 <Stack key={g.key} gap={4}>

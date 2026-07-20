@@ -546,7 +546,7 @@ export function SettingsPage() {
             </Group>
             <Collapse expanded={historyOpen}>
               {cleanupHistoryQ.data && cleanupHistoryQ.data.length > 0 ? (
-                <ScrollArea.Autosize mah={200}>
+                <ScrollArea.Autosize mah="25vh">
                   <Table striped highlightOnHover verticalSpacing={4}>
                     <Table.Thead>
                       <Table.Tr>

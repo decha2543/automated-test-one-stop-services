@@ -292,8 +292,10 @@ export function RunPage() {
         />
       </div>
 
-      {/* Queue & Active Runs */}
-      <RunQueuePanel />
+      {/* Queue & Active Runs — pinned in the fixed top region */}
+      <div style={{ flexShrink: 0 }}>
+        <RunQueuePanel />
+      </div>
 
       {/* Tab bar */}
       <ScrollArea scrollbarSize={6} type="auto" style={{ flexShrink: 0 }}>

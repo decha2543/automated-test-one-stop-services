@@ -1,4 +1,5 @@
 import type { PerformanceType } from './runs.js';
+import type { RunSummary } from './run-summary.js';
 import type { ToolId } from './tools.js';
 
 // Reports --------------------------------------------------------------------
@@ -12,6 +13,12 @@ export interface ReportEntry {
   reportPath: string;
   timestamp: string;
   locked: boolean;
+  /**
+   * Test-case counts for the run that produced this report, joined from run
+   * history. Absent when no matching run is in history (e.g. an old report
+   * whose run has aged out of the capped history).
+   */
+  summary?: RunSummary;
 }
 
 export interface ReportAnnotation {

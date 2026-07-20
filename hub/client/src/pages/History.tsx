@@ -6,6 +6,7 @@ import {
   Group,
   Pagination,
   Paper,
+  ScrollArea,
   Select,
   Skeleton,
   Stack,
@@ -219,7 +220,7 @@ export function HistoryPage() {
   }
 
   return (
-    <Stack gap="md">
+    <Stack gap="md" h="100%">
       <PageHeader
         title={t('history.title')}
         description={t('nav.history.desc')}
@@ -460,9 +461,20 @@ export function HistoryPage() {
       )}
 
       {paginatedData.length > 0 && (
-        <Paper withBorder style={{ overflow: 'hidden' }}>
-          <Table.ScrollContainer minWidth={800}>
-            <Table striped highlightOnHover verticalSpacing="xs">
+        <Paper
+          withBorder
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Bounded ScrollArea → table scrolls inside the card (sticky header)
+              instead of growing the page; pagination below stays visible. */}
+          <ScrollArea type="auto" style={{ flex: 1, minHeight: 0 }}>
+            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={800}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>
@@ -592,7 +604,7 @@ export function HistoryPage() {
                 ))}
               </Table.Tbody>
             </Table>
-          </Table.ScrollContainer>
+          </ScrollArea>
         </Paper>
       )}
 

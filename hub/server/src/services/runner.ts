@@ -4,7 +4,13 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { RunRecord, RunRequest, RunStatus, WsServerEvent } from '@hub/shared';
+import {
+  parseRunSummary,
+  type RunRecord,
+  type RunRequest,
+  type RunStatus,
+  type WsServerEvent,
+} from '@hub/shared';
 import { nanoid } from 'nanoid';
 import { BASH_PATH, WORKSPACE_ROOT } from '../config.js';
 import { historyStore } from './history-store.js';
@@ -332,16 +338,22 @@ class RunnerService extends EventEmitter {
     if (!this.active.has(id)) return;
     const silent = record.request.silent === true;
 
+    // Parse the pass/fail/skip summary from the run's buffered output so it can
+    // be persisted with the history record (drives the Reports "Cases" column).
+    // Silent runs leave no trace, so skip it for them.
+    const run = this.active.get(id);
+    const summary = !silent && run ? (parseRunSummary(run.outputBuffer) ?? undefined) : undefined;
+
     const finished: RunRecord = {
       ...record,
       status: finalStatus,
       endedAt: new Date().toISOString(),
       ...(typeof exitCode === 'number' ? { exitCode } : {}),
+      ...(summary ? { summary } : {}),
     };
 
     // Snapshot the live buffer before dropping the active entry so a late
     // subscriber / reconnect can still replay it. Silent runs leave no trace.
-    const run = this.active.get(id);
     if (!silent && run) {
       this.rememberFinished(
         id,

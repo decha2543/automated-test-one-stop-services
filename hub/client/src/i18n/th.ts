@@ -663,6 +663,7 @@ export const th: Record<TranslationKey, string> = {
   // Reports (page body)
   'reports.advancedSearch': 'ค้นหาขั้นสูง',
   'reports.reportsWord': 'รายงาน',
+  'reports.cases': 'เคส',
   'reports.open': 'เปิด',
   'reports.selectRow': 'เลือก',
   'reports.lockHint': 'ล็อก (กันการล้างอัตโนมัติ)',

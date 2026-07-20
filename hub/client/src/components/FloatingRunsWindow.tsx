@@ -66,7 +66,7 @@ export function FloatingRunsWindow({
             <CloseButton size="sm" onClick={onClose} aria-label="Close" />
           </Group>
         </Group>
-        <ScrollArea.Autosize mah={240}>
+        <ScrollArea.Autosize mah="28vh">
           <Stack gap={6}>
             {runs.map((run) => (
               <Group

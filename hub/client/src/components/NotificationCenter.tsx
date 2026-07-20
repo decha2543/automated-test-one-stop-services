@@ -91,7 +91,7 @@ export function NotificationCenter() {
           </Group>
         </Group>
 
-        <ScrollArea.Autosize mah={400}>
+        <ScrollArea.Autosize mah="45vh">
           {notifications.length === 0 ? (
             <Text size="sm" c="dimmed" ta="center" py="xl">
               No notifications yet

@@ -1,4 +1,4 @@
-import type { ReportEntry, ToolId } from '@hub/shared';
+import type { ReportEntry, RunSummary, ToolId } from '@hub/shared';
 import {
   ActionIcon,
   Badge,
@@ -7,6 +7,7 @@ import {
   Group,
   Pagination,
   Paper,
+  ScrollArea,
   Select,
   Skeleton,
   Stack,
@@ -51,6 +52,40 @@ const ALL_STATUSES = ['success', 'error'];
 // custom format, and they sort chronologically as strings.
 
 type SortField = 'timestamp' | 'tool' | 'project' | 'type' | 'status';
+
+/**
+ * "Cases" cell: total test-case count for a report, with a red badge when any
+ * failed and a full pass/fail/skip breakdown in the tooltip. Shows a dash when
+ * the report has no matching run summary (e.g. an aged-out run).
+ */
+function CaseCountCell({ summary }: { summary?: RunSummary }) {
+  const t = useT();
+  if (!summary) {
+    return (
+      <Text size="xs" c="dimmed">
+        —
+      </Text>
+    );
+  }
+  const total = summary.passed + summary.failed + (summary.skipped ?? 0);
+  const breakdown = `${summary.passed} ${t('run.passed')} · ${summary.failed} ${t('run.failed')}${
+    summary.skipped ? ` · ${summary.skipped} ${t('run.skipped')}` : ''
+  }`;
+  return (
+    <Tooltip label={breakdown} withArrow>
+      <Group gap={5} wrap="nowrap">
+        <Text size="xs" fw={600}>
+          {total}
+        </Text>
+        {summary.failed > 0 && (
+          <Badge size="xs" color="red" variant="light">
+            {summary.failed}
+          </Badge>
+        )}
+      </Group>
+    </Tooltip>
+  );
+}
 
 export function ReportsPage() {
   const t = useT();
@@ -227,7 +262,7 @@ export function ReportsPage() {
   }
 
   return (
-    <Stack gap="md">
+    <Stack gap="md" h="100%">
       <PageHeader
         title={t('reports.title')}
         description={t('nav.reports.desc')}
@@ -475,9 +510,21 @@ export function ReportsPage() {
       )}
 
       {paginatedData.length > 0 && (
-        <Paper withBorder style={{ overflow: 'hidden' }}>
-          <Table.ScrollContainer minWidth={800}>
-            <Table striped highlightOnHover verticalSpacing="xs">
+        <Paper
+          withBorder
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Bounded ScrollArea → the table scrolls inside the card (sticky
+              header) instead of growing the page. `miw` keeps a horizontal
+              scroll on narrow screens. Pagination below stays pinned. */}
+          <ScrollArea type="auto" style={{ flex: 1, minHeight: 0 }}>
+            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={800}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th w={40}>
@@ -531,6 +578,7 @@ export function ReportsPage() {
                       onSort={handleSort}
                     />
                   </Table.Th>
+                  <Table.Th>{t('reports.cases')}</Table.Th>
                   <Table.Th>
                     <SortableHeader
                       label={t('table.timestamp')}
@@ -589,6 +637,9 @@ export function ReportsPage() {
                       </Text>
                     </Table.Td>
                     <Table.Td>
+                      <CaseCountCell summary={r.summary} />
+                    </Table.Td>
+                    <Table.Td>
                       <Tooltip label={formatAbsolute(r.timestamp)} withArrow>
                         <Text size="xs" c="dimmed">
                           {formatRelative(r.timestamp)}
@@ -640,7 +691,7 @@ export function ReportsPage() {
                 ))}
               </Table.Tbody>
             </Table>
-          </Table.ScrollContainer>
+          </ScrollArea>
         </Paper>
       )}
 
