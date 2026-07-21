@@ -649,12 +649,18 @@ export function ReportsPage() {
                     <Table.Td>
                       <Group gap="xs">
                         <Button
-                          component="a"
-                          href={`/api/reports/open?path=${encodeURIComponent(r.reportPath)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           size="compact-xs"
                           leftSection={<TbExternalLink size={12} />}
+                          onClick={async () => {
+                            // Ask the server to open the report with the OS
+                            // default app so it loads as a real file:// path.
+                            // (A localhost page can't navigate to file://.)
+                            try {
+                              await api.post('/api/reports/open-file', { path: r.reportPath });
+                            } catch {
+                              toast.error(t('reports.openFailed'));
+                            }
+                          }}
                         >
                           {t('reports.open')}
                         </Button>

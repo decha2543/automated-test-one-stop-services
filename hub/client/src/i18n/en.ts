@@ -668,6 +668,7 @@ export const en = {
   'reports.reportsWord': 'reports',
   'reports.cases': 'Cases',
   'reports.open': 'Open',
+  'reports.openFailed': 'Could not open the report file',
   'reports.selectRow': 'Select',
   'reports.lockHint': 'Lock (prevent cleanup)',
   'reports.unlockHint': 'Unlock (allow cleanup)',

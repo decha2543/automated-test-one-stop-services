@@ -665,6 +665,7 @@ export const th: Record<TranslationKey, string> = {
   'reports.reportsWord': 'รายงาน',
   'reports.cases': 'เคส',
   'reports.open': 'เปิด',
+  'reports.openFailed': 'เปิดไฟล์รายงานไม่สำเร็จ',
   'reports.selectRow': 'เลือก',
   'reports.lockHint': 'ล็อก (กันการล้างอัตโนมัติ)',
   'reports.unlockHint': 'ปลดล็อก (อนุญาตให้ล้างได้)',

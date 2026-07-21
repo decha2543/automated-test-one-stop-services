@@ -46,12 +46,15 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /**
-   * GET /api/reports/open?path=<absolute-path>
-   * Stream a report HTML file. Path must resolve under OUTPUTS_DIR.
+   * POST /api/reports/open-file  { path: <absolute-path> }
+   * Open the report in the OS default app (the browser opens it as a real
+   * `file://` path). A web page at localhost cannot navigate to `file://`
+   * itself — browsers block that — so the server launches it via the OS, the
+   * same way traces / Docker are launched elsewhere. Path must be under
+   * OUTPUTS_DIR. Best-effort: spawn errors are logged, not surfaced.
    */
-  app.get<{ Querystring: { path: string } }>('/api/reports/open', async (req, reply) => {
-    const reportPath = req.query.path;
-
+  app.post<{ Body: { path: string } }>('/api/reports/open-file', async (req, reply) => {
+    const reportPath = req.body?.path;
     if (!reportPath || !isUnderOutputs(reportPath)) {
       reply.status(403);
       return { code: 'FORBIDDEN', message: 'Access denied' };
@@ -61,10 +64,23 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
       return { code: 'NOT_FOUND', message: 'Report file not found' };
     }
 
-    const stat = fs.statSync(reportPath);
-    reply.header('Content-Type', 'text/html; charset=utf-8');
-    reply.header('Content-Length', String(stat.size));
-    return reply.send(fs.createReadStream(reportPath));
+    // cross-OS "open with default app": Windows `start`, macOS `open`, Linux `xdg-open`
+    const opener =
+      process.platform === 'win32'
+        ? spawn('cmd', ['/c', 'start', '', reportPath], {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true,
+          })
+        : process.platform === 'darwin'
+          ? spawn('open', [reportPath], { detached: true, stdio: 'ignore' })
+          : spawn('xdg-open', [reportPath], { detached: true, stdio: 'ignore' });
+    opener.on('error', (err) => {
+      console.warn('[reports/open-file] failed to launch:', err.message);
+    });
+    opener.unref();
+
+    return { opened: true };
   });
 
   /** POST /api/reports/artifacts — list trace/video files for a report */
