@@ -19,7 +19,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { TbCheck, TbChevronDown, TbChevronRight, TbSearch, TbTag, TbX } from 'react-icons/tb';
 import { useT } from '~/i18n/index.js';
 import { matchTests } from '~/utils/tag-selection';
@@ -29,6 +29,12 @@ interface TagSelectorProps {
   isLoading: boolean;
   selectedTags: string[];
   onChange: (next: string[]) => void;
+  /**
+   * Fill the parent's height and make the category-group list the only scroll
+   * region (used in the Run form, so the surrounding fields stay fixed and the
+   * panel bottom sits flush). Default: autosize the list up to a capped height.
+   */
+  fill?: boolean;
 }
 
 // Stable group display order — single source of truth: @hub/shared.
@@ -47,7 +53,45 @@ const GROUP_COLORS: Record<string, string> = {
   'case-id': 'gray',
 };
 
-export function TagSelector({ tags, isLoading, selectedTags, onChange }: TagSelectorProps) {
+/**
+ * Scroll wrapper for the category-group list.
+ * - `fill`: fills the parent's remaining height and scrolls, so ONLY this list
+ *   scrolls while the surrounding form stays fixed (Run form).
+ * - default: autosizes up to a capped height (e.g. schedule form).
+ */
+function GroupList({ fill, children }: { fill: boolean; children: ReactNode }) {
+  if (fill) {
+    return (
+      <Paper
+        withBorder
+        style={{
+          overflow: 'hidden',
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <ScrollArea type="auto" scrollbarSize={8} style={{ flex: 1, minHeight: 0 }}>
+          {children}
+        </ScrollArea>
+      </Paper>
+    );
+  }
+  return (
+    <Paper withBorder style={{ overflow: 'hidden' }}>
+      <ScrollArea.Autosize mah="40vh">{children}</ScrollArea.Autosize>
+    </Paper>
+  );
+}
+
+export function TagSelector({
+  tags,
+  isLoading,
+  selectedTags,
+  onChange,
+  fill = false,
+}: TagSelectorProps) {
   const t = useT();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['case-id']));
@@ -127,7 +171,7 @@ export function TagSelector({ tags, isLoading, selectedTags, onChange }: TagSele
   }
 
   return (
-    <Stack gap="xs">
+    <Stack gap="xs" style={fill ? { flex: 1, minHeight: 0 } : undefined}>
       {/* ─── Match panel ON TOP ─── */}
       {totalCount > 0 && (
         <Paper
@@ -229,110 +273,109 @@ export function TagSelector({ tags, isLoading, selectedTags, onChange }: TagSele
         }
       />
 
-      {/* ─── Category groups (flat) ─── */}
-      <Paper withBorder style={{ overflow: 'hidden' }}>
-        <ScrollArea.Autosize mah="40vh">
-          <Stack gap={0}>
-            {filteredGroups.map((group) => {
-              const color = GROUP_COLORS[group.kind] ?? 'teal';
-              const isCollapsed = collapsed.has(group.kind);
-              const selectedInGroup = group.tags.filter((t) => selectedTags.includes(t)).length;
+      {/* ─── Category groups (flat) — in `fill` mode this is the ONLY scroll
+          region (the rest of the Run form stays fixed). ─── */}
+      <GroupList fill={fill}>
+        <Stack gap={0}>
+          {filteredGroups.map((group) => {
+            const color = GROUP_COLORS[group.kind] ?? 'teal';
+            const isCollapsed = collapsed.has(group.kind);
+            const selectedInGroup = group.tags.filter((t) => selectedTags.includes(t)).length;
 
-              return (
-                <div
-                  key={group.kind + group.label}
-                  style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
+            return (
+              <div
+                key={group.kind + group.label}
+                style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
+              >
+                {/* Group header */}
+                <UnstyledButton
+                  onClick={() => toggleGroup(group.kind)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
                 >
-                  {/* Group header */}
-                  <UnstyledButton
-                    onClick={() => toggleGroup(group.kind)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <Group gap={6} wrap="nowrap">
-                      <TbChevronRight
-                        size={12}
-                        style={{
-                          transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
-                          transition: 'transform 150ms',
-                        }}
-                      />
-                      <Text size="xs" fw={600} c="dimmed" tt="uppercase">
-                        {group.label}
-                      </Text>
-                      <Text size="xs" c="dimmed" fw={400}>
-                        ({group.tags.length})
-                      </Text>
-                    </Group>
-                    {selectedInGroup > 0 && (
-                      <Badge size="xs" color="blue" circle>
-                        {selectedInGroup}
-                      </Badge>
-                    )}
-                  </UnstyledButton>
+                  <Group gap={6} wrap="nowrap">
+                    <TbChevronRight
+                      size={12}
+                      style={{
+                        transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+                        transition: 'transform 150ms',
+                      }}
+                    />
+                    <Text size="xs" fw={600} c="dimmed" tt="uppercase">
+                      {group.label}
+                    </Text>
+                    <Text size="xs" c="dimmed" fw={400}>
+                      ({group.tags.length})
+                    </Text>
+                  </Group>
+                  {selectedInGroup > 0 && (
+                    <Badge size="xs" color="blue" circle>
+                      {selectedInGroup}
+                    </Badge>
+                  )}
+                </UnstyledButton>
 
-                  {/* Group tags */}
-                  <Collapse expanded={!isCollapsed}>
-                    <Group gap={6} px="sm" pb="sm" wrap="wrap">
-                      {group.tags.map((tag) => {
-                        const isSelected = selectedTags.includes(tag);
-                        const detail = tags.details?.[tag];
-                        const tooltipLabel = detail
-                          ? detail.tests.length === 1
-                            ? detail.tests[0]?.title || tag
-                            : `${detail.count} tests`
-                          : tag;
-                        return (
-                          <Tooltip
-                            key={tag}
-                            label={tooltipLabel}
-                            withArrow
-                            openDelay={300}
-                            multiline
-                            maw={420}
+                {/* Group tags */}
+                <Collapse expanded={!isCollapsed}>
+                  <Group gap={6} px="sm" pb="sm" wrap="wrap">
+                    {group.tags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      const detail = tags.details?.[tag];
+                      const tooltipLabel = detail
+                        ? detail.tests.length === 1
+                          ? detail.tests[0]?.title || tag
+                          : `${detail.count} tests`
+                        : tag;
+                      return (
+                        <Tooltip
+                          key={tag}
+                          label={tooltipLabel}
+                          withArrow
+                          openDelay={300}
+                          multiline
+                          maw={420}
+                        >
+                          <Badge
+                            size="sm"
+                            variant={isSelected ? 'filled' : 'outline'}
+                            color={isSelected ? 'blue' : color}
+                            style={{ cursor: 'pointer' }}
+                            role="button"
+                            tabIndex={0}
+                            aria-pressed={isSelected}
+                            onClick={() => toggle(tag)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                toggle(tag);
+                              }
+                            }}
                           >
-                            <Badge
-                              size="sm"
-                              variant={isSelected ? 'filled' : 'outline'}
-                              color={isSelected ? 'blue' : color}
-                              style={{ cursor: 'pointer' }}
-                              role="button"
-                              tabIndex={0}
-                              aria-pressed={isSelected}
-                              onClick={() => toggle(tag)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  toggle(tag);
-                                }
-                              }}
-                            >
-                              {tag}
-                              {detail && detail.count > 1 && group.kind !== 'case-id'
-                                ? ` (${detail.count})`
-                                : ''}
-                            </Badge>
-                          </Tooltip>
-                        );
-                      })}
-                    </Group>
-                  </Collapse>
-                </div>
-              );
-            })}
-            {filteredGroups.length === 0 && (
-              <Text size="xs" c="dimmed" p="sm">
-                {t('tagSelector.noMatchSearch')} &ldquo;{search}&rdquo;
-              </Text>
-            )}
-          </Stack>
-        </ScrollArea.Autosize>
-      </Paper>
+                            {tag}
+                            {detail && detail.count > 1 && group.kind !== 'case-id'
+                              ? ` (${detail.count})`
+                              : ''}
+                          </Badge>
+                        </Tooltip>
+                      );
+                    })}
+                  </Group>
+                </Collapse>
+              </div>
+            );
+          })}
+          {filteredGroups.length === 0 && (
+            <Text size="xs" c="dimmed" p="sm">
+              {t('tagSelector.noMatchSearch')} &ldquo;{search}&rdquo;
+            </Text>
+          )}
+        </Stack>
+      </GroupList>
     </Stack>
   );
 }
