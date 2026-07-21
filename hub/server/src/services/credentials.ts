@@ -16,6 +16,13 @@ function thirdPartyDir(): string {
 /** Canonical credential filename expected inside each `<tool>/credentials/`. */
 const CREDENTIALS_FILENAME = 'credentials.json';
 
+/**
+ * OAuth token filename written after a successful interactive authentication
+ * (e.g. Google). Its presence means "this tool has been connected", separate
+ * from `credentials.json` (the app credentials the user uploads).
+ */
+const TOKEN_FILENAME = 'token.json';
+
 export interface CredentialStatus {
   /** Third-party tool folder name (e.g. "google"). */
   readonly tool: string;
@@ -50,6 +57,22 @@ export function listCredentialStatus(): CredentialStatus[] {
       hasCredentials: fs.existsSync(path.join(root, d.name, 'credentials', CREDENTIALS_FILENAME)),
     }))
     .sort((a, b) => a.tool.localeCompare(b.tool));
+}
+
+/**
+ * True once `<tool>/credentials/token.json` exists — i.e. the user has completed
+ * the interactive OAuth flow at least once. Presence only (no validity check):
+ * an expired-but-refreshable token still counts as connected, and a dead token
+ * surfaces at run time via the best-effort logging script's warn+skip.
+ */
+export function hasToken(tool: string): boolean {
+  let dir: string;
+  try {
+    dir = credentialsDir(tool);
+  } catch {
+    return false;
+  }
+  return fs.existsSync(path.join(dir, TOKEN_FILENAME));
 }
 
 export type SaveCredentialsResult =

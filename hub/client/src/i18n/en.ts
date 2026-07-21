@@ -303,6 +303,7 @@ export const en = {
   'creds.missing': 'credentials missing',
   'creds.replace': 'Replace',
   'creds.upload': 'Upload credentials.json',
+  'creds.title': 'Credentials',
   'usage.title': 'Force Usage logging',
   'usage.on': 'on',
   'usage.readyOff': 'ready (off)',
@@ -311,6 +312,19 @@ export const en = {
   'usage.enabled': 'Force Usage logging enabled',
   'usage.disabled': 'Force Usage logging disabled',
   'usage.toggleFailed': 'Could not change Force usage logging',
+  'usage.needAuth': 'connect Google',
+  'usage.setupTitle': 'Google Sheet usage logging',
+  'usage.setupHint':
+    'Set up in 2 steps: upload Google credentials, then connect your account. Logging turns on automatically once ready.',
+  'auth.title': 'Google account',
+  'auth.connect': 'Connect',
+  'auth.reconnect': 'Reconnect',
+  'auth.connecting': 'Connecting…',
+  'auth.connected': 'connected',
+  'auth.notConnected': 'not connected',
+  'auth.needCreds': 'upload credentials first',
+  'auth.opening': 'A browser window will open — approve access to your Google account.',
+  'auth.failed': 'Google connection failed',
 
   // More-menu + bookmarks
   'common.remove': 'Remove',

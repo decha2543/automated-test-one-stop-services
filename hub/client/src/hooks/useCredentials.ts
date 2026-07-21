@@ -22,6 +22,10 @@ export function useUploadCredentials() {
   return useMutation({
     mutationFn: ({ tool, content }: { tool: string; content: string }) =>
       api.post<{ success: boolean; path: string }>(`/api/credentials/${tool}`, { content }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['credentials'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['credentials'] });
+      // Uploading credentials changes usage-logging readiness — refresh its badge/steps.
+      qc.invalidateQueries({ queryKey: ['usage-logging'] });
+    },
   });
 }

@@ -9,6 +9,8 @@ import { api } from '~/api/client.js';
 export interface UsageLoggingStatus {
   readonly hasCredentials: boolean;
   readonly hasSpreadsheetId: boolean;
+  /** A Google token.json exists — the account has been connected at least once. */
+  readonly hasToken: boolean;
   readonly forceTrack: boolean;
   readonly ready: boolean;
   readonly sheetName: string;
@@ -19,6 +21,26 @@ export function useUsageLogging() {
     queryKey: ['usage-logging'],
     queryFn: () => api.get<UsageLoggingStatus>('/api/usage-logging/status'),
     staleTime: 15_000,
+  });
+}
+
+/**
+ * Run the interactive Google OAuth flow (POST /api/usage-logging/authenticate).
+ * Opens a browser on the machine running the Hub (local-only) and writes
+ * token.json; on success the server auto-enables logging when fully ready.
+ */
+export function useAuthenticateGoogle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<UsageLoggingStatus>('/api/usage-logging/authenticate', {}),
+    onSuccess: () => {
+      // Auth can flip FORCE_TRACK + creates token.json — refresh everything
+      // derived from usage-logging state (badge, credentials, scripts/.env, config).
+      qc.invalidateQueries({ queryKey: ['usage-logging'] });
+      qc.invalidateQueries({ queryKey: ['credentials'] });
+      qc.invalidateQueries({ queryKey: ['env'] });
+      qc.invalidateQueries({ queryKey: ['config'] });
+    },
   });
 }
 

@@ -303,6 +303,7 @@ export const th: Record<TranslationKey, string> = {
   'creds.missing': 'ยังไม่มี credentials',
   'creds.replace': 'แทนที่',
   'creds.upload': 'อัปโหลด credentials.json',
+  'creds.title': 'ไฟล์ credentials',
   'usage.title': 'บังคับบันทึกการใช้งาน',
   'usage.on': 'เปิด',
   'usage.readyOff': 'พร้อม (ปิดอยู่)',
@@ -311,6 +312,19 @@ export const th: Record<TranslationKey, string> = {
   'usage.enabled': 'เปิดการบังคับบันทึกการใช้งานแล้ว',
   'usage.disabled': 'ปิดการบังคับบันทึกการใช้งานแล้ว',
   'usage.toggleFailed': 'เปลี่ยนสถานะการบังคับบันทึกการใช้งานไม่สำเร็จ',
+  'usage.needAuth': 'เชื่อมต่อ Google',
+  'usage.setupTitle': 'บันทึกการใช้งานลง Google Sheet',
+  'usage.setupHint':
+    'ตั้งค่า 2 ขั้นตอน: อัปโหลด credentials ของ Google แล้วเชื่อมต่อบัญชี เมื่อพร้อมระบบจะเปิดให้อัตโนมัติ',
+  'auth.title': 'บัญชี Google',
+  'auth.connect': 'เชื่อมต่อ',
+  'auth.reconnect': 'เชื่อมต่อใหม่',
+  'auth.connecting': 'กำลังเชื่อมต่อ…',
+  'auth.connected': 'เชื่อมต่อแล้ว',
+  'auth.notConnected': 'ยังไม่ได้เชื่อมต่อ',
+  'auth.needCreds': 'อัปโหลด credentials ก่อน',
+  'auth.opening': 'ระบบจะเปิดหน้าต่างเบราว์เซอร์ — กรุณาอนุญาตให้เข้าถึงบัญชี Google ของคุณ',
+  'auth.failed': 'เชื่อมต่อ Google ไม่สำเร็จ',
 
   // More-menu + bookmarks
   'common.remove': 'ลบ',

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   parseRunSummary,
   type RunRecord,
@@ -148,6 +149,34 @@ async function killProcessTree(child: ChildProcess): Promise<void> {
       /* already gone */
     }
   }
+}
+
+/**
+ * Fire best-effort Google Sheet usage logging for a run (approach A: the run
+ * flow owns logging, not the task layer). Delegates to the shared helper
+ * `scripts/lib/usage-log.mjs` — the SAME one the interactive CLI runner uses —
+ * which spawns the logging script through dotenvx (loading scripts/.env) and
+ * refreshes the Google token non-interactively. A missing/expired token or any
+ * API error degrades to a warn + skip and never opens a browser mid-run.
+ *
+ * Fire-and-forget: we neither await nor surface errors, so logging can neither
+ * block nor fail a run. Imported lazily by file URL (mirrors
+ * `manifest-registry`'s dynamic import of `scripts/`), so the Hub keeps no
+ * static dependency on the workspace `scripts/` tree.
+ */
+function fireUsageLog(command: string): void {
+  const modUrl = pathToFileURL(
+    path.resolve(WORKSPACE_ROOT, 'scripts', 'lib', 'usage-log.mjs'),
+  ).href;
+  void import(modUrl)
+    .then((mod) =>
+      (
+        mod as {
+          runUsageLog: (o: { command: string; channel?: string; cwd?: string }) => Promise<void>;
+        }
+      ).runUsageLog({ command, channel: 'hub', cwd: WORKSPACE_ROOT }),
+    )
+    .catch(() => {});
 }
 
 class RunnerService extends EventEmitter {
@@ -327,6 +356,13 @@ class RunnerService extends EventEmitter {
     };
     this.active.set(id, activeRun);
     this.emitEvent({ kind: 'run-started', runId: id, record });
+
+    // Best-effort Google Sheet usage logging at run start. Skipped when the user
+    // opted out (`noTrack`) or for a silent run (which must leave no trace).
+    // Non-blocking — never affects the run's lifecycle or status.
+    if (!record.request.noTrack && !record.request.silent) {
+      fireUsageLog(command);
+    }
 
     child.stdout?.on('data', (buf: Buffer) => {
       const chunk = buf.toString('utf8');

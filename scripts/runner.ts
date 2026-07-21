@@ -11,6 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import prompts from 'prompts';
 
+import { runUsageLog } from './lib/usage-log.mjs';
 import { createManifestRegistry } from './manifests/index.js';
 import { buildTaskCommand, matchesWhen, type RunnerAnswers } from './manifests/runner-command.js';
 import {
@@ -313,8 +314,25 @@ async function runManifestCLI(): Promise<void> {
     }
   }
 
+  // Fire best-effort Google Sheet usage logging BEFORE the run when tracking is
+  // on (approach A: the run flow owns logging — the task layer does not consume
+  // TRACK). Same opt-in as the TRACK=none opt-out above: an explicit "Yes" or a
+  // FORCE_TRACK default, and only for an actual `run`. Auth is non-interactive
+  // (silent token refresh, never a browser); a hiccup warns + skips, never blocks.
+  const shouldTrack =
+    answers.executionType === 'run' &&
+    (answers.trackUsage === 'yes' || process.env.FORCE_TRACK === 'true');
+
   // Save and spawn
   saveLastRun(fullCommand);
+  if (shouldTrack) {
+    await runUsageLog({
+      command: fullCommand,
+      channel: 'local',
+      cwd: WORKSPACE_ROOT,
+      inheritStdio: true,
+    });
+  }
   spawnCommand(fullCommand);
 }
 

@@ -24,7 +24,24 @@ export function credentialsReady(): boolean {
   return fs.existsSync(CREDENTIALS_PATH);
 }
 
-export async function authorize(): Promise<OAuth2Client> {
+/** Thrown by `authorize({ interactive: false })` when it cannot get a valid token without a browser. */
+export const SILENT_AUTH_FAILED = 'SILENT_AUTH_FAILED';
+
+export interface AuthorizeOptions {
+  /**
+   * When false, NEVER open the interactive browser consent flow. Used by
+   * automated, unattended callers (usage logging fired from a test run): the
+   * existing token is refreshed silently if possible, but a missing or
+   * unrefreshable token throws `SILENT_AUTH_FAILED` so the caller can warn +
+   * skip instead of blocking the run on a browser login. Default true — the
+   * standalone `node google-auth.ts` admin re-auth still opens the browser.
+   */
+  interactive?: boolean;
+}
+
+export async function authorize(options: AuthorizeOptions = {}): Promise<OAuth2Client> {
+  const interactive = options.interactive ?? true;
+
   if (fs.existsSync(TOKEN_PATH)) {
     try {
       const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
@@ -41,8 +58,17 @@ export async function authorize(): Promise<OAuth2Client> {
       // though they're the same class. Bridge — same cast the fallback path uses.
       return oAuth2Client as unknown as OAuth2Client;
     } catch (_err) {
+      // The stored token could not be refreshed (revoked / offline / expired
+      // refresh token). An unattended caller must not fall into the browser
+      // flow — surface a typed failure so it can warn + skip.
+      if (!interactive) {
+        throw new Error(`${SILENT_AUTH_FAILED}: stored token could not be refreshed`);
+      }
       console.warn('Token expired or invalid, re-authenticating...');
     }
+  } else if (!interactive) {
+    // No token on disk and we are not allowed to prompt — nothing to refresh.
+    throw new Error(`${SILENT_AUTH_FAILED}: no stored token to refresh`);
   }
 
   function cleanupPort(port: number) {
@@ -101,5 +127,10 @@ export async function authorize(): Promise<OAuth2Client> {
 if (require.main === module) {
   authorize()
     .then(() => console.log('Google Auth Successful! Token is ready.'))
-    .catch(console.error);
+    .catch((err) => {
+      // Exit non-zero so callers (the Hub "Connect Google" button) can detect
+      // failure — console.error alone leaves the exit code at 0.
+      console.error(err);
+      process.exit(1);
+    });
 }

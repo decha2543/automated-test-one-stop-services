@@ -19,7 +19,6 @@ import { PageHeader } from '~/components/PageHeader.js';
 import { AddToolsModal } from '~/components/projects/AddToolsModal.js';
 import { CloneModal } from '~/components/projects/CloneModal.js';
 import { CreateModal } from '~/components/projects/CreateModal.js';
-import { CredentialsPanel } from '~/components/projects/CredentialsPanel.js';
 import {
   type EnvEntry,
   EnvModal,
@@ -28,7 +27,7 @@ import {
 import { ProjectRow } from '~/components/projects/ProjectRow.js';
 import { ToolSection } from '~/components/projects/ToolSection.js';
 import { ToolSectionActions } from '~/components/projects/ToolSectionActions.js';
-import { UsageLoggingPanel } from '~/components/projects/UsageLoggingPanel.js';
+import { UsageLoggingSetup } from '~/components/projects/UsageLoggingSetup.js';
 import { toast } from '~/components/Toast.js';
 import { TypeToConfirmModal } from '~/components/TypeToConfirmModal.js';
 import { useTools } from '~/hooks/useTools.js';
@@ -431,8 +430,7 @@ export function ProjectsPage() {
               status="ready"
               onEdit={() => startEditEnv('scripts', '', '')}
             />
-            <CredentialsPanel />
-            <UsageLoggingPanel />
+            <UsageLoggingSetup />
           </ToolSection>
 
           {/* Tool sections flow into two columns on desktop (left/right),
