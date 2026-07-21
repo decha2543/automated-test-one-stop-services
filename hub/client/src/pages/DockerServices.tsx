@@ -264,7 +264,7 @@ export function DockerServicesPage() {
                             leftSection={<TbPlayerPlay size={12} />}
                             onClick={() => startService.mutate(name)}
                             disabled={!dockerRunning}
-                            loading={startService.isPending}
+                            loading={startService.isPending && startService.variables === name}
                           >
                             Start
                           </Button>
@@ -279,7 +279,7 @@ export function DockerServicesPage() {
                             leftSection={<TbPlayerStop size={12} />}
                             onClick={() => stopService.mutate(name)}
                             disabled={!dockerRunning}
-                            loading={stopService.isPending}
+                            loading={stopService.isPending && stopService.variables === name}
                           >
                             Stop
                           </Button>
@@ -293,7 +293,7 @@ export function DockerServicesPage() {
                           leftSection={<TbRefresh size={12} />}
                           onClick={() => restartService.mutate(name)}
                           disabled={!dockerRunning || !isRunning}
-                          loading={restartService.isPending}
+                          loading={restartService.isPending && restartService.variables === name}
                         >
                           Restart
                         </Button>

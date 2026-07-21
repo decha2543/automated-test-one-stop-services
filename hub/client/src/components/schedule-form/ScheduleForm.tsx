@@ -302,7 +302,16 @@ export function ScheduleForm({
                 variant={cronExpr === p.value ? 'filled' : 'outline'}
                 color={cronExpr === p.value ? 'blue' : 'gray'}
                 style={{ cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                aria-pressed={cronExpr === p.value}
                 onClick={() => setCronExpr(p.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setCronExpr(p.value);
+                  }
+                }}
               >
                 {p.label}
               </Badge>

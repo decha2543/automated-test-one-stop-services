@@ -1,11 +1,21 @@
 import type { RunStatus, WsServerEvent } from '@hub/shared';
 import { useCallback, useEffect, useRef } from 'react';
+import { z } from 'zod';
 import { api } from '~/api/client.js';
 import { toast } from '~/components/Toast.js';
 import { playFailureSound, playSuccessSound } from '~/hooks/useNotificationSound.js';
 import type { RunTerminal } from '~/hooks/useRunTerminal.js';
 import type { TranslationKey } from '~/i18n/en';
 import { parseRunSummary, type RunSummary } from '~/utils/parse-run-summary.js';
+
+/**
+ * Minimal envelope guard for incoming WS frames: require an object with a
+ * string `kind` (the discriminant the message switch reads) and pass the rest
+ * through. Deliberately permissive on the payload so it never rejects a valid
+ * frame as the WsServerEvent union evolves — the goal is to drop garbage, not
+ * to re-validate the whole schema.
+ */
+const wsFrameSchema = z.looseObject({ kind: z.string() });
 
 interface UseRunSocketOptions {
   /** Terminal API to write live output into. */
@@ -58,7 +68,18 @@ export function useRunSocket({
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     wsRef.current = ws;
     ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data) as WsServerEvent;
+      // A malformed / non-JSON frame must not throw in onmessage (which would
+      // silently stop live output). Parse defensively and require the `kind`
+      // discriminant the switch below relies on; the payload is passed through.
+      let raw: unknown;
+      try {
+        raw = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      const parsed = wsFrameSchema.safeParse(raw);
+      if (!parsed.success) return;
+      const msg = parsed.data as unknown as WsServerEvent;
       if (!term.ready()) return;
       switch (msg.kind) {
         case 'run-started':
@@ -115,12 +136,28 @@ export function useRunSocket({
   useEffect(() => {
     if (!reconnectRunId) return;
     const runId = reconnectRunId;
+    // Track EVERY timer this effect schedules (the initial 600ms, the recursive
+    // waitForWs poll, and the 2000ms re-check) plus a cancelled flag, so unmount
+    // / reconnect-target change cancels all of them. Otherwise the recursive
+    // poll and the delayed re-check would fire ws.send on a closing socket and
+    // setState/term.writeln after unmount.
+    let cancelled = false;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const track = (fn: () => void, ms: number): void => {
+      const id = setTimeout(() => {
+        timers.delete(id);
+        if (!cancelled) fn();
+      }, ms);
+      timers.add(id);
+    };
     async function doReconnect() {
+      if (cancelled) return;
       setActiveRunId(runId);
       setRunStatus('running');
       setLastCommand(reconnectCommand ?? '');
       try {
         const { output } = (await api.get(`/api/runs/${runId}/output`)) as { output: string };
+        if (cancelled) return;
         if (term.ready()) {
           term.clear();
           term.writeln(`\x1b[32m[Reconnected]\x1b[0m Run ${runId}`);
@@ -128,6 +165,7 @@ export function useRunSocket({
           term.write(output);
         }
       } catch {
+        if (cancelled) return;
         setRunStatus('idle');
         if (term.ready()) {
           term.clear();
@@ -136,26 +174,33 @@ export function useRunSocket({
         return;
       }
       const waitForWs = () => {
+        if (cancelled) return;
         const ws = wsRef.current;
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ kind: 'subscribe', runId }));
         } else {
-          setTimeout(waitForWs, 200);
+          track(waitForWs, 200);
         }
       };
       waitForWs();
 
-      setTimeout(async () => {
-        try {
-          await api.get(`/api/runs/${runId}/output`);
-        } catch {
-          setRunStatus('idle');
-          term.writeln(`\n\x1b[33m[Finished]\x1b[0m Run completed while reconnecting.`);
-        }
+      track(() => {
+        void (async () => {
+          try {
+            await api.get(`/api/runs/${runId}/output`);
+          } catch {
+            if (cancelled) return;
+            setRunStatus('idle');
+            term.writeln(`\n\x1b[33m[Finished]\x1b[0m Run completed while reconnecting.`);
+          }
+        })();
       }, 2000);
     }
-    const timer = setTimeout(doReconnect, 600);
-    return () => clearTimeout(timer);
+    track(() => void doReconnect(), 600);
+    return () => {
+      cancelled = true;
+      for (const id of timers) clearTimeout(id);
+    };
   }, [reconnectRunId, reconnectCommand]);
 
   return { send };

@@ -121,6 +121,22 @@ function serveUrl(path: string): string {
   return `/api/artifacts/serve?path=${encodeURIComponent(path)}`;
 }
 
+/**
+ * Enter/Space activation for `role="button"` containers (Card/Group) that hold
+ * nested controls (checkbox, download/delete icons). Guarding on
+ * `target === currentTarget` keeps keyboard activation to the container itself,
+ * so activating a nested control does not also trigger navigation.
+ */
+function handleActivateKey(action: () => void) {
+  return (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      action();
+    }
+  };
+}
+
 // ─── Components ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
@@ -155,7 +171,11 @@ function FolderCard({
       withBorder
       padding="lg"
       radius="md"
+      role="button"
+      tabIndex={0}
+      aria-label={`Open folder ${node.name}`}
       onClick={onClick}
+      onKeyDown={handleActivateKey(onClick)}
       style={{
         cursor: 'pointer',
         transition: 'box-shadow 150ms',
@@ -288,12 +308,16 @@ function FileRow({
       justify="space-between"
       px="sm"
       py="xs"
+      role="button"
+      tabIndex={0}
+      aria-label={`Preview ${node.name}`}
       style={{
         borderBottom: '1px solid var(--mantine-color-default-border)',
         cursor: 'pointer',
         background: selected ? 'var(--mantine-color-brand-light)' : undefined,
       }}
       onClick={onClick}
+      onKeyDown={handleActivateKey(onClick)}
     >
       <Group gap="sm">
         {onToggleSelect && (
@@ -364,12 +388,16 @@ function FolderRow({
       justify="space-between"
       px="sm"
       py="xs"
+      role="button"
+      tabIndex={0}
+      aria-label={`Open folder ${node.name}`}
       style={{
         borderBottom: '1px solid var(--mantine-color-default-border)',
         cursor: 'pointer',
         background: selected ? 'var(--mantine-color-brand-light)' : undefined,
       }}
       onClick={onClick}
+      onKeyDown={handleActivateKey(onClick)}
     >
       <Group gap="sm">
         {onToggleSelect && (

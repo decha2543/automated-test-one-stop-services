@@ -20,6 +20,11 @@ import { useT } from '~/i18n/index.js';
 export interface EnvEntry {
   key: string;
   value: string;
+  /** Stable React key so add/delete of a middle row doesn't reuse a positional
+   *  index (which reuses the wrong DOM node / focus). Optional so existing
+   *  callers that build `{key,value}` still type-check; rows without one fall
+   *  back to their index. */
+  id?: string;
 }
 
 export interface EnvModalEditingTarget {
@@ -94,7 +99,7 @@ export function EnvModal({
       const merged = [...entries];
       for (const tpl of res.entries) {
         if (!existingKeys.has(tpl.key)) {
-          merged.push({ key: tpl.key, value: tpl.value });
+          merged.push({ key: tpl.key, value: tpl.value, id: crypto.randomUUID() });
         }
       }
       setEntries(merged);
@@ -134,7 +139,7 @@ export function EnvModal({
           </Alert>
         )}
         {entries.map((entry, idx) => (
-          <Group key={idx as number} gap="xs" wrap="nowrap">
+          <Group key={entry.id ?? idx} gap="xs" wrap="nowrap">
             <TextInput
               size="xs"
               w={180}
@@ -183,7 +188,7 @@ export function EnvModal({
           size="compact-xs"
           variant="subtle"
           leftSection={<TbPlus size={12} />}
-          onClick={() => setEntries([...entries, { key: '', value: '' }])}
+          onClick={() => setEntries([...entries, { key: '', value: '', id: crypto.randomUUID() }])}
           style={{ alignSelf: 'flex-start' }}
         >
           {t('env.addEntry')}

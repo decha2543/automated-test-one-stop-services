@@ -2,17 +2,45 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunRequest } from '@hub/shared';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { WORKSPACE_ROOT } from '../config.js';
 import { buildTaskCommand } from '../services/command-builder.js';
 import { getEnabledToolIds } from '../services/manifest-registry.js';
 import { runner } from '../services/runner.js';
 
+/**
+ * Runtime schema for a run request — replaces the previous unchecked
+ * `req.body as RunRequest` cast so a malformed body is rejected with a 400
+ * before it reaches command building / spawn. `tool` stays a plain string
+ * (the manifest registry validates tool existence downstream); unknown keys
+ * are stripped. Mirrors the `RunRequest` interface in @hub/shared.
+ */
+const runRequestSchema = z.object({
+  tool: z.string().min(1),
+  type: z.string().min(1),
+  project: z.string().min(1),
+  mode: z.enum(['local', 'docker']),
+  tag: z.string().optional(),
+  headless: z.enum(['headless', 'headed']).optional(),
+  extraArgs: z.string().optional(),
+  noTrack: z.boolean().optional(),
+  silent: z.boolean().optional(),
+  section: z.string().optional(),
+  performanceType: z
+    .enum(['TEST_PROTOCOL', 'MINIMAL_LOAD', 'LOAD', 'STRESS', 'ENDURANCE', 'PEAK'])
+    .optional(),
+});
+
 export async function runRoutes(app: FastifyInstance): Promise<void> {
   /** POST /api/runs — start a new test run */
-  app.post<{ Body: RunRequest }>('/api/runs', async (req) => {
-    const command = await buildTaskCommand(req.body);
-    return runner.start(req.body, command);
-  });
+  app.post<{ Body: RunRequest }>(
+    '/api/runs',
+    { schema: { body: runRequestSchema } },
+    async (req) => {
+      const command = await buildTaskCommand(req.body);
+      return runner.start(req.body, command);
+    },
+  );
 
   /** GET /api/runs/active — list currently running tests */
   app.get('/api/runs/active', async () => {
@@ -89,17 +117,16 @@ export async function runRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** POST /api/runs/batch — start multiple runs (queued sequentially) */
-  app.post<{ Body: { requests: RunRequest[] } }>('/api/runs/batch', async (req, reply) => {
-    const requests = req.body?.requests;
-    if (!Array.isArray(requests) || requests.length === 0) {
-      reply.status(400);
-      return { code: 'BAD_REQUEST', message: 'requests array is required' };
-    }
-    const records = await Promise.all(
-      requests.map(async (r) => runner.start(r, await buildTaskCommand(r))),
-    );
-    return { records };
-  });
+  app.post<{ Body: { requests: RunRequest[] } }>(
+    '/api/runs/batch',
+    { schema: { body: z.object({ requests: z.array(runRequestSchema).min(1) }) } },
+    async (req) => {
+      const records = await Promise.all(
+        req.body.requests.map(async (r) => runner.start(r, await buildTaskCommand(r))),
+      );
+      return { records };
+    },
+  );
 
   /** GET /api/runs/case-history?project=x&tag=@TA-C001 — last 10 runs for a case */
   app.get<{ Querystring: { project: string; tag: string } }>(

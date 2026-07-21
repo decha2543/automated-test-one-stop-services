@@ -1,10 +1,21 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ReportEntry, RunRecord, RunStatus, ToolId } from '@hub/shared';
-import { nanoid } from 'nanoid';
 import { OUTPUTS_DIR } from '../config.js';
 import { historyStore } from './history-store.js';
 import { getEnabledTools, getManifestModule } from './manifest-registry.js';
+
+/**
+ * Deterministic id for a report entry, derived from its absolute path. The
+ * report list is rebuilt on every poll (10s cache); a random `nanoid` would
+ * hand the client a new id for the same report each rebuild, churning React
+ * keys and dropping the user's selection. The path is unique per report, so a
+ * short content hash is stable across rebuilds and process restarts.
+ */
+function stableId(seed: string): string {
+  return createHash('sha1').update(seed).digest('hex').slice(0, 12);
+}
 
 /**
  * Recursively walking `outputs/` is the slow part of every dashboard poll.
@@ -234,7 +245,7 @@ function findHtmlReports(
     const { timestamp } = extractMeta(parts);
 
     out.push({
-      id: nanoid(8),
+      id: stableId(filePath),
       tool,
       type,
       project,
@@ -272,10 +283,18 @@ function matchesGlob(filePath: string, glob: string): boolean {
   return globSegs.every((g, i) => segmentMatches(segs[i] ?? '', g));
 }
 
+/** Compiled wildcard-segment patterns, cached so a walk doesn't recompile the
+ *  same glob segment RegExp for every candidate file. */
+const segmentRegexCache = new Map<string, RegExp>();
+
 function segmentMatches(segment: string, pattern: string): boolean {
   if (pattern === '*') return true;
   if (!pattern.includes('*')) return segment === pattern;
-  const re = new RegExp(`^${pattern.split('*').map(escapeRegex).join('[^/]*')}$`);
+  let re = segmentRegexCache.get(pattern);
+  if (!re) {
+    re = new RegExp(`^${pattern.split('*').map(escapeRegex).join('[^/]*')}$`);
+    segmentRegexCache.set(pattern, re);
+  }
   return re.test(segment);
 }
 

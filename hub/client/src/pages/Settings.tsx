@@ -128,6 +128,14 @@ export function SettingsPage() {
     onError: () => toast.error(t('settings.concurrencyFailed')),
   });
 
+  // Sync the input once the server value loads. The useState above lazy-seeds
+  // 2 while the query is still pending; without this a server value other than
+  // 2 would render as 2 and the Save guard (input === data) would let a
+  // careless save silently downgrade concurrency. Mirrors the retention sync.
+  useEffect(() => {
+    if (concurrencyQ.data) setConcurrencyInput(concurrencyQ.data.maxConcurrency);
+  }, [concurrencyQ.data]);
+
   // Cleanup — load from server
   const retentionQ = useQuery<{ retentionDays: number; autoCleanup: boolean }>({
     queryKey: ['retention'],

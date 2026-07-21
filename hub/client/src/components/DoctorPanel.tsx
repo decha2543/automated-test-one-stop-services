@@ -11,6 +11,7 @@ import {
   SimpleGrid,
   Stack,
   Text,
+  UnstyledButton,
 } from '@mantine/core';
 import { useState } from 'react';
 import {
@@ -158,43 +159,47 @@ export function DoctorPanel({ doctor, isLoading }: DoctorPanelProps) {
 
   return (
     <Paper p="md" withBorder>
-      <Group
-        justify="space-between"
-        wrap="nowrap"
+      <UnstyledButton
+        w="100%"
+        aria-expanded={isExpanded}
+        aria-disabled={hasIssues || undefined}
+        aria-label="Toggle environment status details"
         style={{ cursor: hasIssues ? 'default' : 'pointer' }}
         onClick={() => {
           if (!hasIssues) setExpanded((v) => !v);
         }}
       >
-        <Group gap="sm" wrap="nowrap">
-          {!hasIssues && (
-            <TbChevronRight
-              size={14}
-              style={{
-                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                transition: 'transform 200ms',
-              }}
-            />
-          )}
-          <Text fw={600} size="sm">
-            Environment Status
-          </Text>
-          {badge.ok ? (
-            <Badge
-              color="green"
-              variant="light"
-              size="sm"
-              leftSection={<TbCircleCheck size={12} />}
-            >
-              {badge.text}
-            </Badge>
-          ) : (
-            <Badge color="red" variant="filled" size="sm" leftSection={<TbCircleX size={12} />}>
-              {badge.text}
-            </Badge>
-          )}
+        <Group justify="space-between" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap">
+            {!hasIssues && (
+              <TbChevronRight
+                size={14}
+                style={{
+                  transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                  transition: 'transform 200ms',
+                }}
+              />
+            )}
+            <Text fw={600} size="sm">
+              Environment Status
+            </Text>
+            {badge.ok ? (
+              <Badge
+                color="green"
+                variant="light"
+                size="sm"
+                leftSection={<TbCircleCheck size={12} />}
+              >
+                {badge.text}
+              </Badge>
+            ) : (
+              <Badge color="red" variant="filled" size="sm" leftSection={<TbCircleX size={12} />}>
+                {badge.text}
+              </Badge>
+            )}
+          </Group>
         </Group>
-      </Group>
+      </UnstyledButton>
 
       <Collapse expanded={isExpanded}>
         <Stack gap="md" mt="md">

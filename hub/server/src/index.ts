@@ -17,6 +17,7 @@ import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
+import { validatorCompiler } from 'fastify-type-provider-zod';
 import { ALLOWED_ORIGINS, CLIENT_DIST_DIR, HOST, PORT, SCRIPTS_DIR } from './config.js';
 import { appiumServer } from './services/appium-server.js';
 import { getDb } from './services/db.js';
@@ -57,6 +58,12 @@ async function main(): Promise<void> {
     // exceed 1 MiB in larger workspaces.
     bodyLimit: 5 * 1024 * 1024,
   });
+
+  // Enable zod-based request validation for routes that declare a `schema`
+  // (body/params/querystring). Only the validator is registered — response
+  // serialization stays on Fastify's default, so schemaless routes are
+  // unaffected. Routes opt in by attaching a zod schema.
+  app.setValidatorCompiler(validatorCompiler);
 
   // Plugins
   //

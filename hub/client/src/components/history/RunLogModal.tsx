@@ -136,9 +136,13 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
                 variant="light"
                 color="gray"
                 leftSection={<TbCopy size={12} />}
-                onClick={() => {
-                  navigator.clipboard.writeText(run.command);
-                  toast.success('Command copied');
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(run.command);
+                    toast.success('Command copied');
+                  } catch {
+                    toast.error('Copy failed');
+                  }
                 }}
               >
                 Copy

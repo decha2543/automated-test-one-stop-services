@@ -1,4 +1,4 @@
-import type { DoctorReport, RunRequest } from '@hub/shared';
+import type { RunRequest } from '@hub/shared';
 import {
   AppShell,
   Badge,
@@ -32,8 +32,7 @@ import {
   TbReportAnalytics,
   TbSettings,
 } from 'react-icons/tb';
-import { api } from '~/api/client.js';
-import { qActiveRuns } from '~/api/queries.js';
+import { qActiveRuns, qDoctor } from '~/api/queries.js';
 import { ActiveRunsBanner } from '~/components/ActiveRunsBanner.js';
 import { ErrorBoundary } from '~/components/ErrorBoundary.js';
 import { FloatingRunsWindow } from '~/components/FloatingRunsWindow.js';
@@ -194,12 +193,10 @@ export function AppLayout() {
   });
   const runningCount = activeRuns.data?.length ?? 0;
 
-  // Doctor poll for nav badge
-  const doctorQ = useQuery<DoctorReport>({
-    queryKey: ['doctor-nav'],
-    queryFn: () => api.get('/api/doctor'),
-    staleTime: 120_000,
-  });
+  // Doctor status for the nav badge. Reuses the shared `qDoctor()` options so
+  // the layout and the Dashboard share a single cache entry / fetch for
+  // /api/doctor instead of each keeping its own (['doctor'] vs ['doctor-nav']).
+  const doctorQ = useQuery(qDoctor());
   const envUnhealthy = doctorQ.data ? !doctorQ.data.overallOk : false;
 
   function navigateTo(path: PagePath) {

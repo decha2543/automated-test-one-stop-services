@@ -758,7 +758,8 @@ export interface UpdateToolError {
     | 'NOT_REGISTRY_INSTALLED'
     | 'LOCAL_EDITS_PRESENT'
     | 'INVALID_MANIFEST_AFTER_UPDATE'
-    | 'INVALID_REF';
+    | 'INVALID_REF'
+    | 'INVALID_TOOL_NAME';
   readonly message: string;
   readonly dirty?: readonly string[];
   readonly errors?: readonly { readonly code: string; readonly message: string }[];
@@ -781,6 +782,16 @@ export type UpdateToolResult =
  * Requirements: 10.1–10.7
  */
 export async function updateTool(id: string, ref?: string): Promise<UpdateToolResult> {
+  // Defence in depth: `id` is interpolated into `git -C "${toolDir}"` shell
+  // strings below, so re-guard it against the safe-id charset (sibling entry
+  // points like runToolSetupTask/installFromRegistry do the same) before any
+  // git work.
+  if (!SAFE_ID.test(id)) {
+    return {
+      ok: false,
+      error: { code: 'INVALID_TOOL_NAME', message: `tool "${id}" contains unsafe characters` },
+    };
+  }
   // Defence in depth: the route validates `ref` too, but `targetRef` is
   // interpolated into a `git` shell command below, so re-guard here against the
   // safe ref charset before any git work.

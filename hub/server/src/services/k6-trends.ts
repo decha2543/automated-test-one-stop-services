@@ -19,7 +19,7 @@ function save(data: K6TrendsData): void {
   saveJson(K6_TRENDS_FILE, data);
 }
 
-function parseK6Summary(summaryPath: string): Partial<K6RunSummary> | null {
+function parseK6Summary(summaryPath: string, runTimestamp: string): Partial<K6RunSummary> | null {
   try {
     if (!fs.existsSync(summaryPath)) return null;
     const raw = fs.readFileSync(summaryPath, 'utf8');
@@ -58,10 +58,19 @@ function parseK6Summary(summaryPath: string): Partial<K6RunSummary> | null {
       }
     }
 
+    // Real wall-clock test duration (seconds) from k6's `state.testRunDurationMs`
+    // when present. The old `avg * count / 1000` was total request-seconds, which
+    // inflates with concurrency and is not the test's elapsed time.
+    const testRunDurationMs = (data.state?.testRunDurationMs ?? 0) as number;
+    const duration = testRunDurationMs > 0 ? Math.round(testRunDurationMs / 1000) : 0;
+
     return {
       metrics: [
         {
-          timestamp: new Date().toISOString(),
+          // Use the run's own timestamp (summary mtime), not scan time — otherwise
+          // every run parsed in one refresh collapses to the same instant on the
+          // trend chart.
+          timestamp: runTimestamp,
           rps: httpReqs.values?.rate ?? 0,
           avgResponseTime: httpReqDuration.values?.avg ?? 0,
           p95ResponseTime: httpReqDuration.values?.['p(95)'] ?? 0,
@@ -71,12 +80,7 @@ function parseK6Summary(summaryPath: string): Partial<K6RunSummary> | null {
         },
       ],
       thresholds,
-      duration:
-        (httpReqDuration.values?.count ?? 0) > 0
-          ? Math.round(
-              ((httpReqDuration.values?.avg ?? 0) * (httpReqDuration.values?.count ?? 0)) / 1000,
-            )
-          : 0,
+      duration,
     };
   } catch {
     return null;
@@ -94,13 +98,14 @@ function walkForSummaries(dir: string, project: string, out: K6RunSummary[], dep
     if (entry.isDirectory()) {
       walkForSummaries(fullPath, project, out, depth + 1);
     } else if (entry.name === 'summary.json') {
-      const parsed = parseK6Summary(fullPath);
+      const stat = fs.statSync(fullPath);
+      const runTimestamp = stat.mtime.toISOString();
+      const parsed = parseK6Summary(fullPath, runTimestamp);
       if (parsed) {
-        const stat = fs.statSync(fullPath);
         out.push({
           runId: path.relative(path.join(OUTPUTS_DIR, 'k6', project), dir).replace(/\\/g, '/'),
           project,
-          timestamp: stat.mtime.toISOString(),
+          timestamp: runTimestamp,
           duration: parsed.duration ?? 0,
           metrics: parsed.metrics ?? [],
           thresholds: parsed.thresholds ?? [],

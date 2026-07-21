@@ -35,6 +35,23 @@ import {
  * collection swap is atomic.
  */
 
+/**
+ * Parse a JSON string[] column defensively. A single corrupt/legacy row must
+ * not throw and fail the ENTIRE collection read (e.g. one bad webhook row
+ * taking down the whole webhook list). Returns undefined on absent/invalid.
+ */
+function readStrArray(raw: string | null | undefined): string[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? (parsed.filter((v) => typeof v === 'string') as string[])
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface CollectionRepo<T> {
   readAll(db: DatabaseSync): T[];
   /** Replace the whole collection (DELETE + INSERT). Caller wraps in a txn. */
@@ -240,7 +257,7 @@ export const webhooksRepo: CollectionRepo<WebhookConfig> = {
               project: scopeProject,
             }
           : undefined,
-        projectFilter: projectFilterRaw ? (JSON.parse(projectFilterRaw) as string[]) : undefined,
+        projectFilter: readStrArray(projectFilterRaw),
         enabled: readBool(row.enabled) ?? false,
         createdAt: readReqStr(row.created_at),
         lastTriggeredAt: readStr(row.last_triggered_at),

@@ -253,7 +253,7 @@ export function EnvProfilesPage() {
                         color="green"
                         leftSection={<TbPlayerPlay size={14} />}
                         onClick={() => applyMutation.mutate(p.id)}
-                        loading={applyMutation.isPending}
+                        loading={applyMutation.isPending && applyMutation.variables === p.id}
                       >
                         {t('envProfiles.apply')}
                       </Button>

@@ -228,7 +228,7 @@ export function WebhooksPage() {
                         variant="subtle"
                         color="teal"
                         onClick={() => testMutation.mutate(w)}
-                        loading={testMutation.isPending}
+                        loading={testMutation.isPending && testMutation.variables === w}
                         aria-label={t('webhook.test')}
                       >
                         <TbPlayerPlay size={16} />

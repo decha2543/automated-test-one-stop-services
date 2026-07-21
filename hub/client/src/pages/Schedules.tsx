@@ -18,10 +18,19 @@ import { CronExpressionParser } from 'cron-parser';
 import cronstrue from 'cronstrue';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { TbCalendar, TbCalendarPlus, TbClock, TbList, TbPencil, TbTrash } from 'react-icons/tb';
+import {
+  TbAlertTriangle,
+  TbCalendar,
+  TbCalendarPlus,
+  TbClock,
+  TbList,
+  TbPencil,
+  TbTrash,
+} from 'react-icons/tb';
 import { api } from '~/api/client.js';
 import { confirmDialog } from '~/components/confirmDialog.js';
 import { EmptyState } from '~/components/EmptyState.js';
+import { InlineAlert } from '~/components/InlineAlert.js';
 import { PageHeader } from '~/components/PageHeader.js';
 import { ScheduleCalendar } from '~/components/ScheduleCalendar.js';
 import { ListSkeleton } from '~/components/Skeletons.js';
@@ -187,6 +196,24 @@ export function SchedulesPage() {
       )}
 
       {schedules.isLoading && <ListSkeleton rows={4} />}
+
+      {schedules.isError && (
+        <InlineAlert
+          color="red"
+          icon={<TbAlertTriangle size={14} color="var(--mantine-color-red-6)" />}
+          message={t('common.loadFailed')}
+          action={
+            <Button
+              size="compact-xs"
+              variant="light"
+              color="red"
+              onClick={() => schedules.refetch()}
+            >
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      )}
 
       {schedules.data && schedules.data.length === 0 && (
         <EmptyState

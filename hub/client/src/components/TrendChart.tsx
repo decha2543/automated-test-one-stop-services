@@ -2,6 +2,7 @@ import type { RunRecord } from '@hub/shared';
 import { AreaChart } from '@mantine/charts';
 import { Text } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { api } from '~/api/client.js';
 
 interface DayStats {
@@ -47,6 +48,8 @@ export function TrendChart() {
     queryFn: () => api.get('/api/runs/history'),
   });
 
+  const data = useMemo(() => aggregateByDay(history.data ?? []), [history.data]);
+
   if (history.isLoading)
     return (
       <Text c="dimmed" size="sm">
@@ -61,7 +64,6 @@ export function TrendChart() {
     );
   }
 
-  const data = aggregateByDay(history.data);
   if (data.length === 0) {
     return (
       <Text c="dimmed" size="sm">

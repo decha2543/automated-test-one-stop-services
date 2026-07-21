@@ -31,6 +31,7 @@ export function SortableHeader<F extends string>({
   return (
     <UnstyledButton
       onClick={() => onSort(field)}
+      aria-sort={isActive ? (currentDir === 'asc' ? 'ascending' : 'descending') : 'none'}
       style={{ display: 'flex', alignItems: 'center', gap: 4 }}
     >
       <Text size="xs" fw={600}>

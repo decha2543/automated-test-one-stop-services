@@ -16,6 +16,7 @@ import { BASH_PATH, WORKSPACE_ROOT } from '../config.js';
 import { historyStore } from './history-store.js';
 import { invalidateReportsCache } from './reports.js';
 import { webhookService } from './webhooks.js';
+import { createKillJob, type KillJob } from './win-job.js';
 
 const DEFAULT_MAX_CONCURRENCY = 2;
 /**
@@ -36,6 +37,20 @@ const OUTPUT_BUFFER_LIMIT = 1024 * 1024; // 1 MiB
  * Upgrade path: switch to a byte-budgeted LRU if memory ever becomes a concern.
  */
 const RECENT_FINISHED_LIMIT = 20;
+
+/**
+ * Grace period after a cancel before the run is force-finalized when the
+ * child's `close` never arrives.
+ *
+ * On Windows + Git Bash the real worker processes (task → node → browser) are
+ * reparented away from the tracked `bash -c` pid, so `taskkill /T /F` reaps
+ * only the shell layer and the orphaned workers keep the child's stdio pipes
+ * open. Node then never emits `close`, so without this fallback the run sticks
+ * on `running` forever and the UI "Stop" appears to do nothing. When `close`
+ * does fire first (POSIX, or a clean Windows tree) `finishRun`'s
+ * double-finalize guard makes this a no-op.
+ */
+const CANCEL_FINALIZE_GRACE_MS = 5000;
 
 /**
  * Filesystem prefix for a silent run's ephemeral output directory. The run id
@@ -72,6 +87,13 @@ interface ActiveRun {
    * signal, which would otherwise be misclassified as `failed`.
    */
   cancelRequested: boolean;
+  /**
+   * Windows Job Object enrolling this run's whole process tree, or `null`
+   * off-Windows / when the job could not be created. Terminating the job reaps
+   * every descendant — including workers Git Bash reparents away from
+   * `child.pid`, which `taskkill /T` cannot reach.
+   */
+  killJob: KillJob | null;
 }
 
 interface QueuedRun {
@@ -277,6 +299,21 @@ class RunnerService extends EventEmitter {
       windowsHide: true,
     });
 
+    // Enroll the run in a Windows Job Object so cancellation can reap the whole
+    // tree even when Git Bash reparents the real workers away from `child.pid`
+    // (taskkill /T misses them). Best-effort: stays null off-Windows or on any
+    // failure, in which case cancel() falls back to taskkill. Assigned
+    // synchronously here so descendants spawned by the shell inherit the job.
+    let killJob: KillJob | null = null;
+    const job = createKillJob();
+    if (job) {
+      if (child.pid && job.assign(child.pid)) {
+        killJob = job;
+      } else {
+        job.release(); // couldn't enroll the process — drop it, use taskkill
+      }
+    }
+
     const id = record.id;
     const activeRun: ActiveRun = {
       record,
@@ -286,6 +323,7 @@ class RunnerService extends EventEmitter {
       silent,
       silentTmpDir,
       cancelRequested: false,
+      killJob,
     };
     this.active.set(id, activeRun);
     this.emitEvent({ kind: 'run-started', runId: id, record });
@@ -363,6 +401,10 @@ class RunnerService extends EventEmitter {
     }
 
     this.active.delete(id);
+    // Close our Job Object handle. If the run was cancelled, terminate() already
+    // closed it (this is a guarded no-op); for a normal finish this frees the
+    // handle and, via KILL_ON_JOB_CLOSE, reaps any lingering stray descendants.
+    run?.killJob?.release();
 
     if (!silent) {
       // History append (R6.1), last-status index (R6.3) and report cache
@@ -427,11 +469,33 @@ class RunnerService extends EventEmitter {
     // identifier, so any active run can be cancelled — not only the silent run
     // currently executing.
     run.cancelRequested = true;
-    // Kick off the kill but do not block the caller — the close handler will
-    // finalize state. Errors are logged so we notice if taskkill is missing.
-    void killProcessTree(run.child).catch((err) => {
-      console.error(`[runner] killProcessTree failed for run ${id}:`, err);
-    });
+    // Reap the whole process tree without blocking the caller — the close
+    // handler finalizes state. Prefer the Job Object (terminates reparented
+    // workers that `taskkill /T` cannot reach); fall back to taskkill when no
+    // job was enrolled (off-Windows or assignment failed).
+    if (run.killJob) {
+      run.killJob.terminate();
+    } else {
+      void killProcessTree(run.child).catch((err) => {
+        console.error(`[runner] killProcessTree failed for run ${id}:`, err);
+      });
+    }
+    // Fallback finalize: if `close` has not fired within the grace window
+    // (orphaned/reparented workers on Windows keep the child's stdio open, so
+    // Node never emits `close`), force the run to `cancelled` so the active
+    // list and UI never stick on `running`. If `close` fired first the run is
+    // already gone from `active` and finishRun's guard makes this a no-op.
+    const timer = setTimeout(() => {
+      const stuck = this.active.get(id);
+      if (!stuck?.cancelRequested) return;
+      // Detach live-output listeners so orphaned workers still holding the
+      // pipe cannot emit stdout/stderr after the terminal run-finished event.
+      stuck.child.stdout?.removeAllListeners('data');
+      stuck.child.stderr?.removeAllListeners('data');
+      this.finishRun(stuck.record, 'cancelled', undefined);
+    }, CANCEL_FINALIZE_GRACE_MS);
+    // Never let this timer keep the process alive at shutdown.
+    timer.unref?.();
     return true;
   }
 

@@ -4,7 +4,7 @@ import { Box, Group, SegmentedControl, Stack, Text, useMantineColorScheme } from
 import { useElementSize } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { api } from '~/api/client.js';
 
 type Metric = 'total' | 'failed' | 'passed';
@@ -48,6 +48,25 @@ export function RunHeatmap() {
     queryFn: () => api.get('/api/runs/history'),
   });
 
+  const buckets = useMemo(() => aggregate(history.data ?? []), [history.data]);
+
+  const data = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const [day, b] of Object.entries(buckets)) {
+      map[day] = b[metric];
+    }
+    return map;
+  }, [buckets, metric]);
+
+  const totals = useMemo(() => {
+    const values = Object.values(buckets);
+    return {
+      totalRuns: values.reduce((s, b) => s + b.total, 0),
+      totalFailed: values.reduce((s, b) => s + b.failed, 0),
+      totalPassed: values.reduce((s, b) => s + b.passed, 0),
+    };
+  }, [buckets]);
+
   if (history.isLoading) {
     return (
       <Text c="dimmed" size="sm">
@@ -63,12 +82,6 @@ export function RunHeatmap() {
     );
   }
 
-  const buckets = aggregate(history.data);
-  const data: Record<string, number> = {};
-  for (const [day, b] of Object.entries(buckets)) {
-    data[day] = b[metric];
-  }
-
   const colorMap: Record<Metric, string[]> = {
     total: isDark ? COLORS_TOTAL_DARK : COLORS_TOTAL_LIGHT,
     passed: isDark ? COLORS_PASSED_DARK : COLORS_PASSED_LIGHT,
@@ -78,9 +91,7 @@ export function RunHeatmap() {
   const today = dayjs().format('YYYY-MM-DD');
   const yearAgo = dayjs().subtract(1, 'year').format('YYYY-MM-DD');
 
-  const totalRuns = Object.values(buckets).reduce((s, b) => s + b.total, 0);
-  const totalFailed = Object.values(buckets).reduce((s, b) => s + b.failed, 0);
-  const totalPassed = Object.values(buckets).reduce((s, b) => s + b.passed, 0);
+  const { totalRuns, totalFailed, totalPassed } = totals;
 
   return (
     <Stack gap="xs">

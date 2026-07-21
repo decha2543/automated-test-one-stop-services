@@ -31,7 +31,7 @@ export const th: Record<TranslationKey, string> = {
   'nav.projects.desc': 'สร้าง โคลน และจัดการโปรเจคเทส รวมถึงไฟล์ .env',
   'nav.tools.desc': 'จัดการ tool plugin ที่ติดตั้ง — เปิด/ปิดใช้งาน และ re-sync workspace',
   'nav.envProfiles.desc': 'บันทึกและสลับโปรไฟล์ environment variable ในแต่ละโปรเจค',
-  'nav.reports.desc': 'ดูรายงาน HTML ของ Playwright, Robot Framework และ k6',
+  'nav.reports.desc': 'ดูรายงาน HTML ของเครื่องมือที่ทดสอบ',
   'nav.artifacts.desc': 'ดูภาพหน้าจอ วิดีโอ trace และ log จากการรันเทส',
   'nav.insights.desc': 'สรุปผล: tag coverage, flaky tests, แนวโน้มประสิทธิภาพ',
   'nav.docker.desc': 'เริ่ม หยุด และตรวจสอบ Docker services',
@@ -87,6 +87,8 @@ export const th: Record<TranslationKey, string> = {
   'common.yes': 'ใช่',
   'common.no': 'ไม่',
   'common.select': 'เลือก...',
+  'common.loadFailed': 'โหลดไม่สำเร็จ',
+  'common.retry': 'ลองใหม่',
 
   // Settings
   'settings.title': 'ตั้งค่า',

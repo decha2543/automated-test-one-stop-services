@@ -2,9 +2,38 @@ import type { WsClientEvent, WsServerEvent } from '@hub/shared';
 import type { FastifyInstance } from 'fastify';
 import { runner } from '../services/runner.js';
 
+/** Ping each socket on this interval; terminate one that misses a pong so a
+ *  half-open connection can't leak its runner 'event' listener forever. */
+const HEARTBEAT_MS = 30_000;
+
 export async function wsRoutes(app: FastifyInstance): Promise<void> {
+  // Each connection adds one runner 'event' listener (removed on close). The UI
+  // opens several sockets (one per run session + dashboard), which exceeds the
+  // default EventEmitter cap of 10 and logs a spurious MaxListenersExceeded
+  // warning. Listener count is bounded by live sockets, so lift the cap.
+  runner.setMaxListeners(0);
+
   app.get('/ws', { websocket: true }, (socket) => {
     const subscriptions = new Set<string>();
+
+    // Heartbeat: detect and reap dead/half-open sockets so their listener +
+    // interval are cleaned up instead of accumulating.
+    let alive = true;
+    socket.on('pong', () => {
+      alive = true;
+    });
+    const heartbeat = setInterval(() => {
+      if (!alive) {
+        socket.terminate();
+        return;
+      }
+      alive = false;
+      try {
+        socket.ping();
+      } catch {
+        /* socket already closing */
+      }
+    }, HEARTBEAT_MS);
 
     function onEvent(event: WsServerEvent): void {
       // Broadcast schedule-finished to every socket regardless of
@@ -58,6 +87,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
     });
 
     socket.on('close', () => {
+      clearInterval(heartbeat);
       runner.off('event', onEvent);
     });
   });

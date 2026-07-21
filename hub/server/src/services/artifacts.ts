@@ -8,6 +8,17 @@ import { isUnderOutputs } from './path-guard.js';
 /** Short TTL cache for the full `outputs/` tree walk (dashboard poll hot path). */
 const BROWSE_CACHE_TTL_MS = 10_000;
 let browseAllCache: { value: ArtifactFolder; at: number } | null = null;
+/** Per-project (tool/type/project) short-TTL cache for `browse()`. */
+const browseCache = new Map<string, { value: ArtifactFolder; at: number }>();
+
+/** Max size for an in-memory text read (readFile). Larger files must stream. */
+const MAX_INLINE_READ_BYTES = 5 * 1024 * 1024; // 5 MiB
+
+// Extension→type sets hoisted to module scope so getArtifactType doesn't rebuild
+// array literals on every call (it runs once per file during a tree walk).
+const SCREENSHOT_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
+const VIDEO_EXTS = new Set(['.mp4', '.webm']);
+const LOG_EXTS = new Set(['.log', '.txt', '.md', '.csv']);
 
 const MIME_MAP: Record<string, string> = {
   '.png': 'image/png',
@@ -29,10 +40,10 @@ const MIME_MAP: Record<string, string> = {
 };
 
 function getArtifactType(ext: string): ArtifactType {
-  if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'].includes(ext)) return 'screenshot';
-  if (['.mp4', '.webm'].includes(ext)) return 'video';
+  if (SCREENSHOT_EXTS.has(ext)) return 'screenshot';
+  if (VIDEO_EXTS.has(ext)) return 'video';
   if (ext === '.zip' || ext === '.trace') return 'trace';
-  if (['.log', '.txt', '.md', '.csv'].includes(ext)) return 'log';
+  if (LOG_EXTS.has(ext)) return 'log';
   if (ext === '.html') return 'html';
   if (ext === '.json' || ext === '.xml') return 'json';
   return 'other';
@@ -120,11 +131,20 @@ function collectArtifacts(dir: string, out: ArtifactEntry[], maxDepth: number, d
 
 class ArtifactService {
   browse(tool: string, type: string, project: string): ArtifactFolder {
+    const key = `${tool}/${type}/${project}`;
+    const now = Date.now();
+    const cached = browseCache.get(key);
+    // Same rationale as browseAll: the depth-6 walk is synchronous and hit on
+    // every artifacts-page poll. Cache per project for a short window; dropped
+    // on artifact deletion via invalidateBrowseAll for immediate consistency.
+    if (cached && now - cached.at < BROWSE_CACHE_TTL_MS) return cached.value;
     const projectDir = path.join(OUTPUTS_DIR, tool, type, project);
     if (!fs.existsSync(projectDir)) {
       return { name: project, path: projectDir, children: [], totalSize: 0, fileCount: 0 };
     }
-    return buildTree(projectDir, 6);
+    const value = buildTree(projectDir, 6);
+    browseCache.set(key, { value, at: now });
+    return value;
   }
 
   browseAll(): ArtifactFolder {
@@ -145,9 +165,11 @@ class ArtifactService {
     return browseAllCache.value;
   }
 
-  /** Drop the cached `browseAll` tree so the next call re-walks `outputs/`. */
+  /** Drop the cached `browseAll` + per-project `browse` trees so the next call
+   *  re-walks `outputs/`. */
   invalidateBrowseAll(): void {
     browseAllCache = null;
+    browseCache.clear();
   }
 
   getForReport(reportPath: string): ArtifactEntry[] {
@@ -161,8 +183,9 @@ class ArtifactService {
 
   readFile(filePath: string): { content: string; mimeType: string } | null {
     const resolved = path.resolve(filePath);
-    const outputsResolved = path.resolve(OUTPUTS_DIR);
-    if (!resolved.startsWith(outputsResolved)) return null;
+    // isUnderOutputs resolves `..` and appends a separator, closing the
+    // prefix-escape a bare startsWith allows (e.g. a sibling `outputs-evil/`).
+    if (!isUnderOutputs(resolved)) return null;
     if (!fs.existsSync(resolved)) return null;
 
     const ext = path.extname(resolved).toLowerCase();
@@ -176,14 +199,18 @@ class ArtifactService {
       return null;
     }
 
+    // Cap in-memory text reads so a runaway log can't block the event loop or
+    // OOM the server. Larger files should be streamed via serveInfo instead.
+    const stat = fs.statSync(resolved);
+    if (!stat.isFile() || stat.size > MAX_INLINE_READ_BYTES) return null;
+
     const content = fs.readFileSync(resolved, 'utf8');
     return { content, mimeType };
   }
 
   getFileInfo(filePath: string): ArtifactEntry | null {
     const resolved = path.resolve(filePath);
-    const outputsResolved = path.resolve(OUTPUTS_DIR);
-    if (!resolved.startsWith(outputsResolved)) return null;
+    if (!isUnderOutputs(resolved)) return null;
     if (!fs.existsSync(resolved)) return null;
 
     const stat = fs.statSync(resolved);

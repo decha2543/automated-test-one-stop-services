@@ -186,7 +186,15 @@ export function openLocalDb(dbPath: string): LocalDb {
     const row = db.prepare('SELECT data FROM kv_store WHERE name = ?').get(name) as Row | undefined;
     if (!row) return undefined;
     const text = asText(row.data);
-    return text === undefined ? undefined : JSON.parse(text);
+    if (text === undefined) return undefined;
+    // A single corrupt kv_store row must not throw and take down every read of
+    // its dataset (matrix-runs / k6-trends / flaky / cleanup) — treat unparseable
+    // data as absent.
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
   }
 
   // Re-insert anything rescued from a legacy upgrade, now that the schema and

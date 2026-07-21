@@ -301,7 +301,16 @@ export function TagSelector({ tags, isLoading, selectedTags, onChange }: TagSele
                               variant={isSelected ? 'filled' : 'outline'}
                               color={isSelected ? 'blue' : color}
                               style={{ cursor: 'pointer' }}
+                              role="button"
+                              tabIndex={0}
+                              aria-pressed={isSelected}
                               onClick={() => toggle(tag)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggle(tag);
+                                }
+                              }}
                             >
                               {tag}
                               {detail && detail.count > 1 && group.kind !== 'case-id'

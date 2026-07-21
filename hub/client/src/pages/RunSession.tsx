@@ -201,6 +201,9 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
     queryKey: ['config'],
     queryFn: () => api.get('/api/config'),
     gcTime: Infinity,
+    // Config (forceTrack/dockerRunning) is stable within a session; without a
+    // staleTime it refetched on every session mount / window refocus.
+    staleTime: Infinity,
   });
 
   // Full doctor report (shares the ['doctor'] cache with the Dashboard panel).
@@ -352,8 +355,14 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
     if (runMutation.data) runMutation.mutate(runMutation.data.request);
   }
 
-  function handleCopyCommand() {
-    if (lastCommand) navigator.clipboard.writeText(lastCommand);
+  async function handleCopyCommand() {
+    if (!lastCommand) return;
+    try {
+      await navigator.clipboard.writeText(lastCommand);
+      toast.success('Command copied');
+    } catch {
+      toast.error('Copy failed');
+    }
   }
 
   // Ctrl/Cmd + Enter to run when this session is visible

@@ -15,9 +15,10 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
-import { TbAnalyze, TbFlame, TbX } from 'react-icons/tb';
+import { TbAlertTriangle, TbAnalyze, TbFlame, TbX } from 'react-icons/tb';
 import { api } from '~/api/client';
 import { EmptyState } from '~/components/EmptyState.js';
+import { InlineAlert } from '~/components/InlineAlert.js';
 import { PageHeader } from '~/components/PageHeader.js';
 import { ListSkeleton } from '~/components/Skeletons.js';
 import { toast } from '~/components/Toast';
@@ -106,6 +107,19 @@ export function FlakyTestsPage() {
       />
 
       {flaky.isLoading && <ListSkeleton rows={4} />}
+
+      {flaky.isError && (
+        <InlineAlert
+          color="red"
+          icon={<TbAlertTriangle size={14} color="var(--mantine-color-red-6)" />}
+          message={t('common.loadFailed')}
+          action={
+            <Button size="compact-xs" variant="light" color="red" onClick={() => flaky.refetch()}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      )}
 
       {flaky.data && tests.length === 0 && (
         <EmptyState

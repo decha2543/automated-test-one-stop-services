@@ -2,9 +2,10 @@ import type { K6RunSummary, K6TrendData } from '@hub/shared';
 import { Badge, Button, Card, Paper, Select, SimpleGrid, Stack, Table, Text } from '@mantine/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { TbChartLine, TbCheck, TbRefresh, TbX } from 'react-icons/tb';
+import { TbAlertTriangle, TbChartLine, TbCheck, TbRefresh, TbX } from 'react-icons/tb';
 import { api } from '~/api/client';
 import { EmptyState } from '~/components/EmptyState.js';
+import { InlineAlert } from '~/components/InlineAlert.js';
 import { PageHeader } from '~/components/PageHeader.js';
 import { StatCardsSkeleton } from '~/components/Skeletons.js';
 import { toast } from '~/components/Toast';
@@ -97,7 +98,20 @@ export function PerformancePage() {
 
       {selectedProject && trends.isLoading && <StatCardsSkeleton count={5} />}
 
-      {selectedProject && !trends.isLoading && runs.length === 0 && (
+      {selectedProject && trends.isError && (
+        <InlineAlert
+          color="red"
+          icon={<TbAlertTriangle size={14} color="var(--mantine-color-red-6)" />}
+          message={t('common.loadFailed')}
+          action={
+            <Button size="compact-xs" variant="light" color="red" onClick={() => trends.refetch()}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      )}
+
+      {selectedProject && !trends.isLoading && !trends.isError && runs.length === 0 && (
         <EmptyState
           icon={<TbChartLine size={48} color="var(--mantine-color-dimmed)" />}
           description={t('performance.noData')}

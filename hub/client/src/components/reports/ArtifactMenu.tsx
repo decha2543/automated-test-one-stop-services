@@ -44,6 +44,19 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [runningTraces, setRunningTraces] = useState<Set<string>>(new Set());
 
+  // Track every trace-status poll interval so they are all cleared on unmount.
+  // Without this, closing the modal / navigating away while a trace is opening
+  // leaves the 3s poll running forever and calling setState on an unmounted
+  // component.
+  const pollIntervals = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
+  useEffect(() => {
+    const intervals = pollIntervals.current;
+    return () => {
+      for (const id of intervals) clearInterval(id);
+      intervals.clear();
+    };
+  }, []);
+
   const artifacts = useQuery<ArtifactData>({
     queryKey: ['artifacts', reportPath],
     queryFn: () => api.post('/api/reports/artifacts', { path: reportPath }),
@@ -77,28 +90,26 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
   }
 
   function pollTraceStatus(tracePath: string) {
+    const stopTracking = (interval: ReturnType<typeof setInterval>) => {
+      clearInterval(interval);
+      pollIntervals.current.delete(interval);
+      setRunningTraces((prev) => {
+        const next = new Set(prev);
+        next.delete(tracePath);
+        return next;
+      });
+    };
     const interval = setInterval(async () => {
       try {
         const res = await api.post<{ running: boolean }>('/api/reports/trace/status', {
           path: tracePath,
         });
-        if (!res.running) {
-          clearInterval(interval);
-          setRunningTraces((prev) => {
-            const next = new Set(prev);
-            next.delete(tracePath);
-            return next;
-          });
-        }
+        if (!res.running) stopTracking(interval);
       } catch {
-        clearInterval(interval);
-        setRunningTraces((prev) => {
-          const next = new Set(prev);
-          next.delete(tracePath);
-          return next;
-        });
+        stopTracking(interval);
       }
     }, 3000);
+    pollIntervals.current.add(interval);
   }
 
   async function openTrace(tracePath: string) {

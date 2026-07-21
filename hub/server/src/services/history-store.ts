@@ -23,12 +23,26 @@ import { getDb } from './db.js';
  */
 class HistoryStore {
   /**
+   * Memoized snapshot of the last `getAll()` read. `readCollection('history')`
+   * re-queries and re-materializes up to MAX_HISTORY=200 rows on every call,
+   * and this store is read on several polled endpoints (/api/runs/history,
+   * last-status, reports enrichment, flaky). The cache is invalidated on every
+   * write (`append`/`clear`), so it can never go stale. Consumers treat the
+   * result as read-only (they filter into new arrays), so sharing the snapshot
+   * reference is safe.
+   */
+  private cache: RunRecord[] | null = null;
+
+  /**
    * Get all records (newest first, capped at MAX_HISTORY).
    * `readCollection('history')` returns rows ordered by `started_at DESC` as a
-   * deep clone (R12.2).
+   * deep clone (R12.2); the snapshot is memoized until the next write.
    */
   getAll(): RunRecord[] {
-    return getDb().readCollection<RunRecord>('history');
+    if (this.cache === null) {
+      this.cache = getDb().readCollection<RunRecord>('history');
+    }
+    return this.cache;
   }
 
   /**
@@ -39,11 +53,13 @@ class HistoryStore {
    */
   append(record: RunRecord): void {
     getDb().appendHistory(record);
+    this.cache = null; // invalidate memoized snapshot
   }
 
   /** Clear all history (manual user action) by writing an empty collection. */
   clear(): void {
     getDb().writeCollection<RunRecord>('history', []);
+    this.cache = null; // invalidate memoized snapshot
   }
 
   /**

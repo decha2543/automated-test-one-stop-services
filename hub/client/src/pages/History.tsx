@@ -20,7 +20,7 @@ import { useDebouncedValue, useDisclosure } from '@mantine/hooks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   TbCalendar,
   TbCopy,
@@ -161,43 +161,54 @@ export function HistoryPage() {
     URL.revokeObjectURL(url);
   }
 
-  const filtered = (history.data ?? []).filter((r) => {
-    if (selectedTools.size > 0 && !selectedTools.has(r.request.tool)) return false;
-    if (selectedStatuses.size > 0 && !selectedStatuses.has(r.status)) return false;
-    if (selectedTypes.size > 0 && !selectedTypes.has(r.request.type)) return false;
-    if (debouncedFilter && !r.request.project.toLowerCase().includes(debouncedFilter.toLowerCase()))
-      return false;
-    const [from, to] = dateRange;
-    if (from || to) {
-      const runDay = dayjs(r.startedAt);
-      if (!runDay.isValid()) return false;
-      if (from && runDay.isBefore(dayjs(from).startOf('day'))) return false;
-      if (to && runDay.isAfter(dayjs(to).endOf('day'))) return false;
-    }
-    return true;
-  });
+  const filtered = useMemo(
+    () =>
+      (history.data ?? []).filter((r) => {
+        if (selectedTools.size > 0 && !selectedTools.has(r.request.tool)) return false;
+        if (selectedStatuses.size > 0 && !selectedStatuses.has(r.status)) return false;
+        if (selectedTypes.size > 0 && !selectedTypes.has(r.request.type)) return false;
+        if (
+          debouncedFilter &&
+          !r.request.project.toLowerCase().includes(debouncedFilter.toLowerCase())
+        )
+          return false;
+        const [from, to] = dateRange;
+        if (from || to) {
+          const runDay = dayjs(r.startedAt);
+          if (!runDay.isValid()) return false;
+          if (from && runDay.isBefore(dayjs(from).startOf('day'))) return false;
+          if (to && runDay.isAfter(dayjs(to).endOf('day'))) return false;
+        }
+        return true;
+      }),
+    [history.data, selectedTools, selectedStatuses, selectedTypes, debouncedFilter, dateRange],
+  );
 
-  const sorted = [...filtered].sort((a, b) => {
-    let cmp = 0;
-    switch (sortField) {
-      case 'startedAt':
-        cmp = a.startedAt.localeCompare(b.startedAt);
-        break;
-      case 'endedAt':
-        cmp = (a.endedAt ?? '').localeCompare(b.endedAt ?? '');
-        break;
-      case 'project':
-        cmp = a.request.project.localeCompare(b.request.project);
-        break;
-      case 'tool':
-        cmp = a.request.tool.localeCompare(b.request.tool);
-        break;
-      case 'status':
-        cmp = a.status.localeCompare(b.status);
-        break;
-    }
-    return sortDir === 'asc' ? cmp : -cmp;
-  });
+  const sorted = useMemo(
+    () =>
+      [...filtered].sort((a, b) => {
+        let cmp = 0;
+        switch (sortField) {
+          case 'startedAt':
+            cmp = a.startedAt.localeCompare(b.startedAt);
+            break;
+          case 'endedAt':
+            cmp = (a.endedAt ?? '').localeCompare(b.endedAt ?? '');
+            break;
+          case 'project':
+            cmp = a.request.project.localeCompare(b.request.project);
+            break;
+          case 'tool':
+            cmp = a.request.tool.localeCompare(b.request.tool);
+            break;
+          case 'status':
+            cmp = a.status.localeCompare(b.status);
+            break;
+        }
+        return sortDir === 'asc' ? cmp : -cmp;
+      }),
+    [filtered, sortField, sortDir],
+  );
 
   const totalPages = Math.ceil(sorted.length / pageSize);
   const safePage = Math.min(currentPage, totalPages || 1);

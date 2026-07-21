@@ -2,7 +2,7 @@ import type { RunRecord } from '@hub/shared';
 import { BarsList, type BarsListBarData } from '@mantine/charts';
 import { SegmentedControl, Stack, Text } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { api } from '~/api/client.js';
 
 type Mode = 'project' | 'tool';
@@ -33,6 +33,8 @@ export function TopProjectsBars() {
     queryFn: () => api.get('/api/runs/history'),
   });
 
+  const data = useMemo(() => aggregate(history.data ?? [], mode), [history.data, mode]);
+
   if (history.isLoading) {
     return (
       <Text c="dimmed" size="sm">
@@ -40,8 +42,6 @@ export function TopProjectsBars() {
       </Text>
     );
   }
-
-  const data = aggregate(history.data ?? [], mode);
 
   if (data.length === 0) {
     return (
