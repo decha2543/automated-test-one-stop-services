@@ -150,11 +150,16 @@ async function main(): Promise<void> {
       wildcard: false,
       // Hashed assets (/assets/*) are immutable — cache aggressively.
       // index.html and other root files must not be cached.
-      setHeaders(res, filePath) {
+      //
+      // @fastify/static v10 passes the Fastify `reply` (not the raw Node
+      // `res`) to setHeaders, so headers are set via reply.header(), not
+      // res.setHeader() — the v9→v10 signature change that this callback
+      // must track.
+      setHeaders(reply, filePath) {
         if (filePath.includes('assets')) {
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          reply.header('Cache-Control', 'public, max-age=31536000, immutable');
         } else {
-          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
         }
       },
     });

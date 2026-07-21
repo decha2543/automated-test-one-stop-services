@@ -17,17 +17,17 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.2",
-    "@evilmartians/lefthook": "^2.1.9",
-    "@types/node": "^26.1.0",
+    "@biomejs/biome": "2.5.4",
+    "@evilmartians/lefthook": "^2.1.10",
+    "@types/node": "^26.1.1",
     "@types/prompts": "^2.4.9",
-    "@vitest/coverage-v8": "4.1.9",
+    "@vitest/coverage-v8": "4.1.10",
     "dayjs": "^1.11.21",
-    "fast-check": "^4.8.0",
-    "markdownlint-cli2": "0.23.0",
+    "fast-check": "^4.9.0",
+    "markdownlint-cli2": "0.23.1",
     "prompts": "^2.4.2",
-    "typescript": "^6.0.3",
-    "vitest": "4.1.9",
+    "typescript": "^7.0.2",
+    "vitest": "4.1.10",
     "zod": "^4.4.3"
   },
   "volta": {
