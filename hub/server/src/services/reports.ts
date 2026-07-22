@@ -198,7 +198,6 @@ function attachSummaries(entries: ReportEntry[]): void {
 
   const byKey = new Map<string, RunRecord[]>();
   for (const r of history) {
-    if (!r.summary) continue;
     const key = `${r.request.tool}/${r.request.type}/${r.request.project}`;
     const list = byKey.get(key);
     if (list) list.push(r);
@@ -232,7 +231,15 @@ function attachSummaries(entries: ReportEntry[]): void {
         best = run;
       }
     }
-    if (best?.summary && bestDist <= MATCH_WINDOW_MS) e.summary = best.summary;
+    if (best && bestDist <= MATCH_WINDOW_MS) {
+      if (best.summary) e.summary = best.summary;
+      if (best.startedAt && best.endedAt) {
+        const dMs = Date.parse(best.endedAt) - Date.parse(best.startedAt);
+        if (!Number.isNaN(dMs) && dMs >= 0) e.durationMs = dMs;
+      }
+      if (best.request.tag) e.runTag = best.request.tag;
+      e.runMode = best.request.mode;
+    }
   }
 }
 

@@ -1,5 +1,5 @@
-import type { ReportEntry, RunSummary, SeverityBreakdown, ToolId } from '@hub/shared';
-import { SEVERITY_LEVELS, weightedPassPercent } from '@hub/shared';
+import type { ReportEntry, RunSummary, ToolId } from '@hub/shared';
+import { parseTagExpr } from '@hub/shared';
 import {
   ActionIcon,
   Badge,
@@ -36,6 +36,7 @@ import { api } from '~/api/client.js';
 import { confirmDialog } from '~/components/confirmDialog.js';
 import { EmptyState } from '~/components/EmptyState.js';
 import { PageHeader } from '~/components/PageHeader.js';
+import { PassScoreCell } from '~/components/PassScoreCell.js';
 import { ArtifactMenu } from '~/components/reports/ArtifactMenu.js';
 import { SavedFiltersBar } from '~/components/SavedFilters.js';
 import { toast } from '~/components/Toast.js';
@@ -88,84 +89,12 @@ function CaseCountCell({ summary }: { summary?: RunSummary }) {
   );
 }
 
-/**
- * "Pass Cases (%)" cell: severity-weighted pass score when breakdown is
- * available, plain pass rate when not, dash when nothing is known.
- *
- * Tooltip shows per-severity passed/failed counts (severity breakdown) or
- * a note explaining whether the score is plain or weighted.
- */
-function PassScoreCell({
-  summary,
-  severity,
-}: {
-  summary?: RunSummary;
-  severity?: SeverityBreakdown;
-}) {
-  const t = useT();
-
-  // No data at all
-  if (!summary && !severity) {
-    return (
-      <Text size="xs" c="dimmed">
-        —
-      </Text>
-    );
-  }
-
-  const weighted = severity ? weightedPassPercent(severity) : null;
-
-  let pct: number | null = null;
-  if (weighted !== null) {
-    pct = weighted;
-  } else if (summary) {
-    const total = summary.passed + summary.failed + (summary.skipped ?? 0);
-    pct = total > 0 ? (summary.passed / total) * 100 : null;
-  }
-
-  const display = pct !== null ? `${pct.toFixed(1)}%` : '—';
-  const color = pct === null ? 'dimmed' : pct >= 80 ? 'green' : pct >= 50 ? 'yellow' : 'red';
-
-  // Build tooltip lines
-  const tooltipLines: string[] = [];
-  if (weighted !== null && severity) {
-    tooltipLines.push(t('reports.scoreWeighted'));
-    for (const level of SEVERITY_LEVELS) {
-      const { passed, failed } = severity[level];
-      if (passed + failed === 0) continue;
-      tooltipLines.push(
-        t('reports.scoreSeverityRow')
-          .replace('{level}', level)
-          .replace('{passed}', String(passed))
-          .replace('{failed}', String(failed)),
-      );
-    }
-  } else {
-    tooltipLines.push(t('reports.scoreNoSeverity'));
-    if (summary) {
-      const total = summary.passed + summary.failed + (summary.skipped ?? 0);
-      tooltipLines.push(
-        `${summary.passed} ${t('run.passed')} · ${summary.failed} ${t('run.failed')}` +
-          (summary.skipped ? ` · ${summary.skipped} ${t('run.skipped')}` : '') +
-          ` / ${total}`,
-      );
-    }
-  }
-
-  return (
-    <Tooltip
-      label={
-        <Text size="xs" style={{ whiteSpace: 'pre-line' }}>
-          {tooltipLines.join('\n')}
-        </Text>
-      }
-      withArrow
-    >
-      <Text size="xs" fw={600} c={color}>
-        {display}
-      </Text>
-    </Tooltip>
-  );
+function formatMs(ms: number): string {
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ${sec % 60}s`;
+  return `${Math.floor(min / 60)}h ${min % 60}m`;
 }
 
 export function ReportsPage() {
@@ -613,7 +542,7 @@ export function ReportsPage() {
               header) instead of growing the page. `miw` keeps a horizontal
               scroll on narrow screens. Pagination below stays pinned. */}
           <ScrollArea type="auto" style={{ flex: 1, minHeight: 0 }}>
-            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={800}>
+            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={1100}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th w={40}>
@@ -668,7 +597,10 @@ export function ReportsPage() {
                     />
                   </Table.Th>
                   <Table.Th>{t('reports.cases')}</Table.Th>
-                  <Table.Th>{t('reports.passCasesPercent')}</Table.Th>
+                  <Table.Th>{t('reports.passScore')}</Table.Th>
+                  <Table.Th>{t('table.duration')}</Table.Th>
+                  <Table.Th>{t('table.tag')}</Table.Th>
+                  <Table.Th>{t('table.mode')}</Table.Th>
                   <Table.Th>
                     <SortableHeader
                       label={t('table.timestamp')}
@@ -731,6 +663,56 @@ export function ReportsPage() {
                     </Table.Td>
                     <Table.Td>
                       <PassScoreCell summary={r.summary} severity={r.severity} />
+                    </Table.Td>
+                    <Table.Td>
+                      {r.durationMs !== undefined ? (
+                        <Text size="xs" ff="monospace">
+                          {formatMs(r.durationMs)}
+                        </Text>
+                      ) : (
+                        <Text size="xs" c="dimmed">
+                          —
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      {r.runTag ? (
+                        <Tooltip label={r.runTag} withArrow>
+                          <Group gap={3} wrap="wrap" maw={140}>
+                            {parseTagExpr(r.runTag)
+                              .slice(0, 3)
+                              .map((tag) => (
+                                <Badge key={tag} size="xs" variant="outline" color="blue">
+                                  {tag.replace(/^@/, '')}
+                                </Badge>
+                              ))}
+                            {parseTagExpr(r.runTag).length > 3 && (
+                              <Text size="xs" c="dimmed">
+                                +{parseTagExpr(r.runTag).length - 3}
+                              </Text>
+                            )}
+                          </Group>
+                        </Tooltip>
+                      ) : (
+                        <Text size="xs" c="dimmed">
+                          {t('reports.allTests')}
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      {r.runMode ? (
+                        <Badge
+                          size="xs"
+                          variant="light"
+                          color={r.runMode === 'docker' ? 'violet' : 'gray'}
+                        >
+                          {r.runMode}
+                        </Badge>
+                      ) : (
+                        <Text size="xs" c="dimmed">
+                          —
+                        </Text>
+                      )}
                     </Table.Td>
                     <Table.Td>
                       <Tooltip label={formatAbsolute(r.timestamp)} withArrow>

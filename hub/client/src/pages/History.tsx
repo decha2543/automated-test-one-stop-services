@@ -1,4 +1,5 @@
 import type { RunRecord, RunRequest, RunStatus, ToolId } from '@hub/shared';
+import { parseTagExpr } from '@hub/shared';
 import {
   ActionIcon,
   Badge,
@@ -37,6 +38,7 @@ import { confirmDialog } from '~/components/confirmDialog';
 import { EmptyState } from '~/components/EmptyState.js';
 import { RunLogModal } from '~/components/history/RunLogModal.js';
 import { PageHeader } from '~/components/PageHeader.js';
+import { PassScoreCell } from '~/components/PassScoreCell.js';
 import { toast } from '~/components/Toast.js';
 import { PAGE_SIZE_OPTIONS, SortableHeader } from '~/components/table/SortableHeader.js';
 import { useTableSort } from '~/hooks/useTableSort.js';
@@ -485,7 +487,7 @@ export function HistoryPage() {
           {/* Bounded ScrollArea → table scrolls inside the card (sticky header)
               instead of growing the page; pagination below stays visible. */}
           <ScrollArea type="auto" style={{ flex: 1, minHeight: 0 }}>
-            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={800}>
+            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={1050}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>
@@ -516,6 +518,10 @@ export function HistoryPage() {
                     />
                   </Table.Th>
                   <Table.Th>{t('table.type')}</Table.Th>
+                  <Table.Th>{t('table.cases')}</Table.Th>
+                  <Table.Th>{t('table.passScore')}</Table.Th>
+                  <Table.Th>{t('table.tag')}</Table.Th>
+                  <Table.Th>{t('table.mode')}</Table.Th>
                   <Table.Th>{t('table.duration')}</Table.Th>
                   <Table.Th>
                     <SortableHeader
@@ -559,6 +565,49 @@ export function HistoryPage() {
                       <Text size="xs" truncate maw={80}>
                         {r.request.type}
                       </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="xs" c="dimmed">
+                        {r.summary
+                          ? `${r.summary.passed + r.summary.failed + (r.summary.skipped ?? 0)}`
+                          : '—'}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <PassScoreCell summary={r.summary} />
+                    </Table.Td>
+                    <Table.Td>
+                      {r.request.tag ? (
+                        <Tooltip label={r.request.tag} withArrow>
+                          <Group gap={3} wrap="wrap" maw={130}>
+                            {parseTagExpr(r.request.tag)
+                              .slice(0, 3)
+                              .map((tag) => (
+                                <Badge key={tag} size="xs" variant="outline" color="blue">
+                                  {tag.replace(/^@/, '')}
+                                </Badge>
+                              ))}
+                            {parseTagExpr(r.request.tag).length > 3 && (
+                              <Text size="xs" c="dimmed">
+                                +{parseTagExpr(r.request.tag).length - 3}
+                              </Text>
+                            )}
+                          </Group>
+                        </Tooltip>
+                      ) : (
+                        <Text size="xs" c="dimmed">
+                          {t('reports.allTests')}
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge
+                        size="xs"
+                        variant="light"
+                        color={r.request.mode === 'docker' ? 'violet' : 'gray'}
+                      >
+                        {r.request.mode}
+                      </Badge>
                     </Table.Td>
                     <Table.Td>
                       <Text size="xs" ff="monospace">

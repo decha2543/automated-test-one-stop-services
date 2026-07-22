@@ -27,6 +27,20 @@ export interface ReportEntry {
    * file is missing/unparseable.
    */
   severity?: SeverityBreakdown;
+  /**
+   * Wall-clock run duration in milliseconds, derived from the matched run's
+   * startedAt/endedAt. Absent when the run has not finished or aged out.
+   */
+  durationMs?: number;
+  /**
+   * Tag expression the run was launched with (from RunRequest.tag). Absent when
+   * the run was launched without a tag filter (all tests).
+   */
+  runTag?: string;
+  /**
+   * Run mode (local | docker) from the matched run request.
+   */
+  runMode?: string;
 }
 
 export interface ReportAnnotation {
