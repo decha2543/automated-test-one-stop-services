@@ -1,7 +1,16 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ReportEntry, RunRecord, RunStatus, ToolId } from '@hub/shared';
+import {
+  emptySeverityBreakdown,
+  type ReportEntry,
+  type RunRecord,
+  type RunStatus,
+  SEVERITY_LEVELS,
+  type SeverityBreakdown,
+  type SeverityLevel,
+  type ToolId,
+} from '@hub/shared';
 import { OUTPUTS_DIR } from '../config.js';
 import { historyStore } from './history-store.js';
 import { getEnabledTools, getManifestModule } from './manifest-registry.js';
@@ -66,7 +75,95 @@ async function buildAllEntries(): Promise<ReportEntry[]> {
   const entries: ReportEntry[] = [];
   walkOutputs(OUTPUTS_DIR, toolConfigs, entries);
   attachSummaries(entries);
+  attachSeverity(entries);
   return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+// --- severity-weighted score -------------------------------------------------
+
+/** Minimal shape of the Playwright JSON reporter output we read. */
+interface PwSpec {
+  ok?: boolean;
+  tags?: string[];
+}
+interface PwSuite {
+  specs?: PwSpec[];
+  suites?: PwSuite[];
+}
+
+const SEVERITY_SET = new Set<string>(SEVERITY_LEVELS);
+
+/** First severity tag on a spec (tags come with or without a leading `@`). */
+function severityOf(tags: string[] | undefined): SeverityLevel | undefined {
+  for (const raw of tags ?? []) {
+    const tag = raw.replace(/^@/, '').toLowerCase();
+    if (SEVERITY_SET.has(tag)) return tag as SeverityLevel;
+  }
+  return undefined;
+}
+
+function collectSpecs(suite: PwSuite, out: PwSpec[]): void {
+  for (const spec of suite.specs ?? []) out.push(spec);
+  for (const child of suite.suites ?? []) collectSpecs(child, out);
+}
+
+/**
+ * Parse the per-severity passed/failed tally from a Playwright `results.json`.
+ * Cached by file mtime because the file can be large and the report list is
+ * rebuilt every 10s. Best-effort: a missing/oversized/malformed file yields
+ * `null` (the row falls back to a plain pass rate) rather than throwing.
+ */
+const severityCache = new Map<string, { mtimeMs: number; breakdown: SeverityBreakdown | null }>();
+const MAX_RESULTS_JSON_BYTES = 25 * 1024 * 1024;
+
+function parseSeverityBreakdown(resultsJsonPath: string): SeverityBreakdown | null {
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(resultsJsonPath);
+  } catch {
+    return null;
+  }
+  const cached = severityCache.get(resultsJsonPath);
+  if (cached && cached.mtimeMs === stat.mtimeMs) return cached.breakdown;
+
+  let breakdown: SeverityBreakdown | null = null;
+  if (stat.size <= MAX_RESULTS_JSON_BYTES) {
+    try {
+      const json = JSON.parse(fs.readFileSync(resultsJsonPath, 'utf8')) as { suites?: PwSuite[] };
+      const specs: PwSpec[] = [];
+      for (const suite of json.suites ?? []) collectSpecs(suite, specs);
+      const acc = emptySeverityBreakdown();
+      let any = false;
+      for (const spec of specs) {
+        const level = severityOf(spec.tags);
+        if (!level) continue;
+        any = true;
+        if (spec.ok) acc[level].passed += 1;
+        else acc[level].failed += 1;
+      }
+      breakdown = any ? acc : null;
+    } catch {
+      breakdown = null;
+    }
+  }
+  severityCache.set(resultsJsonPath, { mtimeMs: stat.mtimeMs, breakdown });
+  return breakdown;
+}
+
+/**
+ * Attach a per-severity tally to Playwright reports by reading the
+ * `results.json` the JSON reporter writes into the run's time directory
+ * (sibling of `html-results/`). Other tools have no per-test severity and are
+ * left without a breakdown.
+ */
+function attachSeverity(entries: ReportEntry[]): void {
+  for (const entry of entries) {
+    if (entry.tool !== 'playwright') continue;
+    // reportPath = .../<time>/html-results/index.html → results.json is in <time>/.
+    const timeDir = path.dirname(path.dirname(entry.reportPath));
+    const breakdown = parseSeverityBreakdown(path.join(timeDir, 'results.json'));
+    if (breakdown) entry.severity = breakdown;
+  }
 }
 
 /** Report status ↔ run status compatibility, used to disambiguate two runs of

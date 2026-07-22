@@ -1,5 +1,6 @@
 import type { PerformanceType } from './runs.js';
 import type { RunSummary } from './run-summary.js';
+import type { SeverityBreakdown } from './severity-score.js';
 import type { ToolId } from './tools.js';
 
 // Reports --------------------------------------------------------------------
@@ -19,6 +20,13 @@ export interface ReportEntry {
    * whose run has aged out of the capped history).
    */
   summary?: RunSummary;
+  /**
+   * Per-severity passed/failed tally, parsed from the runner's machine-readable
+   * result file (Playwright `results.json`). Drives the severity-weighted pass
+   * score. Absent for tools with no per-test severity (k6) or when the result
+   * file is missing/unparseable.
+   */
+  severity?: SeverityBreakdown;
 }
 
 export interface ReportAnnotation {

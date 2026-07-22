@@ -26,6 +26,15 @@ export type TagGroupKind =
   | 'domain-single'
   | 'case-id';
 
+/**
+ * Severity facet vocabulary — THE single source, ordered most→least severe.
+ * The severity tag matcher and the severity-weighted score
+ * (`./severity-score.ts`) both derive from this so they can never disagree.
+ * Mirrors the spec-tag `Severity` enum (`@critical/@high/@medium/@low`).
+ */
+export const SEVERITY_LEVELS = ['critical', 'high', 'medium', 'low'] as const;
+export type SeverityLevel = (typeof SEVERITY_LEVELS)[number];
+
 export interface TagCategory {
   kind: TagGroupKind;
   label: string;
@@ -68,7 +77,7 @@ export const TAG_TAXONOMY: readonly TagCategory[] = [
     kind: 'severity',
     label: 'Severity',
     description: 'Priority level of the test case',
-    match: facetMatcher('Severity', ['critical', 'high', 'medium', 'low']),
+    match: facetMatcher('Severity', SEVERITY_LEVELS),
   },
   {
     kind: 'test-type',

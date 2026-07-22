@@ -19,6 +19,7 @@ export * from './domains/import-export.js';
 export * from './domains/projects.js';
 export * from './domains/reports.js';
 export * from './domains/run-summary.js';
+export * from './domains/severity-score.js';
 export * from './domains/runs.js';
 export * from './domains/schedules.js';
 export * from './domains/tags.js';
