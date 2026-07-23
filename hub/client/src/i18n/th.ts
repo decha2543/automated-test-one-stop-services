@@ -675,6 +675,10 @@ export const th: Record<TranslationKey, string> = {
   'table.passScore': 'ผ่าน (%)',
   'table.tag': 'แท็ก',
   'table.mode': 'โหมด',
+  'table.trigger': 'ทริกเกอร์',
+  'trigger.manual': 'สั่งเอง',
+  'trigger.schedule': 'ตามตาราง',
+  'trigger.webhook': 'Webhook',
 
   // Dashboard (actionable recent runs)
   'dashboard.runAgain': 'รันซ้ำ',

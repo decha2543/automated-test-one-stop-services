@@ -264,16 +264,19 @@ export function openLocalDb(dbPath: string): LocalDb {
 }
 
 /**
- * Add the `summary_*` columns to an existing `history` table when missing.
- * Idempotent: each `ALTER TABLE` runs only when `hasColumn` reports the column
- * absent, so this is a no-op once the columns exist (or for a fresh DB where
- * SCHEMA_DDL already created them).
+ * Add columns to an existing `history` table when missing. Idempotent: each
+ * `ALTER TABLE` runs only when `hasColumn` reports the column absent, so this is
+ * a no-op once the columns exist (or for a fresh DB where SCHEMA_DDL already
+ * created them). Covers `summary_*` (INTEGER) and `triggered_by` (TEXT).
  */
 function ensureHistorySummaryColumns(db: DatabaseSync): void {
   for (const col of ['summary_passed', 'summary_failed', 'summary_skipped']) {
     if (!hasColumn(db, 'history', col)) {
       db.exec(`ALTER TABLE history ADD COLUMN ${col} INTEGER`);
     }
+  }
+  if (!hasColumn(db, 'history', 'triggered_by')) {
+    db.exec('ALTER TABLE history ADD COLUMN triggered_by TEXT');
   }
 }
 

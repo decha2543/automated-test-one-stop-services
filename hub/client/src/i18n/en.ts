@@ -678,6 +678,10 @@ export const en = {
   'table.passScore': 'Pass (%)',
   'table.tag': 'Tag',
   'table.mode': 'Mode',
+  'table.trigger': 'Trigger',
+  'trigger.manual': 'Manual',
+  'trigger.schedule': 'Schedule',
+  'trigger.webhook': 'Webhook',
 
   // Dashboard (actionable recent runs)
   'dashboard.runAgain': 'Run again',

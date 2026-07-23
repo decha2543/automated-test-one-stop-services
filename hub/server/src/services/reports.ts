@@ -1,19 +1,11 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  emptySeverityBreakdown,
-  type ReportEntry,
-  type RunRecord,
-  type RunStatus,
-  SEVERITY_LEVELS,
-  type SeverityBreakdown,
-  type SeverityLevel,
-  type ToolId,
-} from '@hub/shared';
+import type { ReportEntry, RunRecord, RunStatus, SeverityBreakdown, ToolId } from '@hub/shared';
 import { OUTPUTS_DIR } from '../config.js';
 import { historyStore } from './history-store.js';
 import { getEnabledTools, getManifestModule } from './manifest-registry.js';
+import { severityFromReportPath } from './severity-parse.js';
 
 /**
  * Deterministic id for a report entry, derived from its absolute path. The
@@ -79,77 +71,6 @@ async function buildAllEntries(): Promise<ReportEntry[]> {
   return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
-// --- severity-weighted score -------------------------------------------------
-
-/** Minimal shape of the Playwright JSON reporter output we read. */
-interface PwSpec {
-  ok?: boolean;
-  tags?: string[];
-}
-interface PwSuite {
-  specs?: PwSpec[];
-  suites?: PwSuite[];
-}
-
-const SEVERITY_SET = new Set<string>(SEVERITY_LEVELS);
-
-/** First severity tag on a spec (tags come with or without a leading `@`). */
-function severityOf(tags: string[] | undefined): SeverityLevel | undefined {
-  for (const raw of tags ?? []) {
-    const tag = raw.replace(/^@/, '').toLowerCase();
-    if (SEVERITY_SET.has(tag)) return tag as SeverityLevel;
-  }
-  return undefined;
-}
-
-function collectSpecs(suite: PwSuite, out: PwSpec[]): void {
-  for (const spec of suite.specs ?? []) out.push(spec);
-  for (const child of suite.suites ?? []) collectSpecs(child, out);
-}
-
-/**
- * Parse the per-severity passed/failed tally from a Playwright `results.json`.
- * Cached by file mtime because the file can be large and the report list is
- * rebuilt every 10s. Best-effort: a missing/oversized/malformed file yields
- * `null` (the row falls back to a plain pass rate) rather than throwing.
- */
-const severityCache = new Map<string, { mtimeMs: number; breakdown: SeverityBreakdown | null }>();
-const MAX_RESULTS_JSON_BYTES = 25 * 1024 * 1024;
-
-function parseSeverityBreakdown(resultsJsonPath: string): SeverityBreakdown | null {
-  let stat: fs.Stats;
-  try {
-    stat = fs.statSync(resultsJsonPath);
-  } catch {
-    return null;
-  }
-  const cached = severityCache.get(resultsJsonPath);
-  if (cached && cached.mtimeMs === stat.mtimeMs) return cached.breakdown;
-
-  let breakdown: SeverityBreakdown | null = null;
-  if (stat.size <= MAX_RESULTS_JSON_BYTES) {
-    try {
-      const json = JSON.parse(fs.readFileSync(resultsJsonPath, 'utf8')) as { suites?: PwSuite[] };
-      const specs: PwSpec[] = [];
-      for (const suite of json.suites ?? []) collectSpecs(suite, specs);
-      const acc = emptySeverityBreakdown();
-      let any = false;
-      for (const spec of specs) {
-        const level = severityOf(spec.tags);
-        if (!level) continue;
-        any = true;
-        if (spec.ok) acc[level].passed += 1;
-        else acc[level].failed += 1;
-      }
-      breakdown = any ? acc : null;
-    } catch {
-      breakdown = null;
-    }
-  }
-  severityCache.set(resultsJsonPath, { mtimeMs: stat.mtimeMs, breakdown });
-  return breakdown;
-}
-
 /**
  * Attach a per-severity tally to Playwright reports by reading the
  * `results.json` the JSON reporter writes into the run's time directory
@@ -159,9 +80,7 @@ function parseSeverityBreakdown(resultsJsonPath: string): SeverityBreakdown | nu
 function attachSeverity(entries: ReportEntry[]): void {
   for (const entry of entries) {
     if (entry.tool !== 'playwright') continue;
-    // reportPath = .../<time>/html-results/index.html → results.json is in <time>/.
-    const timeDir = path.dirname(path.dirname(entry.reportPath));
-    const breakdown = parseSeverityBreakdown(path.join(timeDir, 'results.json'));
+    const breakdown = severityFromReportPath(entry.reportPath);
     if (breakdown) entry.severity = breakdown;
   }
 }
@@ -246,6 +165,58 @@ function attachSummaries(entries: ReportEntry[]): void {
 /** Drop the cache so the next listReports call re-walks `outputs/`. */
 export function invalidateReportsCache(): void {
   reportsCache = null;
+}
+
+/**
+ * Map run id → severity breakdown, by matching each run to its report entry.
+ *
+ * `RunRecord` carries no path to its output dir, so history cannot locate its
+ * own `results.json`. The report listing already parses severity per report and
+ * knows the outputs layout, so we reverse the report↔run match here (same
+ * tool/type/project + status + nearest-time-within-window heuristic as
+ * `attachSummaries`) and hand back the severity the report service already
+ * computed — no second parse. Best-effort: unmatched runs are simply absent.
+ */
+export async function severityByRun(runs: RunRecord[]): Promise<Map<string, SeverityBreakdown>> {
+  const result = new Map<string, SeverityBreakdown>();
+  if (runs.length === 0) return result;
+
+  const entries = await listReports();
+  const byKey = new Map<string, ReportEntry[]>();
+  for (const e of entries) {
+    if (!e.severity) continue;
+    const key = `${e.tool}/${e.type}/${e.project}`;
+    const list = byKey.get(key);
+    if (list) list.push(e);
+    else byKey.set(key, [e]);
+  }
+  if (byKey.size === 0) return result;
+
+  const MATCH_WINDOW_MS = 5 * 60_000;
+  for (const run of runs) {
+    const candidates = byKey.get(`${run.request.tool}/${run.request.type}/${run.request.project}`);
+    if (!candidates) continue;
+    const startMs = Date.parse(run.startedAt);
+    const endMs = run.endedAt ? Date.parse(run.endedAt) : startMs;
+
+    let best: ReportEntry | undefined;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const e of candidates) {
+      if (!statusCompatible(e.status, run.status)) continue;
+      const reportMs = Date.parse(e.timestamp);
+      if (Number.isNaN(reportMs)) continue;
+      const dist =
+        reportMs >= startMs && reportMs <= endMs
+          ? 0
+          : Math.min(Math.abs(reportMs - startMs), Math.abs(reportMs - endMs));
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = e;
+      }
+    }
+    if (best?.severity && bestDist <= MATCH_WINDOW_MS) result.set(run.id, best.severity);
+  }
+  return result;
 }
 
 /**

@@ -1,8 +1,12 @@
 import type { RunSummary } from './run-summary.js';
+import type { SeverityBreakdown } from './severity-score.js';
 import type { ToolId } from './tools.js';
 
 export type RunMode = 'local' | 'docker';
 export type HeadlessMode = 'headless' | 'headed';
+
+/** How a run was launched. */
+export type RunTrigger = 'manual' | 'schedule' | 'webhook';
 
 export type PerformanceType =
   | 'TEST_PROTOCOL'
@@ -52,6 +56,14 @@ export interface RunRecord {
   reportPath?: string;
   /** Test-case counts parsed from the run output, when a summary was present. */
   summary?: RunSummary;
+  /** How the run was launched. Persisted; defaults to 'manual' for legacy rows. */
+  triggeredBy?: RunTrigger;
+  /**
+   * Per-severity passed/failed tally, parsed on demand from the Playwright
+   * `results.json` when serving history. Transient (never persisted) — derived
+   * from `reportPath`. Absent for non-Playwright tools or missing result files.
+   */
+  severity?: SeverityBreakdown;
 }
 
 /**

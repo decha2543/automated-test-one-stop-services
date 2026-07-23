@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { WORKSPACE_ROOT } from '../config.js';
 import { buildTaskCommand } from '../services/command-builder.js';
 import { getEnabledToolIds } from '../services/manifest-registry.js';
+import { severityByRun } from '../services/reports.js';
 import { runner } from '../services/runner.js';
 
 /**
@@ -60,7 +61,15 @@ export async function runRoutes(app: FastifyInstance): Promise<void> {
   /** GET /api/runs/history — past runs of ENABLED tools (max 100) */
   app.get('/api/runs/history', async () => {
     const enabledIds = await getEnabledToolIds();
-    return runner.getHistory().filter((r) => enabledIds.has(r.request.tool));
+    const records = runner.getHistory().filter((r) => enabledIds.has(r.request.tool));
+    // Enrich with the per-severity tally the report service already parsed,
+    // matched back to each run (RunRecord has no path to its own results.json).
+    const severity = await severityByRun(records);
+    if (severity.size === 0) return records;
+    return records.map((r) => {
+      const sev = severity.get(r.id);
+      return sev ? { ...r, severity: sev } : r;
+    });
   });
 
   /** GET /api/runs/last-status — last run status per project (enabled tools).

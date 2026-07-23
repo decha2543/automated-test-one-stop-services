@@ -10,6 +10,7 @@ import {
   type RunRecord,
   type RunRequest,
   type RunStatus,
+  type RunTrigger,
   type WsServerEvent,
 } from '@hub/shared';
 import { nanoid } from 'nanoid';
@@ -259,7 +260,7 @@ class RunnerService extends EventEmitter {
    * `command-builder`, keeping this method synchronous so the spawn/queue
    * lifecycle stays in one tick.
    */
-  start(req: RunRequest, command: string): RunRecord {
+  start(req: RunRequest, command: string, triggeredBy: RunTrigger = 'manual'): RunRecord {
     const id = nanoid(10);
     const record: RunRecord = {
       id,
@@ -267,6 +268,7 @@ class RunnerService extends EventEmitter {
       command,
       status: 'pending',
       startedAt: new Date().toISOString(),
+      triggeredBy,
     };
 
     if (this.active.size >= this.maxConcurrency) {

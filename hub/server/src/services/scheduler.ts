@@ -207,7 +207,7 @@ class SchedulerService {
       }
       schedule.lastRunAt = new Date().toISOString();
       const command = await buildTaskCommand(schedule.config);
-      const record = runner.start(schedule.config, command);
+      const record = runner.start(schedule.config, command, 'schedule');
       schedule.lastRunId = record.id;
       schedule.lastStatus = 'pending';
       this.runToSchedule.set(record.id, schedule.id);

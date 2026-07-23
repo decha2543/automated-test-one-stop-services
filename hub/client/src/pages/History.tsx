@@ -53,6 +53,12 @@ const ALL_STATUSES: RunStatus[] = ['passed', 'failed'];
 
 type SortField = 'startedAt' | 'endedAt' | 'project' | 'tool' | 'status';
 
+function triggerColor(trigger?: string): string {
+  if (trigger === 'schedule') return 'blue';
+  if (trigger === 'webhook') return 'violet';
+  return 'gray';
+}
+
 function formatDuration(start: string, end?: string): string {
   if (!end) return '-';
   const ms = dayjs(end).diff(dayjs(start));
@@ -139,6 +145,12 @@ export function HistoryPage() {
       type: r.request.type,
       project: r.request.project,
       status: r.status,
+      mode: r.request.mode,
+      triggeredBy: r.triggeredBy ?? 'manual',
+      tag: r.request.tag ?? '',
+      cases: r.summary ? r.summary.passed + r.summary.failed + (r.summary.skipped ?? 0) : '',
+      passed: r.summary?.passed ?? '',
+      failed: r.summary?.failed ?? '',
       startedAt: r.startedAt,
       endedAt: r.endedAt ?? '',
       duration: formatDuration(r.startedAt, r.endedAt),
@@ -487,7 +499,7 @@ export function HistoryPage() {
           {/* Bounded ScrollArea → table scrolls inside the card (sticky header)
               instead of growing the page; pagination below stays visible. */}
           <ScrollArea type="auto" style={{ flex: 1, minHeight: 0 }}>
-            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={1050}>
+            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={1200}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>
@@ -522,6 +534,7 @@ export function HistoryPage() {
                   <Table.Th>{t('table.passScore')}</Table.Th>
                   <Table.Th>{t('table.tag')}</Table.Th>
                   <Table.Th>{t('table.mode')}</Table.Th>
+                  <Table.Th>{t('table.trigger')}</Table.Th>
                   <Table.Th>{t('table.duration')}</Table.Th>
                   <Table.Th>
                     <SortableHeader
@@ -574,7 +587,7 @@ export function HistoryPage() {
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <PassScoreCell summary={r.summary} />
+                      <PassScoreCell summary={r.summary} severity={r.severity} />
                     </Table.Td>
                     <Table.Td>
                       {r.request.tag ? (
@@ -607,6 +620,11 @@ export function HistoryPage() {
                         color={r.request.mode === 'docker' ? 'violet' : 'gray'}
                       >
                         {r.request.mode}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge size="xs" variant="outline" color={triggerColor(r.triggeredBy)}>
+                        {t(`trigger.${r.triggeredBy ?? 'manual'}`)}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
