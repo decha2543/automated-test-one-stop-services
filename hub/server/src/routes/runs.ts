@@ -7,6 +7,7 @@ import { WORKSPACE_ROOT } from '../config.js';
 import { buildTaskCommand } from '../services/command-builder.js';
 import { getEnabledToolIds } from '../services/manifest-registry.js';
 import { severityByRun } from '../services/reports.js';
+import { compareRuns } from '../services/run-compare.js';
 import { runner } from '../services/runner.js';
 
 /**
@@ -164,6 +165,23 @@ export async function runRoutes(app: FastifyInstance): Promise<void> {
       return { tag, project, runs: matching };
     },
   );
+
+  /** GET /api/runs/compare?a=<id>&b=<id> — per-test diff of two runs (Playwright). */
+  app.get<{ Querystring: { a?: string; b?: string } }>('/api/runs/compare', async (req, reply) => {
+    const { a, b } = req.query;
+    if (!a || !b) {
+      reply.status(400);
+      return { code: 'BAD_REQUEST', message: 'a and b run ids are required' };
+    }
+    const history = runner.getHistory();
+    const runA = history.find((r) => r.id === a);
+    const runB = history.find((r) => r.id === b);
+    if (!runA || !runB) {
+      reply.status(404);
+      return { code: 'RUN_NOT_FOUND', message: 'One or both runs are not in history' };
+    }
+    return compareRuns(runA, runB);
+  });
 
   /** DELETE /api/runs/history — clear all run history */
   app.delete('/api/runs/history', async () => {

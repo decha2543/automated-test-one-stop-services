@@ -30,6 +30,10 @@ import { confirmDialog } from '~/components/confirmDialog';
 import { ImportExportPanel } from '~/components/ImportExportPanel';
 import { PageHeader } from '~/components/PageHeader.js';
 import { toast } from '~/components/Toast';
+import {
+  requestDesktopPermission,
+  useDesktopNotification,
+} from '~/hooks/useDesktopNotification.js';
 import { useNotificationSound } from '~/hooks/useNotificationSound.js';
 import { useToolOptions } from '~/hooks/useTools.js';
 import { type Locale, useI18nStore, useT } from '~/i18n';
@@ -94,6 +98,8 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const { enabled: soundEnabled, toggle: toggleSound } = useNotificationSound();
+  const desktopEnabled = useDesktopNotification((s) => s.enabled);
+  const setDesktopEnabled = useDesktopNotification((s) => s.setEnabled);
   const { locale, setLocale } = useI18nStore();
   const lastTool = usePreferences((s) => s.lastTool);
   const defaultMode = usePreferences((s) => s.defaultMode);
@@ -256,6 +262,22 @@ export function SettingsPage() {
     }
   };
 
+  // Enabling desktop notifications requires an OS permission grant; request it
+  // on enable and revert the toggle (with a hint) if the browser blocks it.
+  const handleToggleDesktop = async (checked: boolean) => {
+    if (!checked) {
+      setDesktopEnabled(false);
+      return;
+    }
+    const permission = await requestDesktopPermission();
+    if (permission === 'granted') {
+      setDesktopEnabled(true);
+    } else {
+      setDesktopEnabled(false);
+      toast.error(t('settings.desktopPermissionDenied'));
+    }
+  };
+
   return (
     <Stack gap="md">
       <PageHeader title={t('settings.title')} description={t('nav.settings.desc')} />
@@ -334,6 +356,19 @@ export function SettingsPage() {
                 </Text>
               </Stack>
               <Switch checked={soundEnabled} onChange={toggleSound} size="md" />
+            </Group>
+            <Group justify="space-between">
+              <Stack gap={2}>
+                <Text size="sm">{t('settings.desktopNotifications')}</Text>
+                <Text size="xs" c="dimmed">
+                  {t('settings.desktopNotificationsDesc')}
+                </Text>
+              </Stack>
+              <Switch
+                checked={desktopEnabled}
+                onChange={(e) => handleToggleDesktop(e.currentTarget.checked)}
+                size="md"
+              />
             </Group>
           </Stack>
         </Paper>
@@ -648,6 +683,7 @@ export function SettingsPage() {
                   if (!ok) return;
                   localStorage.removeItem('hub-preferences');
                   localStorage.removeItem('hub-notification-sound');
+                  localStorage.removeItem('hub-desktop-notification');
                   window.location.reload();
                 }}
               >
@@ -748,7 +784,7 @@ export function SettingsPage() {
         </Title>
         <Stack gap={4}>
           <Text size="xs" c="dimmed">
-            AutoQA Hub v0.1.0 — Test Execution Manager
+            AutoQA Hub v{import.meta.env.VITE_APP_VERSION} — Test Execution Manager
           </Text>
           <Text size="xs" c="dimmed">
             Copyright © 2026-present{' '}

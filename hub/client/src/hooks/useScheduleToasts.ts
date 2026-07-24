@@ -5,6 +5,7 @@ import {
   buildScheduleToast,
   shouldShowScheduleToast,
 } from '~/components/schedule-toast-helpers.js';
+import { notifyRunFinished } from '~/hooks/useDesktopNotification.js';
 import { usePreferences } from '~/stores/hub.js';
 
 /**
@@ -54,6 +55,9 @@ export function useScheduleToasts(): void {
         message: toast.message,
         autoClose: toast.autoClose,
       });
+      // Mirror as an OS notification when the tab is backgrounded (no-ops when
+      // the desktop-notification toggle is off or permission is not granted).
+      notifyRunFinished({ title: toast.title, body: toast.message, tag: toast.id });
     }
 
     function connect(): void {

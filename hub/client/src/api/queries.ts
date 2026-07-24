@@ -25,6 +25,22 @@ import { api } from '~/api/client.js';
  * without a manual generic, and `invalidateQueries` calls are key-checked.
  */
 
+/**
+ * Staleness tiers (ms). The Hub mutates its own data through the API and
+ * invalidates the affected query keys on success, so background refetching
+ * only needs to catch changes made *outside* the Hub. Setting a `staleTime`
+ * therefore cuts the refetch-on-mount / refetch-on-focus churn that a local
+ * single-user tool does not need (default `staleTime: 0` refetches every time).
+ */
+const STALE = {
+  /** Structural axes that change only when a project is created/cloned/removed. */
+  structural: 5 * 60_000,
+  /** Lists that change when a run finishes or a project/env is edited in the Hub. */
+  moderate: 60_000,
+  /** Data that can also change from outside the Hub (specs, env files on disk). */
+  short: 30_000,
+} as const;
+
 // ---------------------------------------------------------------------------
 // Dashboard / global axis
 // ---------------------------------------------------------------------------
@@ -40,14 +56,18 @@ export const qProjects = () =>
   queryOptions({
     queryKey: ['projects'] as const,
     queryFn: () => api.get<ProjectSummary[]>('/api/projects'),
+    staleTime: STALE.moderate,
   });
 
 export const qRunsHistory = () =>
   queryOptions({
     queryKey: ['runs-history'] as const,
     queryFn: () => api.get<RunRecord[]>('/api/runs/history'),
+    staleTime: STALE.short,
   });
 
+// Active runs are the live axis — keep the default (always refetch on mount) so
+// a reconnecting page never shows a stale "running" that has already finished.
 export const qActiveRuns = () =>
   queryOptions({
     queryKey: ['activeRuns'] as const,
@@ -63,6 +83,7 @@ export const qAllProjects = () =>
   queryOptions({
     queryKey: ['allProjects'] as const,
     queryFn: () => api.get<string[]>('/api/projects/list'),
+    staleTime: STALE.moderate,
   });
 
 export const qProjectTypes = (tool: ToolId | undefined | '') =>
@@ -70,6 +91,7 @@ export const qProjectTypes = (tool: ToolId | undefined | '') =>
     queryKey: ['types', tool] as const,
     queryFn: () => api.get<string[]>(`/api/projects/types?tool=${tool}`),
     enabled: !!tool,
+    staleTime: STALE.structural,
     gcTime: Number.POSITIVE_INFINITY,
   });
 
@@ -79,6 +101,7 @@ export const qProjectList = (tool: ToolId | undefined | '', type: string | undef
     queryKey: ['projectList', tool, type] as const,
     queryFn: () => api.get<string[]>(`/api/projects/list?tool=${tool}&type=${type}`),
     enabled: !!tool && !!type,
+    staleTime: STALE.structural,
     gcTime: Number.POSITIVE_INFINITY,
   });
 
@@ -88,6 +111,7 @@ export const qProjectSections = (project: string | undefined | '', enabled = tru
     queryKey: ['sections', project] as const,
     queryFn: () => api.get<string[]>(`/api/projects/sections?project=${project}`),
     enabled: enabled && !!project,
+    staleTime: STALE.structural,
     gcTime: Number.POSITIVE_INFINITY,
   });
 
@@ -100,6 +124,7 @@ export const qProjectTags = (
     queryKey: ['tags', tool, type, project] as const,
     queryFn: () => api.get<TagsResponse>(`/api/tags?tool=${tool}&type=${type}&project=${project}`),
     enabled: !!tool && !!type && !!project,
+    staleTime: STALE.short,
   });
 
 /**
@@ -117,4 +142,5 @@ export const qProjectEnv = (
     queryFn: () =>
       api.get<EnvFile>(`/api/env/project?tool=${tool}&type=${type}&project=${project}`),
     enabled: !!tool && !!type && !!project,
+    staleTime: STALE.short,
   });

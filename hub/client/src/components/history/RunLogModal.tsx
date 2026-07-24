@@ -1,7 +1,9 @@
 import type { RunRecord, RunRequest, RunStatus } from '@hub/shared';
 import { Badge, Button, Code, Group, Modal, ScrollArea, Stack, Text } from '@mantine/core';
 import dayjs from 'dayjs';
-import { TbCopy, TbPlayerPlay, TbTerminal } from 'react-icons/tb';
+import { TbCopy, TbExternalLink, TbPlayerPlay, TbTerminal } from 'react-icons/tb';
+import { api } from '~/api/client.js';
+import { ArtifactMenu } from '~/components/reports/ArtifactMenu.js';
 import { toast } from '~/components/Toast.js';
 import { formatAbsolute } from '~/utils/datetime.js';
 
@@ -26,6 +28,15 @@ function formatDuration(start: string, end?: string): string {
   return `${hours}h ${remainingMinutes}m`;
 }
 
+/** Open a run's HTML report in the OS default app (same path as the Reports page). */
+async function openReport(reportPath: string): Promise<void> {
+  try {
+    await api.post('/api/reports/open-file', { path: reportPath });
+  } catch {
+    toast.error('Failed to open report');
+  }
+}
+
 export interface RunLogModalProps {
   run: RunRecord | null;
   opened: boolean;
@@ -39,6 +50,7 @@ export interface RunLogModalProps {
  */
 export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps) {
   if (!run) return null;
+  const { reportPath } = run;
 
   return (
     <Modal
@@ -113,6 +125,21 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
           )}
         </Group>
 
+        {reportPath && (
+          <Group gap="xs">
+            <Button
+              size="compact-xs"
+              variant="light"
+              color="blue"
+              leftSection={<TbExternalLink size={12} />}
+              onClick={() => openReport(reportPath)}
+            >
+              Open Report
+            </Button>
+            {run.request.tool === 'playwright' && <ArtifactMenu reportPath={reportPath} />}
+          </Group>
+        )}
+
         <Stack gap={4}>
           <Group justify="space-between">
             <Text size="xs" c="dimmed">
@@ -173,8 +200,8 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
         )}
 
         <Text size="xs" c="dimmed" mt="sm">
-          Note: Full terminal output is only available for currently active sessions. Past run logs
-          are not persisted to disk.
+          Note: Live terminal output is only kept for active sessions — past run logs are not
+          persisted. For a finished run, open its report (when available) for failure details.
         </Text>
       </Stack>
     </Modal>

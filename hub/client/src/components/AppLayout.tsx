@@ -22,6 +22,7 @@ import {
   TbCalendarTime,
   TbChartBar,
   TbChartLine,
+  TbChecklist,
   TbChevronDown,
   TbChevronRight,
   TbFolderFilled,
@@ -41,6 +42,7 @@ import { LanguageToggle } from '~/components/LanguageToggle.js';
 import { NotificationCenter } from '~/components/NotificationCenter.js';
 import { PageLoader } from '~/components/PageLoader.js';
 import { SpotlightSearch } from '~/components/SpotlightSearch.js';
+import { useRunFinishedNotifier } from '~/hooks/useRunFinishedNotifier.js';
 import { useScheduleToasts } from '~/hooks/useScheduleToasts.js';
 import type { TranslationKey } from '~/i18n/en';
 import { useT } from '~/i18n/index.js';
@@ -56,6 +58,7 @@ type PagePath =
   | '/history'
   | '/schedules'
   | '/projects'
+  | '/testcases'
   | '/env-profiles'
   | '/reports'
   | '/artifacts'
@@ -120,6 +123,12 @@ const NAV_CATEGORIES: NavCategory[] = [
         labelKey: 'nav.projects',
         descKey: 'nav.projects.desc',
         icon: <TbFolderFilled size={18} />,
+      },
+      {
+        path: '/testcases',
+        labelKey: 'nav.testCases',
+        descKey: 'nav.testCases.desc',
+        icon: <TbChecklist size={18} />,
       },
       {
         path: '/env-profiles',
@@ -192,6 +201,10 @@ export function AppLayout() {
     },
   });
   const runningCount = activeRuns.data?.length ?? 0;
+
+  // App-level desktop notification for interactive run completion, so a run that
+  // finishes while the user is on another page still raises an OS notification.
+  useRunFinishedNotifier(activeRuns.data ?? []);
 
   // Doctor status for the nav badge. Reuses the shared `qDoctor()` options so
   // the layout and the Dashboard share a single cache entry / fetch for

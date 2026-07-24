@@ -119,6 +119,24 @@ export const settingsRoute = createRoute({
   component: lazyRouteComponent(() => import('./pages/Settings.js'), 'SettingsPage'),
 });
 
+// Contextual view (no nav item): reached from History by selecting two runs.
+// The two run ids ride as ?a=&b= search params.
+export const compareRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/compare',
+  validateSearch: (search: Record<string, unknown>): { a?: string; b?: string } => ({
+    a: typeof search.a === 'string' ? search.a : undefined,
+    b: typeof search.b === 'string' ? search.b : undefined,
+  }),
+  component: lazyRouteComponent(() => import('./pages/Compare.js'), 'ComparePage'),
+});
+
+export const testcasesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/testcases',
+  component: lazyRouteComponent(() => import('./pages/Testcases.js'), 'TestCasesPage'),
+});
+
 // ---------------------------------------------------------------------------
 // Route tree & router
 // ---------------------------------------------------------------------------
@@ -127,8 +145,10 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute,
   runRoute,
   historyRoute,
+  compareRoute,
   schedulesRoute,
   projectsRoute,
+  testcasesRoute,
   envProfilesRoute,
   reportsRoute,
   artifactsRoute,

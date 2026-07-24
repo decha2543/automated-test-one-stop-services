@@ -1,9 +1,19 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+// Single source of truth for the version shown in the UI (Settings → About):
+// read it from this package.json at build time instead of hardcoding a string.
+const { version } = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')) as {
+  version: string;
+};
+
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(version),
+  },
   resolve: {
     alias: {
       '~': path.resolve(__dirname, 'src'),

@@ -4,6 +4,7 @@ import {
   ActionIcon,
   Badge,
   Button,
+  Checkbox,
   Group,
   Pagination,
   Paper,
@@ -27,6 +28,7 @@ import {
   TbCopy,
   TbDownload,
   TbFilter,
+  TbGitCompare,
   TbHistory,
   TbPlayerPlay,
   TbTerminal,
@@ -100,6 +102,8 @@ export function HistoryPage() {
   const { sortField, sortDir, handleSort } = useTableSort<SortField>('startedAt');
   const [logModalOpen, { open: openLog, close: closeLog }] = useDisclosure(false);
   const [selectedRun, setSelectedRun] = useState<RunRecord | null>(null);
+  // Up to two runs picked for the compare view (A vs B).
+  const [compareSel, setCompareSel] = useState<Set<string>>(new Set());
 
   const history = useQuery(qRunsHistory());
 
@@ -136,6 +140,26 @@ export function HistoryPage() {
 
   function handleRerun(run: RunRecord) {
     onRerun(run.request);
+  }
+
+  function toggleCompare(id: string) {
+    setCompareSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 2) next.add(id); // cap at two — a diff is always A vs B
+      return next;
+    });
+  }
+
+  function handleCompare() {
+    const runs = (history.data ?? []).filter((r) => compareSel.has(r.id));
+    if (runs.length !== 2) return;
+    // Baseline = older run (A), target = newer run (B), so the diff reads forward in time.
+    const ordered = [...runs].sort((x, y) => x.startedAt.localeCompare(y.startedAt));
+    const older = ordered[0];
+    const newer = ordered[1];
+    if (!older || !newer) return;
+    navigate({ to: '/compare', search: { a: older.id, b: newer.id } });
   }
 
   function exportCsv() {
@@ -251,6 +275,16 @@ export function HistoryPage() {
         description={t('nav.history.desc')}
         actions={
           <>
+            {compareSel.size === 2 && (
+              <Button
+                size="xs"
+                color="grape"
+                leftSection={<TbGitCompare size={14} />}
+                onClick={handleCompare}
+              >
+                {t('compare.button')} (2)
+              </Button>
+            )}
             {sorted.length > 0 && (
               <Button
                 variant="default"
@@ -502,6 +536,7 @@ export function HistoryPage() {
             <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={1200}>
               <Table.Thead>
                 <Table.Tr>
+                  <Table.Th w={40} />
                   <Table.Th>
                     <SortableHeader
                       label={t('table.status')}
@@ -552,6 +587,14 @@ export function HistoryPage() {
               <Table.Tbody>
                 {paginatedData.map((r) => (
                   <Table.Tr key={r.id}>
+                    <Table.Td>
+                      <Checkbox
+                        size="xs"
+                        checked={compareSel.has(r.id)}
+                        onChange={() => toggleCompare(r.id)}
+                        aria-label={t('compare.button')}
+                      />
+                    </Table.Td>
                     <Table.Td>
                       <Badge
                         color={getStatusColor(r.status)}
