@@ -14,6 +14,7 @@ interface PwSpec {
   ok?: boolean;
   title?: string;
   id?: string;
+  tags?: string[];
 }
 interface PwSuite {
   file?: string;
@@ -27,6 +28,8 @@ export interface RunOutcome {
   title: string;
   file?: string;
   status: TestStatus;
+  /** Playwright tags on the spec (includes cover tags like `TC-<docId>`). */
+  tags?: string[];
 }
 
 const MAX_RESULTS_JSON_BYTES = 25 * 1024 * 1024;
@@ -38,7 +41,7 @@ function collectOutcomes(suite: PwSuite, fileHint: string | undefined, out: RunO
     // spec.id is a stable hash across runs of the same test; fall back to
     // file::title when a reporter omits it.
     const key = spec.id || `${file ?? ''}::${title}`;
-    out.push({ key, title, file, status: spec.ok ? 'passed' : 'failed' });
+    out.push({ key, title, file, status: spec.ok ? 'passed' : 'failed', tags: spec.tags ?? [] });
   }
   for (const child of suite.suites ?? []) collectOutcomes(child, file, out);
 }

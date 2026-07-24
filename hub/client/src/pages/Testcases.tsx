@@ -1,26 +1,14 @@
-import type { TestCaseCsv, TestCaseDoc, TestCaseWorkbook, ToolId } from '@hub/shared';
-import {
-  Badge,
-  Button,
-  Group,
-  Paper,
-  ScrollArea,
-  SegmentedControl,
-  Select,
-  SimpleGrid,
-  Stack,
-  Table,
-  Text,
-} from '@mantine/core';
+import type { TestCaseDoc, ToolId } from '@hub/shared';
+import { Badge, Button, Group, Modal, Paper, Select, SimpleGrid, Stack, Text } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { TbAlertTriangle, TbChecklist, TbDownload, TbEye, TbFileSpreadsheet } from 'react-icons/tb';
+import { TbChecklist, TbDownload, TbEye, TbFileSpreadsheet } from 'react-icons/tb';
 import { api } from '~/api/client.js';
 import { qProjectList, qProjectTypes } from '~/api/queries.js';
 import { EmptyState } from '~/components/EmptyState.js';
-import { InlineAlert } from '~/components/InlineAlert.js';
 import { PageHeader } from '~/components/PageHeader.js';
 import { ListSkeleton } from '~/components/Skeletons.js';
+import { TestCaseGridEditor } from '~/components/testcases/TestCaseGridEditor.js';
 import { useToolOptions } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
 
@@ -34,47 +22,13 @@ function downloadUrl(docPath: string): string {
   return `/api/testcases/download?path=${encodeURIComponent(docPath)}`;
 }
 
-/** Header row + body rows, shared by the CSV and xlsx previews. */
-function PreviewTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
-  return (
-    <ScrollArea.Autosize mah="55vh">
-      <Table striped highlightOnHover verticalSpacing={4} stickyHeader>
-        <Table.Thead>
-          <Table.Tr>
-            {headers.map((h, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: header cells are positional
-              <Table.Th key={i}>
-                <Text size="xs">{h}</Text>
-              </Table.Th>
-            ))}
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {rows.map((row, ri) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional in a flat sheet
-            <Table.Tr key={ri}>
-              {row.map((cell, ci) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
-                <Table.Td key={ci}>
-                  <Text size="xs">{cell}</Text>
-                </Table.Td>
-              ))}
-            </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
-    </ScrollArea.Autosize>
-  );
-}
-
 export function TestCasesPage() {
   const t = useT();
   const toolOptions = useToolOptions();
   const [tool, setTool] = useState<ToolId | ''>('');
   const [type, setType] = useState('');
   const [project, setProject] = useState('');
-  const [preview, setPreview] = useState<TestCaseDoc | null>(null);
-  const [sheetIdx, setSheetIdx] = useState(0);
+  const [openDoc, setOpenDoc] = useState<TestCaseDoc | null>(null);
 
   const typesQ = useQuery(qProjectTypes(tool));
   const projectsQ = useQuery(qProjectList(tool, type));
@@ -83,46 +37,28 @@ export function TestCasesPage() {
     queryFn: () => api.get(`/api/testcases?tool=${tool}&type=${type}&project=${project}`),
     enabled: !!tool && !!type && !!project,
   });
-  const csvQ = useQuery<TestCaseCsv>({
-    queryKey: ['testcases-csv', preview?.path],
-    queryFn: () => api.get(`/api/testcases/csv?path=${encodeURIComponent(preview?.path ?? '')}`),
-    enabled: !!preview && preview.ext === 'csv',
-  });
-  const xlsxQ = useQuery<TestCaseWorkbook>({
-    queryKey: ['testcases-xlsx', preview?.path],
-    queryFn: () => api.get(`/api/testcases/xlsx?path=${encodeURIComponent(preview?.path ?? '')}`),
-    enabled: !!preview && preview.ext === 'xlsx',
-  });
 
   const onTool = (v: string | null) => {
     setTool((v as ToolId) ?? '');
     setType('');
     setProject('');
-    setPreview(null);
+    setOpenDoc(null);
   };
   const onType = (v: string | null) => {
     setType(v ?? '');
     setProject('');
-    setPreview(null);
+    setOpenDoc(null);
   };
   const onProject = (v: string | null) => {
     setProject(v ?? '');
-    setPreview(null);
-  };
-  const openPreview = (doc: TestCaseDoc) => {
-    setPreview(doc);
-    setSheetIdx(0);
+    setOpenDoc(null);
   };
 
   const ready = !!tool && !!type && !!project;
-  const sheets = xlsxQ.data?.sheets ?? [];
-  const activeSheet = sheets[Math.min(sheetIdx, Math.max(0, sheets.length - 1))];
-  const previewTruncated = preview?.ext === 'csv' ? csvQ.data?.truncated : xlsxQ.data?.truncated;
 
   return (
     <Stack gap="md">
       <PageHeader title={t('testcases.title')} description={t('nav.testCases.desc')} />
-
       <Paper withBorder p="md">
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
           <Select
@@ -154,7 +90,6 @@ export function TestCasesPage() {
           />
         </SimpleGrid>
       </Paper>
-
       {!ready ? (
         <EmptyState
           icon={<TbChecklist size={48} color="var(--mantine-color-dimmed)" />}
@@ -199,11 +134,11 @@ export function TestCasesPage() {
                   </Badge>
                   <Button
                     size="compact-xs"
-                    variant="light"
+                    variant={openDoc?.path === doc.path ? 'filled' : 'light'}
                     leftSection={<TbEye size={12} />}
-                    onClick={() => openPreview(doc)}
+                    onClick={() => setOpenDoc(doc)}
                   >
-                    {t('testcases.preview')}
+                    {t('testcases.open')}
                   </Button>
                   <Button
                     size="compact-xs"
@@ -221,52 +156,16 @@ export function TestCasesPage() {
           ))}
         </Stack>
       )}
-
-      {preview && (
-        <Paper withBorder p="md">
-          <Group justify="space-between" mb="xs">
-            <Text size="sm" fw={600}>
-              {preview.name}
-            </Text>
-            {previewTruncated && (
-              <InlineAlert
-                icon={<TbAlertTriangle size={16} />}
-                message={t('testcases.truncated')}
-              />
-            )}
-          </Group>
-
-          {preview.ext === 'csv' ? (
-            csvQ.isLoading ? (
-              <ListSkeleton rows={6} />
-            ) : csvQ.data ? (
-              <PreviewTable headers={csvQ.data.headers} rows={csvQ.data.rows} />
-            ) : (
-              <Text size="xs" c="dimmed">
-                {t('testcases.none')}
-              </Text>
-            )
-          ) : xlsxQ.isLoading ? (
-            <ListSkeleton rows={6} />
-          ) : activeSheet ? (
-            <Stack gap="xs">
-              {sheets.length > 1 && (
-                <SegmentedControl
-                  size="xs"
-                  value={String(Math.min(sheetIdx, sheets.length - 1))}
-                  onChange={(v) => setSheetIdx(Number(v))}
-                  data={sheets.map((s, i) => ({ value: String(i), label: s.name }))}
-                />
-              )}
-              <PreviewTable headers={activeSheet.rows[0] ?? []} rows={activeSheet.rows.slice(1)} />
-            </Stack>
-          ) : (
-            <Text size="xs" c="dimmed">
-              {t('testcases.none')}
-            </Text>
-          )}
-        </Paper>
-      )}
+      <Modal
+        opened={!!openDoc && !!tool}
+        onClose={() => setOpenDoc(null)}
+        title={openDoc?.name}
+        size="90%"
+      >
+        {openDoc && tool && (
+          <TestCaseGridEditor doc={openDoc} tool={tool} type={type} project={project} />
+        )}
+      </Modal>
     </Stack>
   );
 }

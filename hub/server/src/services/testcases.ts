@@ -1,6 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TestCaseCsv, TestCaseDoc, TestCaseSheet, TestCaseWorkbook } from '@hub/shared';
+import type {
+  TestCaseCsv,
+  TestCaseDoc,
+  TestCaseGrid,
+  TestCaseSheet,
+  TestCaseWorkbook,
+} from '@hub/shared';
 import ExcelJS from 'exceljs';
 
 // A test-case document is an xlsx/csv whose name reads like "test-case(s)"
@@ -162,4 +168,149 @@ export async function readTestCaseXlsx(absPath: string): Promise<TestCaseWorkboo
   } catch {
     return null;
   }
+}
+
+const EDITED_SUFFIX = '.edited.json';
+const UPDATED_AT_HEADER = 'Updated At';
+// Identity columns: fillable while empty (a new row) but never changed once set.
+const LOCKED_HEADERS = new Set(['Test Case ID', 'Module', 'Requirement Ref ID']);
+
+/** Path of the local edit overlay that sits beside a source doc. */
+export function editedPathFor(docPath: string): string {
+  return `${docPath}${EDITED_SUFFIX}`;
+}
+
+function writeOverlay(docPath: string, sheets: TestCaseSheet[]): void {
+  const payload = { source: path.basename(docPath), savedAt: new Date().toISOString(), sheets };
+  fs.writeFileSync(editedPathFor(docPath), JSON.stringify(payload, null, 2), 'utf8');
+}
+
+/**
+ * Read a doc as an editable grid, preferring the `.edited.json` overlay when one
+ * exists — so Hub edits never touch the pipeline's source doc. Each sheet's
+ * rows[0] is the header row. Best-effort: returns null when nothing is readable.
+ */
+export async function readTestCaseGrid(docPath: string): Promise<TestCaseGrid | null> {
+  const overlayPath = editedPathFor(docPath);
+  if (fs.existsSync(overlayPath)) {
+    try {
+      const overlay = JSON.parse(fs.readFileSync(overlayPath, 'utf8')) as {
+        sheets?: TestCaseSheet[];
+      };
+      if (Array.isArray(overlay.sheets)) return { sheets: overlay.sheets, edited: true };
+    } catch {
+      // Corrupt overlay — fall back to the source doc.
+    }
+  }
+  const lower = docPath.toLowerCase();
+  if (lower.endsWith('.csv')) {
+    const csv = readTestCaseCsv(docPath);
+    return csv
+      ? { sheets: [{ name: 'Sheet1', rows: [csv.headers, ...csv.rows] }], edited: false }
+      : null;
+  }
+  if (lower.endsWith('.xlsx')) {
+    const wb = await readTestCaseXlsx(docPath);
+    return wb ? { sheets: wb.sheets, edited: false } : null;
+  }
+  return null;
+}
+
+/** Column index of the "Updated At" header in a header row, or -1. */
+function updatedAtIndex(header: string[]): number {
+  return header.findIndex((h) => h.trim().toLowerCase() === UPDATED_AT_HEADER.toLowerCase());
+}
+
+/**
+ * Edit one cell and stamp that row's "Updated At" (when the sheet has such a
+ * column), persisting to the `.edited.json` overlay. Row 0 is the header and is
+ * never editable. Returns the updated grid, or null when the target is invalid.
+ */
+export async function editTestCaseCell(
+  docPath: string,
+  sheetIdx: number,
+  rowIdx: number,
+  colIdx: number,
+  value: string,
+): Promise<TestCaseGrid | null> {
+  if (rowIdx < 1 || colIdx < 0) return null;
+  const grid = await readTestCaseGrid(docPath);
+  const sheet = grid?.sheets[sheetIdx];
+  if (!grid || !sheet) return null;
+  const header = sheet.rows[0] ?? [];
+  const row = sheet.rows[rowIdx];
+  if (!row || colIdx >= header.length) return null;
+  // A locked identity column can be filled while empty (new row) but never changed.
+  if (LOCKED_HEADERS.has((header[colIdx] ?? '').trim()) && (row[colIdx] ?? '').trim() !== '') {
+    return null;
+  }
+  while (row.length < header.length) row.push('');
+  row[colIdx] = value;
+  const uaIdx = updatedAtIndex(header);
+  if (uaIdx >= 0) {
+    while (row.length <= uaIdx) row.push('');
+    row[uaIdx] = new Date().toISOString();
+  }
+  writeOverlay(docPath, grid.sheets);
+  return { sheets: grid.sheets, edited: true };
+}
+
+/** Append a blank row to a sheet, persisting to the overlay. */
+export async function addTestCaseRow(
+  docPath: string,
+  sheetIdx: number,
+): Promise<TestCaseGrid | null> {
+  const grid = await readTestCaseGrid(docPath);
+  const sheet = grid?.sheets[sheetIdx];
+  if (!grid || !sheet) return null;
+  const width = sheet.rows[0]?.length ?? 0;
+  sheet.rows.push(new Array<string>(width).fill(''));
+  writeOverlay(docPath, grid.sheets);
+  return { sheets: grid.sheets, edited: true };
+}
+
+const ID_HEADER = 'Test Case ID';
+const STATUS_HEADER = 'Status';
+
+function headerIndex(header: string[], name: string): number {
+  return header.findIndex((h) => h.trim().toLowerCase() === name.toLowerCase());
+}
+
+/**
+ * Fill each doc row's Status (Pass/Fail) + Updated At from a run's per-case
+ * results, matched by Test Case ID, persisting to the `.edited.json` overlay
+ * (never the source doc). Rows without a matching run result are left untouched.
+ * Returns the updated grid + how many rows matched, or null when unreadable.
+ */
+export async function applyRunStatus(
+  docPath: string,
+  statusByCaseId: Record<string, 'passed' | 'failed'>,
+): Promise<{ grid: TestCaseGrid; matched: number; total: number } | null> {
+  const grid = await readTestCaseGrid(docPath);
+  if (!grid) return null;
+  const now = new Date().toISOString();
+  let matched = 0;
+  let total = 0;
+  for (const sheet of grid.sheets) {
+    const header = sheet.rows[0] ?? [];
+    const idIdx = headerIndex(header, ID_HEADER);
+    const statusIdx = headerIndex(header, STATUS_HEADER);
+    if (idIdx < 0 || statusIdx < 0) continue;
+    const uaIdx = updatedAtIndex(header);
+    for (let r = 1; r < sheet.rows.length; r++) {
+      const row = sheet.rows[r];
+      if (!row) continue;
+      total++;
+      const id = (row[idIdx] ?? '').trim();
+      const outcome = id ? statusByCaseId[id] : undefined;
+      if (!outcome) continue;
+      const widest = Math.max(statusIdx, uaIdx);
+      while (row.length <= widest) row.push('');
+      row[statusIdx] = outcome === 'passed' ? 'Pass' : 'Fail';
+      if (uaIdx >= 0) row[uaIdx] = now;
+      matched++;
+    }
+  }
+  if (matched > 0) writeOverlay(docPath, grid.sheets);
+  return { grid: { sheets: grid.sheets, edited: matched > 0 || grid.edited }, matched, total };
 }
