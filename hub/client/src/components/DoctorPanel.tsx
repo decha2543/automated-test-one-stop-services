@@ -1,37 +1,37 @@
 import type { DoctorCategory, DoctorCheck, DoctorReport } from '@hub/shared';
 import { missingPrerequisites } from '@hub/shared';
 import {
-    Badge,
-    Button,
-    Card,
-    Collapse,
-    Group,
-    Loader,
-    Paper,
-    SimpleGrid,
-    Stack,
-    Text,
-    UnstyledButton,
+  Badge,
+  Button,
+  Card,
+  Collapse,
+  Group,
+  Loader,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  UnstyledButton,
 } from '@mantine/core';
 import { useState } from 'react';
 import {
-    TbAlertTriangle,
-    TbChevronRight,
-    TbCircleCheck,
-    TbCircleX,
-    TbDownload,
-    TbRefresh,
+  TbAlertTriangle,
+  TbChevronRight,
+  TbCircleCheck,
+  TbCircleX,
+  TbDownload,
+  TbRefresh,
 } from 'react-icons/tb';
 import { useInstallPython, useProvisionTool } from '~/hooks/useTools.js';
 import type { TranslationKey } from '~/i18n/en';
 import { useT } from '~/i18n/index.js';
 import {
-    groupByCategory,
-    provisionGuidance,
-    provisionTargetFor,
-    shouldAutoExpand,
-    shouldShowGroup,
-    summaryBadge,
+  groupByCategory,
+  provisionGuidance,
+  provisionTargetFor,
+  shouldAutoExpand,
+  shouldShowGroup,
+  summaryBadge,
 } from './doctor-panel-helpers';
 
 interface DoctorPanelProps {
