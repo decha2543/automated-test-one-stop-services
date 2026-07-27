@@ -6,7 +6,7 @@
 //  Ledger shape: { "steps": { <name>: "pending" | "done" | "failed" }, "updatedAt": ISO }
 //  with STEP_ORDER = node, pnpm, uv, task, install-deps, start-hub.
 //  (k6 is NOT a Core step — it is provisioned by the k6 tool's own setup task,
-//   folder-presence gated; see the install-and-provisioning-overhaul spec.
+//   folder-presence gated.
 //   The Hub runs as a daemonless background process — optionally supervised by
 //   systemd --user / launchd — so no process manager is a Core install step.)
 //
@@ -121,7 +121,7 @@ export function writeState(stateFile, steps) {
  * "done" (the step a re-run resumes from), or null when every step is done.
  * Statuses are coerced, so an absent/invalid entry counts as not-done. This is
  * the canonical "where do I resume?" rule the bootstrap scripts rely on for a
- * re-runnable partial install (R1.5, R2.4); every step before it is "done".
+ * re-runnable partial install; every step before it is "done".
  */
 export function selectResumeStep(steps) {
   const map = steps && typeof steps === 'object' ? steps : {};

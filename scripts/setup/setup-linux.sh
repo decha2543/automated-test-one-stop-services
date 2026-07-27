@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# AUTOMATED TEST ENVIRONMENT SETUP (Linux/macOS) — Setup_Bootstrap (Area G)
+# AUTOMATED TEST ENVIRONMENT SETUP (Linux/macOS) — Setup_Bootstrap
 # ----------------------------------------------------------------------------
 # Installs the 4 Core tools from the lowest baseline, installs deps,
 # starts the Hub, then verifies. Idempotent per tool and re-runnable via a
@@ -20,8 +20,8 @@
 # (scripts/setup/set-android-home.sh) and never installed here.
 #
 # Opt-in env:
-# KIRO_INSECURE_TLS=1 Prefetch Node tarball via curl -k (TLS proxy)
-# KIRO_SETUP_STATE_DIR Where .setup-state.json lives (default: repo root)
+# SETUP_INSECURE_TLS=1 Prefetch Node tarball via curl -k (TLS proxy)
+# SETUP_STATE_DIR Where .setup-state.json lives (default: repo root)
 # ============================================================================
 
 set -uo pipefail
@@ -51,12 +51,49 @@ if [ ! -r "$VERSIONS_FILE" ]; then
 fi
 # shellcheck source=/dev/null
 . "$VERSIONS_FILE"
-if [ -z "${NODE_VERSION:-}" ] || [ -z "${PYTHON_VERSION:-}" ]; then
-  echo "  [error] NODE_VERSION/PYTHON_VERSION missing from $VERSIONS_FILE"
-  echo "  [hint]  Ensure both KEY=value lines are present; no stale fallback is used."
+if [ -z "${NODE_VERSION:-}" ] || [ -z "${PYTHON_VERSION:-}" ] || [ -z "${PNPM_VERSION:-}" ]; then
+  echo "  [error] NODE_VERSION/PYTHON_VERSION/PNPM_VERSION missing from $VERSIONS_FILE"
+  echo "  [hint]  Ensure all three KEY=value lines are present; no stale fallback is used."
   exit 1
 fi
 UV_LINK_MODE="copy"
+
+# ---------------------------------------------------------------------------
+# Version floor for an ALREADY-INSTALLED node/pnpm. Presence alone is not
+# enough: pnpm-lock.yaml (lockfileVersion 9) and the Hub build fail with
+# unrelated-looking errors on an older toolchain, and that failure lands two
+# steps later where the cause is invisible. So a tool on PATH is trusted only
+# when its major is >= the pinned major; otherwise the pinned version is
+# installed over it.
+# ---------------------------------------------------------------------------
+
+# major_of <version> — leading integer of a version string ("v18." -> "18").
+major_of() {
+  local v="${1#v}"
+  v="${v%%.*}"
+  v="${v//[^0-9]/}"
+  printf '%s' "$v"
+}
+
+# tool_major_ok <cmd> <version-flag> <min-major> — true when the tool on PATH
+# reports a major >= min. An unparseable version counts as NOT ok, so the
+# pinned version is installed instead of being trusted.
+tool_major_ok() {
+  local got
+  got="$(major_of "$("$1" "$2" 2>/dev/null | head -n1)")"
+  [ -n "$got" ] || return 1
+  [ "$got" -ge "$3" ] 2>/dev/null
+}
+
+NODE_MAJOR_MIN="$(major_of "$NODE_VERSION")"
+PNPM_MAJOR_MIN="$(major_of "$PNPM_VERSION")"
+
+# now — clock time for the step/phase markers. The long phases (dependency
+# install, Hub build) print no output for minutes at a time; a timestamp on each
+# marker shows how long the current one has been running, and gives the
+# installer log something support can read.
+now() { date +%H:%M:%S 2>/dev/null || echo '--:--:--'; }
+SETUP_STARTED="$(now)"
 
 NODE_OS="linux"
 NODE_ARCH="x64"
@@ -74,12 +111,17 @@ export VOLTA_FEATURE_PNPM=1
 # Playwright browsers share one cache across tool workspaces.
 export PLAYWRIGHT_BROWSERS_PATH="$WORKSPACE_ROOT/.cache/playwright-browsers"
 
+# Hub port: 5174 unless HUB_PORT is already set — nothing to configure for a
+# normal install. Exported so the launcher, the URL printed here, and the Hub
+# itself can never disagree.
+export HUB_PORT="${HUB_PORT:-5174}"
+
 # ---------------------------------------------------------------------------
 # Setup_State ledger location. Steps already 'done' from a previous run are
 # preserved so a re-run skips them; the ledger is written on every
 # step change for progress and crash-safe re-runs.
 # ---------------------------------------------------------------------------
-STATE_DIR="${KIRO_SETUP_STATE_DIR:-$WORKSPACE_ROOT}"
+STATE_DIR="${SETUP_STATE_DIR:-$WORKSPACE_ROOT}"
 mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/.setup-state.json"
 STATE_HELPER="$SETUP_ROOT/setup-state.mjs"
@@ -144,7 +186,7 @@ mark_done() { ST[$1]=done; write_state; }
 
 # fail_step <step> "<step N/M>" "<remediation>" — mark failed, persist, print
 # the failing step + >=1 fix hint, and STOP (no Hub, no later component) per
-# R19.6/R19.7/R20.1. Prior 'done' steps are left untouched in the ledger.
+# . Prior 'done' steps are left untouched in the ledger.
 fail_step() {
   ST[$1]=failed
   write_state
@@ -221,21 +263,25 @@ write_state
 # STEP 1/6 — node (Volta, user-scope)
 # ===========================================================================
 echo ""
-echo "[step] node (1/6)"
-if command -v node &>/dev/null; then
-  echo "  [SKIPPED] node already present on PATH (strict skip)"; mark_done node
-elif [ "${ST[node]}" = "done" ]; then
-  echo "  [SKIPPED] node already installed (state: done)"
+echo "[step] node (1/6)  [$(now)]"
+if command -v node &>/dev/null && tool_major_ok node -v "$NODE_MAJOR_MIN"; then
+  echo "  [SKIPPED] node $(node -v) already present on PATH (needs v${NODE_MAJOR_MIN} or newer)"; mark_done node
 else
-  ensure_volta || fail_step node "node 1/6" "Volta bootstrap failed. Check network/proxy (set KIRO_INSECURE_TLS=1 if behind a TLS proxy), then re-run."
-  if [ "${KIRO_INSECURE_TLS:-}" = "1" ]; then
-    echo "  [warn] KIRO_INSECURE_TLS=1 — prefetching Node tarball via curl -k"
+  if command -v node &>/dev/null; then
+    echo "  [warn] node $(node -v) on PATH is older than this workspace needs (v${NODE_MAJOR_MIN}+)."
+    echo "         Installing the pinned node@${NODE_VERSION} — your other node install is left alone."
+  fi
+  ensure_volta || fail_step node "node 1/6" "Volta bootstrap failed. Check network/proxy (set SETUP_INSECURE_TLS=1 if behind a TLS proxy), then re-run."
+  if [ "${SETUP_INSECURE_TLS:-}" = "1" ]; then
+    echo "  [warn] SETUP_INSECURE_TLS=1 — prefetching Node tarball via curl -k"
     inv="$VOLTA_HOME/tools/inventory/node"; mkdir -p "$inv"
     tarf="node-v${NODE_VERSION}-${NODE_OS}-${NODE_ARCH}.tar.gz"
     retry 3 30 curl -k -L -o "$inv/$tarf" "https://nodejs.org/dist/v${NODE_VERSION}/${tarf}" || true
   fi
   retry 3 30 volta install "node@${NODE_VERSION}" || fail_step node "node 1/6" "Node install via Volta failed after 3 attempts. Check network/proxy, then re-run."
   command -v node &>/dev/null || fail_step node "node 1/6" "Node still not on PATH after install. Open a new shell to refresh PATH, then re-run."
+  tool_major_ok node -v "$NODE_MAJOR_MIN" || fail_step node "node 1/6" \
+    "node@${NODE_VERSION} was installed, but '$(command -v node)' ($(node -v)) still wins on PATH. Put ${VOLTA_HOME}/bin ahead of it in your shell profile (or remove the older node), then re-run."
   mark_done node
 fi
 
@@ -243,15 +289,19 @@ fi
 # STEP 2/6 — pnpm (Volta)
 # ===========================================================================
 echo ""
-echo "[step] pnpm (2/6)"
-if command -v pnpm &>/dev/null; then
-  echo "  [SKIPPED] pnpm already present on PATH (strict skip)"; mark_done pnpm
-elif [ "${ST[pnpm]}" = "done" ]; then
-  echo "  [SKIPPED] pnpm already installed (state: done)"
+echo "[step] pnpm (2/6)  [$(now)]"
+if command -v pnpm &>/dev/null && tool_major_ok pnpm -v "$PNPM_MAJOR_MIN"; then
+  echo "  [SKIPPED] pnpm $(pnpm -v) already present on PATH (needs v${PNPM_MAJOR_MIN} or newer)"; mark_done pnpm
 else
+  if command -v pnpm &>/dev/null; then
+    echo "  [warn] pnpm $(pnpm -v) on PATH cannot read this workspace's lockfile (needs v${PNPM_MAJOR_MIN}+)."
+    echo "         Installing the pinned pnpm@${PNPM_VERSION} — your other pnpm install is left alone."
+  fi
   ensure_volta || fail_step pnpm "pnpm 2/6" "Volta bootstrap failed. Check network/proxy, then re-run."
-  retry 3 30 volta install pnpm || fail_step pnpm "pnpm 2/6" "pnpm install via Volta failed after 3 attempts. Ensure VOLTA_FEATURE_PNPM=1, then re-run."
+  retry 3 30 volta install "pnpm@${PNPM_VERSION}" || fail_step pnpm "pnpm 2/6" "pnpm install via Volta failed after 3 attempts. Ensure VOLTA_FEATURE_PNPM=1, then re-run."
   command -v pnpm &>/dev/null || fail_step pnpm "pnpm 2/6" "pnpm still not on PATH after install. Open a new shell to refresh PATH, then re-run."
+  tool_major_ok pnpm -v "$PNPM_MAJOR_MIN" || fail_step pnpm "pnpm 2/6" \
+    "pnpm@${PNPM_VERSION} was installed, but '$(command -v pnpm)' ($(pnpm -v)) still wins on PATH. Put ${VOLTA_HOME}/bin ahead of it in your shell profile (or remove the older pnpm), then re-run."
   mark_done pnpm
 fi
 
@@ -259,13 +309,16 @@ fi
 # STEP 3/6 — uv (curl installer on Linux / brew on macOS, user-scope)
 # ===========================================================================
 echo ""
-echo "[step] uv (3/6)"
+echo "[step] uv (3/6)  [$(now)]"
 if command -v uv &>/dev/null; then
   echo "  [SKIPPED] uv already present on PATH (strict skip)"; mark_done uv
 elif [ "${ST[uv]}" = "done" ]; then
   echo "  [SKIPPED] uv already installed (state: done)"
 else
-  if [ "$OS" = "Darwin" ]; then
+  # brew is the fast path when it exists; the official install script is the
+  # fallback and works the same on macOS, so a Mac without Homebrew is NOT a
+  # dead end (that used to stop setup here and ask the user to install brew).
+  if [ "$OS" = "Darwin" ] && command -v brew &>/dev/null; then
     brew_install uv || fail_step uv "uv 3/6" "brew install uv failed after 3 attempts. Check network/proxy, then re-run."
   else
     retry 3 30 sh -c "curl -LsSf https://astral.sh/uv/install.sh | sh" || fail_step uv "uv 3/6" "uv install script failed after 3 attempts. Check network/proxy, then re-run."
@@ -279,16 +332,18 @@ fi
 # STEP 4/6 — task (curl installer on Linux / brew go-task on macOS)
 # ===========================================================================
 echo ""
-echo "[step] task (4/6)"
+echo "[step] task (4/6)  [$(now)]"
 if command -v task &>/dev/null; then
   echo "  [SKIPPED] task already present on PATH (strict skip)"; mark_done task
 elif [ "${ST[task]}" = "done" ]; then
   echo "  [SKIPPED] task already installed (state: done)"
 else
-  if [ "$OS" = "Darwin" ]; then
+  # Same shape as uv: brew when available, official install script otherwise
+  # (it supports macOS too), so no Homebrew is not a dead end.
+  if [ "$OS" = "Darwin" ] && command -v brew &>/dev/null; then
     brew_install go-task || fail_step task "task 4/6" "brew install go-task failed after 3 attempts. Check network/proxy, then re-run."
   else
-    # Install user-scope to ~/.local/bin (no root needed, R20.5).
+    # Install user-scope to ~/.local/bin (no root needed).
     mkdir -p "$HOME/.local/bin"
     retry 3 30 sh -c "curl --location https://taskfile.dev/install.sh | sh -s -- -d -b \"$HOME/.local/bin\"" || fail_step task "task 4/6" "task install script failed after 3 attempts. Check network/proxy, then re-run."
   fi
@@ -311,35 +366,50 @@ echo "[aux] Android is opt-in and NOT part of core setup. Run 'task setup-androi
 # STEP 5/6 — install-deps (Workspace_Package + Python_Tool)
 # ===========================================================================
 echo ""
-echo "[step] install-deps (5/6)"
-if [ "${ST[install-deps]}" = "done" ]; then
+echo "[step] install-deps (5/6)  [$(now)]"
+# The ledger alone is not proof: node_modules can be deleted (disk cleanup, a
+# failed prune) long after the step was recorded done. Re-check the artefact.
+if [ "${ST[install-deps]}" = "done" ] && [ -d "$WORKSPACE_ROOT/node_modules" ]; then
   echo "  [SKIPPED] dependencies already installed (state: done)"
 else
+  if [ "${ST[install-deps]}" = "done" ]; then
+    echo "  [warn] state says done but $WORKSPACE_ROOT/node_modules is missing — installing again."
+  fi
   echo "  This downloads dependencies and can take several minutes on the first run."
   echo "  Please keep this window open - it is working, not frozen."
-  echo "  Installing Node workspace dependencies (pnpm install)..."
+  echo "  [$(now)] Installing Node workspace dependencies (pnpm install)..."
   pnpm -C "$WORKSPACE_ROOT" install || fail_step install-deps "install-deps 5/6" "pnpm install failed. Check network and that pnpm-lock.yaml matches package.json, then re-run."
-  echo "  Installing per-tool dependencies (isolated, pnpm)..."
+  echo "  [$(now)] Installing per-tool dependencies (isolated, pnpm)..."
+  # A single tool plugin's own deps are NOT fatal — this is the rule `task setup`
+  # already applies. One tool with an unfinished config (e.g. pnpm's build-script
+  # approval) must not stop the Hub and every other tool from being installed;
+  # the Hub's "Environment Status" panel finishes one tool later with "Set up".
+  DEPS_FAILED=""
   for d in "$WORKSPACE_ROOT"/tools/*/; do
     [ -f "${d}package.json" ] || continue
     echo "    [deps] $(basename "$d")"
-    pnpm -C "$d" install --ignore-workspace || fail_step install-deps "install-deps 5/6" "pnpm install failed for $(basename "$d"). Re-run after fixing."
+    pnpm -C "$d" install --ignore-workspace || DEPS_FAILED="$DEPS_FAILED $(basename "$d")"
   done
+  if [ -n "$DEPS_FAILED" ]; then
+    echo "  [warn] per-tool dependencies incomplete for:$DEPS_FAILED (non-fatal)"
+    echo "  [hint] Finish in the Hub: \"Environment Status\" panel > \"Set up\" on that tool — or re-run:"
+    echo "         pnpm -C tools/<tool> install --ignore-workspace"
+  fi
   # ---- Python toolchain (NON-FATAL) ----------------------------------------
   # Python is needed ONLY by the robot-framework tool. A locked-down network
   # (corporate proxy/policy) can fail the download — that must NOT abort setup.
   # So we WARN and CONTINUE, leaving the Hub to start. The user finishes later
-  # with one click from the Hub: Environment > Install Python
+  # with one click in the Hub's "Environment Status" panel > "Install Python"
   # (POST /api/doctor/install-python), or by re-running the command shown.
-  echo "  Installing Python toolchain (uv python install $PYTHON_VERSION)..."
+  echo "  [$(now)] Installing Python toolchain (uv python install $PYTHON_VERSION)..."
   if uv python install "$PYTHON_VERSION" --native-tls; then
     # uv sync only when a uv tool is present. robot-framework is a declared uv
     # workspace member, so `uv sync` errors if its folder is absent (fresh clone).
     if [ -d "$WORKSPACE_ROOT/tools/robot-framework" ]; then
-      echo "  Syncing Python dependencies (uv sync)..."
+      echo "  [$(now)] Syncing Python dependencies (uv sync)..."
       if ! uv sync --all-packages --native-tls --project "$WORKSPACE_ROOT"; then
         echo "  [warn] uv sync failed — robot-framework Python deps are incomplete (non-fatal)."
-        echo "  [hint] Finish later from the Hub (Environment > Install Python) or re-run:"
+        echo "  [hint] Finish later in the Hub: \"Environment Status\" panel > \"Install Python\" button — or re-run:"
         echo "         uv sync --all-packages --native-tls --project \"$WORKSPACE_ROOT\""
       fi
     else
@@ -347,7 +417,7 @@ else
     fi
   else
     echo "  [warn] uv python install failed — SKIPPING Python for now (non-fatal)."
-    echo "  [hint] Finish later from the Hub (Environment > Install Python) or re-run:"
+    echo "  [hint] Finish later in the Hub: \"Environment Status\" panel > \"Install Python\" button — or re-run:"
     echo "         uv python install $PYTHON_VERSION --native-tls"
   fi
   uv tool install uv-up 2>/dev/null || true
@@ -358,17 +428,30 @@ fi
 # STEP 6/6 — start-hub (build + daemonless launch via the shared launcher)
 # ===========================================================================
 echo ""
-echo "[step] start-hub (6/6)"
-if [ "${ST[start-hub]}" = "done" ]; then
-  echo "  [SKIPPED] Hub already started (state: done)"
+echo "[step] start-hub (6/6)  [$(now)]"
+# `status` exits 0 only while the Hub answers on its port, so a ledger entry left
+# over from a machine that has since rebooted (auto-start blocked by policy) no
+# longer skips this step and leaves the readiness check to fail later.
+if [ "${ST[start-hub]}" = "done" ] \
+  && node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" status >/dev/null 2>&1; then
+  echo "  [SKIPPED] Hub already running (state: done)"
 else
-  echo "  Building the Hub (shared + server + client) - this can take a couple of minutes..."
-  pnpm -C "$WORKSPACE_ROOT/hub" run build || fail_step start-hub "start-hub 6/6" "Hub build failed. Inspect the build output above, then re-run."
+  if [ "${ST[start-hub]}" = "done" ]; then
+    echo "  [warn] state says done but the Hub is not responding — starting it again."
+  fi
+  # Rebuild unless a finished bundle is still on disk from the run that recorded
+  # this step done: that is the "Hub is down, nothing is broken" re-run path.
+  if [ "${ST[start-hub]}" = "done" ] && [ -f "$WORKSPACE_ROOT/hub/server/dist/index.js" ]; then
+    echo "  [skip] Hub bundle already built — starting it without a rebuild."
+  else
+    echo "  [$(now)] Building the Hub (shared + server + client) - this can take a couple of minutes..."
+    pnpm -C "$WORKSPACE_ROOT/hub" run build || fail_step start-hub "start-hub 6/6" "Hub build failed. Inspect the build output above, then re-run."
+  fi
   # Delegate process management to the shared launcher: it frees the port and
   # starts the Hub as a daemonless detached background process (no daemon of our
   # own, so nothing to be blocked by locked-down/corporate policy). One code
   # path, cross-OS.
-  echo "  Starting Hub (daemonless background process)..."
+  echo "  [$(now)] Starting Hub (daemonless background process)..."
   node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" start \
     || fail_step start-hub "start-hub 6/6" "Hub failed to start. Run 'node hub/bin/hub-service.mjs status' for details, then re-run."
   # Register boot auto-start: a systemd --user unit (Restart=always) + lingering,
@@ -410,12 +493,16 @@ echo ""
 echo "==================================================="
 echo "  SETUP COMPLETED — Hub started, all 4 Core tools verified"
 echo "==================================================="
-echo "  Open http://localhost:5174"
+echo "  Open http://localhost:${HUB_PORT}"
+echo ""
+echo "  One more click before your first web test: browsers are downloaded per"
+echo "  tool, not by this installer. In the Hub open the \"Environment Status\""
+echo "  panel and press \"Set up\" on the tool you want (or run: task setup)."
 echo "==================================================="
 
 echo ""
 echo "  [setup] Creating \"Test Hub\" desktop shortcut..."
 node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" install-shortcut || true
-if [ "${KIRO_NO_OPEN:-}" != "1" ]; then
+if [ "${SETUP_NO_OPEN:-}" != "1" ]; then
   node "$WORKSPACE_ROOT/hub/bin/hub-service.mjs" open || true
 fi

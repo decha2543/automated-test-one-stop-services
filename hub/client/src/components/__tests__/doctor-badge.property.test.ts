@@ -1,13 +1,12 @@
-// Feature: one-stop-service-upgrade, Property 6: Required-install summary badge
+// Required-install summary badge
 import type { DoctorCategory, DoctorCheck } from '@hub/shared';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { summaryBadge, summaryBadgeText } from '../doctor-panel-helpers';
 
 /**
- * Property test for Task 2.9 — Required-install summary badge.
+ * Property test for Required-install summary badge.
  *
- * Validates: Requirements 3.11, 3.12
  *
  * The collapsed-state summary badge is computed from the `required-install`
  * group ONLY. When every required-install check passes the badge reads
@@ -59,7 +58,7 @@ const optionalCheckArb: fc.Arbitrary<DoctorCheck> = fc.record(
   { requiredKeys: ['name', 'ok', 'category'] },
 );
 
-describe('Property 6: Required-install summary badge', () => {
+describe('Required-install summary badge', () => {
   it('derives the badge from required-install checks only', () => {
     fc.assert(
       fc.property(checksArb, (checks) => {

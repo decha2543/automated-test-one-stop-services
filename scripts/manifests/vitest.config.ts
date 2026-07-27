@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
-// Minimal vitest config scoped to the manifest module foundation tests
-// (design §8.1). Mirrors the hub/server convention (node env, globals on,
+// Minimal vitest config scoped to the manifest module foundation tests.
+// Mirrors the hub/server convention (node env, globals on,
 // single-run). Source files use `.js`-extension ESM imports that resolve to
 // their `.ts` sources — vite's resolver handles this out of the box.
 export default defineConfig({

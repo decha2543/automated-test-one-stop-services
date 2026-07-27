@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 /**
- * Normalized Local_DB schema (Area E redesign).
+ * Normalized Local_DB schema (redesign).
  *
  * Replaces the previous "one JSON blob per row" layout. Every core dataset now
  * has a real table with one column per scalar field; one-to-many relations

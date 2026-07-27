@@ -196,7 +196,7 @@ tasks:
     cmds:
       - pnpm install
       # ----------------------------------------------------------------------
-      # Tool provisioning is folder-presence delegation (C1, R5.1/R5.5/R6.*).
+      # Tool provisioning is folder-presence delegation.
       # The plan is computed ONCE by the shared pure planner
       # (scripts/manifests/setup-planner.ts) that this loop AND the Hub / CLI
       # install-core both consume, so no install decision logic is duplicated.
@@ -252,10 +252,10 @@ tasks:
     # install Android — they only print a one-line pointer to this target.
     # The helpers perform equivalent actions on every OS: bootstrap
     # the cmdline-tools, install the system image + emulator + platform-tools,
-    # and create the QA_Emulator AVD. Set KIRO_ANDROID_API to override the API
+    # and create the QA_Emulator AVD. Set SETUP_ANDROID_API to override the API
     # level (both helpers default to 34); the env var flows to the helper.
     #
-    # R3.5 (Hub parity): any future Hub Android-PROVISIONING trigger MUST shell
+    # (Hub parity): any future Hub Android-PROVISIONING trigger MUST shell
     # out to this same `task setup-android` target rather than re-implement the
     # SDK/emulator install. There is no such Hub trigger today — the Hub
     # device-farm "emulator/start" endpoint only launches an already-provisioned
@@ -267,6 +267,16 @@ tasks:
         else
           bash scripts/setup/set-android-home.sh
         fi
+
+  uninstall:
+    desc: "Undo what the installer changed on this machine (dry run unless you pass -- --run)"
+    # Inverse of the one-click installer, not of `task setup`: it removes the Hub
+    # auto-start, the desktop shortcut, the setup ledger and (on Windows) the PATH
+    # entries + env vars setup persisted. It never touches node/pnpm/uv/task or the
+    # workspace folder — the script prints what it keeps. Safe by default: without
+    # `--run` it only shows the plan.
+    cmds:
+      - node scripts/setup/uninstall.mjs {{.CLI_ARGS}}
 
   doctor:
     desc: Check environment (node, pnpm, uv, task, k6, docker, playwright-cli)

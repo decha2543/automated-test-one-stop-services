@@ -1,11 +1,10 @@
 // scripts/install-core/provision.ts
 //
-// Playwright offline browser-provisioning DECISION logic (install-and-
-// provisioning-overhaul, C2, D2-A; Property 5/6, R7.1/7.2/7.4/7.7/7.8).
+// Playwright offline browser-provisioning DECISION logic.
 //
 // PURE module: the precedence that `tools/playwright/Taskfile.yml`'s `setup`
 // task applies lives here as ONE testable function, so the runtime decision and
-// the Property 5 test exercise the SAME logic (no shell/TS drift — Pahāna). The
+// its property test exercise the SAME logic (no shell/TS drift). The
 // Taskfile gathers the three inputs (the PLAYWRIGHT_DOWNLOAD_HOST mirror from
 // env, the required revision parsed from `playwright install --dry-run`, and the
 // revision already in PLAYWRIGHT_BROWSERS_PATH) and shells out to the `decide`
@@ -16,9 +15,9 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * The provisioning action chosen for a browser (design Data Models,
- * "Provisioning decision"). `reprovision` carries its reason so the Taskfile and
- * logs can explain why a present-but-different build was discarded.
+ * The provisioning action chosen for a browser. `reprovision` carries its
+ * reason so the Taskfile and logs can explain why a present-but-different build
+ * was discarded.
  */
 export type ProvisionAction =
   | { readonly kind: 'mirror' }
@@ -42,13 +41,13 @@ function isMirrorConfigured(mirrorHost: string | null): boolean {
 }
 
 /**
- * Decide how to provision a browser, by the fixed precedence (R7.1 > R7.2 >
- * R7.7). Pure — no I/O:
+ * Decide how to provision a browser, by the fixed precedence
+ * mirror > reuse > reprovision > archive. Pure — no I/O:
  *
  * 1. mirror configured → `mirror`
  * 2. else present === required → `reuse`
  * 3. else a different build is present → `reprovision` revision-mismatch
- * 4. else nothing present → `archive` (R7.7 manual archive)
+ * 4. else nothing present → `archive` (manual archive)
  *
  * The safety invariant: the revision that ends
  * up on disk is ALWAYS `requiredRevision`. `reuse` is chosen only when the
@@ -98,8 +97,8 @@ export interface CoreInstallReport {
  * provisioning outcome. Browser provisioning is NOT a Core member (Core = node,
  * pnpm, uv, task), so its outcome — success OR failure — is surfaced for
  * reporting but NEVER changes `coreOk`. This is the pure encoding of
- * Property 6: provisioning is non-fatal to the Core install. If `coreOk` ever
- * folded in the provisioning result, Property 6 would fail.
+ * provisioning is non-fatal to the Core install. If `coreOk` ever
+ * folded in the provisioning result, its non-fatality property test would fail.
  */
 export function reportCoreInstall(
   coreStepsOk: boolean,

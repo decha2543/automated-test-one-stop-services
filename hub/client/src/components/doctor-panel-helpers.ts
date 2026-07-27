@@ -5,8 +5,8 @@ import { translate } from '~/i18n/index.js';
  * Pure, framework-free helpers backing {@link DoctorPanel}.
  *
  * These functions are intentionally free of React/Mantine imports so they can
- * be unit- and property-tested in isolation (Properties 4, 5, 6 of the
- * one-stop-service-upgrade spec). The component composes them with rendering.
+ * be unit- and property-tested in isolation. The component composes them with
+ * rendering.
  */
 
 /** The three Doctor categories, in the order they should be rendered. */
@@ -24,7 +24,7 @@ export type DoctorCategoryGroups = Record<DoctorCategory, DoctorCheck[]>;
  *
  * The partition is lossless: every input check lands in exactly one group and
  * no check is dropped or duplicated, so the summed group sizes equal the input
- * length. Relative order within a group is preserved. (R3.2, R3.3, R3.6)
+ * length. Relative order within a group is preserved.
  */
 export function groupByCategory(checks: DoctorCheck[]): DoctorCategoryGroups {
   const groups: DoctorCategoryGroups = {
@@ -42,7 +42,7 @@ export function groupByCategory(checks: DoctorCheck[]): DoctorCategoryGroups {
  * Whether a category group's header should be rendered.
  *
  * Headers are shown only for groups with at least one member; empty groups are
- * hidden entirely. (R3.2, R3.3)
+ * hidden entirely.
  */
 export function shouldShowGroup(checks: DoctorCheck[]): boolean {
   return checks.length > 0;
@@ -52,7 +52,7 @@ export function shouldShowGroup(checks: DoctorCheck[]): boolean {
  * Whether the panel should auto-expand on the first ready report.
  *
  * True iff at least one check in the `required-install` or `optional-install`
- * group has `ok === false`; otherwise the panel stays collapsed. (R3.8, R3.9)
+ * group has `ok === false`; otherwise the panel stays collapsed.
  */
 export function shouldAutoExpand(report: DoctorReport): boolean {
   return report.checks.some(
@@ -76,7 +76,7 @@ export interface SummaryBadge {
  * When every required-install check passes the badge reads `"X/Y OK"` where X
  * is the count of passing required-install checks and Y is the total number of
  * required-install checks (green). When at least one required-install check
- * fails the badge reads `"Action required"`. (R3.11, R3.12)
+ * fails the badge reads `"Action required"`.
  */
 export function summaryBadge(checks: DoctorCheck[]): SummaryBadge {
   const required = checks.filter((check) => check.category === 'required-install');
@@ -87,7 +87,7 @@ export function summaryBadge(checks: DoctorCheck[]): SummaryBadge {
     : { text: 'Action required', ok: false };
 }
 
-/** Convenience accessor for {@link summaryBadge} text only. (R3.11, R3.12) */
+/** Convenience accessor for {@link summaryBadge} text only. */
 export function summaryBadgeText(checks: DoctorCheck[]): string {
   return summaryBadge(checks).text;
 }

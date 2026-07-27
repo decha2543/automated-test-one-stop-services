@@ -1,4 +1,4 @@
-// Feature: one-stop-service-upgrade, Property 18: Schedule toasts never persist
+// Schedule toasts never persist
 import type { RunStatus } from '@hub/shared';
 import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -77,7 +77,7 @@ const DESCRIPTOR_KEYS: ReadonlyArray<keyof ScheduleToastDescriptor> = [
  */
 const PERSISTENCE_MARKER_KEYS = ['timestamp', 'read', 'unreadCount'] as const;
 
-describe('Property 18: Schedule toasts never persist', () => {
+describe('Schedule toasts never persist', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -128,7 +128,7 @@ describe('Property 18: Schedule toasts never persist', () => {
     // 3. No persistence action was ever invoked across all runs. Because
     //    `useNotifications` is the localStorage-backed (zustand persist) store,
     //    proving no mutator fired also proves nothing was written to
-    //    localStorage or surfaced in the NotificationCenter history (R10.4).
+    //    localStorage or surfaced in the NotificationCenter history.
     expect(addSpy).not.toHaveBeenCalled();
     expect(markReadSpy).not.toHaveBeenCalled();
     expect(markAllReadSpy).not.toHaveBeenCalled();

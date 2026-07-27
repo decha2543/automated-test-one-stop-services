@@ -1,9 +1,9 @@
 // scripts/manifests/runner-step-render.ts
 //
-// Interactive step renderer for the runner prompt loop (design §4.3.3). Each
+// Interactive step renderer for the runner prompt loop. Each
 // declarative `manifest.runner.steps[]` entry is turned into a `prompts(...)`
 // call here, isolating ALL interactive IO from the pure command builder in
-// `runner-command.ts`. The runner (task 12) drives the loop, calls
+// `runner-command.ts`. The runner drives the loop, calls
 // `runPreAction` + `renderStep` per step, and feeds the collected answers into
 // `buildTaskCommand`.
 //

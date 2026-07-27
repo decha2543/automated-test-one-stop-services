@@ -8,16 +8,16 @@
 # system image / emulator / platform-tools, and creates the QA_Emulator AVD if
 # it does not already exist. Self-contained: it does NOT require a pre-installed
 # Android Studio. Invoked by `task setup-android` (the single opt-in entry
-# point) — it performs the SAME provisioning actions as the Windows PS1 (R3.4).
+# point) — it performs the SAME provisioning actions as the Windows PS1.
 #
 # Env:
-#   KIRO_ANDROID_API       API level for the system image (default: 34).
-#   KIRO_ANDROID_CLT_URL   Override the cmdline-tools zip URL (offline/mirror).
-#   KIRO_RECREATE_AVD=1    Overwrite an existing QA_Emulator AVD.
+#   SETUP_ANDROID_API       API level for the system image (default: 34).
+#   SETUP_ANDROID_CLT_URL   Override the cmdline-tools zip URL (offline/mirror).
+#   SETUP_RECREATE_AVD=1    Overwrite an existing QA_Emulator AVD.
 
 set -uo pipefail
 
-ANDROID_API="${KIRO_ANDROID_API:-34}"
+ANDROID_API="${SETUP_ANDROID_API:-34}"
 
 OS="$(uname -s)"
 if [ "$OS" = "Darwin" ]; then
@@ -46,12 +46,12 @@ if [ ! -x "$SDKMANAGER" ]; then
     exit 1
   fi
   # Resolve the current commandlinetools zip URL from the official downloads page
-  # so the build number is never pinned. Override with KIRO_ANDROID_CLT_URL for
+  # so the build number is never pinned. Override with SETUP_ANDROID_CLT_URL for
   # offline / internal-mirror installs.
-  # ponytail: scraping developer.android.com for the URL has a ceiling (page
-  # markup change / network-gated). Upgrade path: set KIRO_ANDROID_CLT_URL to a
+  # Known ceiling: scraping developer.android.com for the URL is brittle (page
+  # markup change / network-gated). Upgrade path: set SETUP_ANDROID_CLT_URL to a
   # mirrored commandlinetools-${CLT_OS}-<build>_latest.zip.
-  clt_url="${KIRO_ANDROID_CLT_URL:-}"
+  clt_url="${SETUP_ANDROID_CLT_URL:-}"
   if [ -z "$clt_url" ]; then
     clt_url="$(curl -fsSL "https://developer.android.com/studio" 2>/dev/null \
       | grep -oE "https://dl\.google\.com/android/repository/commandlinetools-${CLT_OS}-[0-9]+_latest\.zip" \
@@ -59,7 +59,7 @@ if [ ! -x "$SDKMANAGER" ]; then
   fi
   if [ -z "$clt_url" ]; then
     echo "[ERROR] Could not resolve the Command Line Tools URL from developer.android.com." >&2
-    echo "        Set KIRO_ANDROID_CLT_URL to a commandlinetools-${CLT_OS}-<build>_latest.zip and re-run." >&2
+    echo "        Set SETUP_ANDROID_CLT_URL to a commandlinetools-${CLT_OS}-<build>_latest.zip and re-run." >&2
     exit 1
   fi
   work="$(mktemp -d)"
@@ -110,9 +110,9 @@ if [ ! -x "$AVDMANAGER" ]; then
   exit 1
 fi
 
-if "$AVDMANAGER" list avd 2>/dev/null | grep -q "Name: QA_Emulator" && [ -z "${KIRO_RECREATE_AVD:-}" ]; then
+if "$AVDMANAGER" list avd 2>/dev/null | grep -q "Name: QA_Emulator" && [ -z "${SETUP_RECREATE_AVD:-}" ]; then
   echo "QA_Emulator already exists - keeping current AVD."
-  echo "Set KIRO_RECREATE_AVD=1 to overwrite it."
+  echo "Set SETUP_RECREATE_AVD=1 to overwrite it."
 else
   echo "no" | "$AVDMANAGER" create avd -n QA_Emulator -k "$SYSTEM_IMAGE" --device "pixel" --force
   echo "QA_Emulator created (Android API $ANDROID_API)."

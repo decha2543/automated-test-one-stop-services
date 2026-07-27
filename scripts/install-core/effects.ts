@@ -1,7 +1,7 @@
 // scripts/install-core/effects.ts
 //
 // The default, real `InstallEffects` implementation: the "spawn" half of
-// install-core (install-and-provisioning-overhaul, C5). It runs the fixed-constant
+// install-core. It runs the fixed-constant
 // invocations from `invocation.ts` with `execFileSync` (argv-form — never a
 // shell) and reuses the setup-planner's `gatherToolSetupFacts` for folder-presence
 // facts, so no decision or presence logic is duplicated.
@@ -56,7 +56,7 @@ function runForExitCode(inv: ChildInvocation, cwd: string): number {
 /**
  * Build the real effects rooted at `workspaceRoot`.
  *
- * ponytail: `gatherFacts` scans every tool under `tools/` (via the planner's
+ * Simplification: `gatherFacts` scans every tool under `tools/` (via the planner's
  * `gatherToolSetupFacts`) and picks the one id, rather than re-implementing the
  * three folder-presence checks for a single tool. Reuse over a fork; the
  * scan is one `readdirSync` and N is tiny. Upgrade path if a single-tool install

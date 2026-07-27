@@ -1,10 +1,10 @@
 // scripts/install-core/invocation.ts
 //
 // Fixed-constant child-process invocation builders for the shared install
-// pipeline (install-and-provisioning-overhaul, C5; Property 9, R8.5, R12.2).
+// pipeline.
 //
 // Every invocation is argv-form (a fixed executable + a fixed argv array), never
-// a shell string. That is the whole point of Property 9: no tool-supplied value
+// a shell string. That is the whole point of no tool-supplied value
 // is ever interpolated into a shell. The only variable parts of a built argv are
 // `tools/<id>` path slots, and `<id>` is SAFE_ID-validated before it gets here.
 //

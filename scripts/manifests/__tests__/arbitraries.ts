@@ -2,7 +2,7 @@
 //
 // fast-check arbitraries for `ToolManifest` and supporting shapes.
 // Used exclusively by `properties.spec.ts` to generate valid
-// ToolManifest-shaped objects for property-based tests (design §9).
+// ToolManifest-shaped objects for property-based tests.
 //
 // All arbitraries are exported for reuse across property tests.
 import * as fc from 'fast-check';
@@ -160,9 +160,9 @@ const arbProjects = fc.oneof(arbProjectsDepth1, arbProjectsDepth2);
  * Generate a valid `ToolManifest`-shaped plain object.
  *
  * The `id` and `alias` are drawn independently; callers that need uniqueness
- * across manifests (e.g. Property 10) should filter or chain as needed.
+ * across manifests should filter or chain as needed.
  *
- * Used in design §9 correctness properties.
+ * Used by the correctness property tests.
  */
 export function arbToolManifest(): fc.Arbitrary<ToolManifest> {
   return fc
@@ -238,7 +238,7 @@ export function arbToolManifest(): fc.Arbitrary<ToolManifest> {
 
 /**
  * Arbitrary for a pair of manifests with intentionally matching alias.
- * Used for Property 10 (alias collision → broken status).
+ * Used for the alias-collision property (both tools get broken status).
  */
 export function arbTwoManifestsSameAlias(): fc.Arbitrary<[ToolManifest, ToolManifest]> {
   return fc
@@ -294,7 +294,7 @@ export function arbTwoManifestsSameAlias(): fc.Arbitrary<[ToolManifest, ToolMani
 
 /**
  * Arbitrary for a pair of manifests with intentionally matching taskNamespace.
- * Used for Property 10 (namespace collision → broken status).
+ * Used for the namespace-collision property (both tools get broken status).
  */
 export function arbTwoManifestsSameNamespace(): fc.Arbitrary<[ToolManifest, ToolManifest]> {
   return fc
@@ -348,9 +348,9 @@ export function arbTwoManifestsSameNamespace(): fc.Arbitrary<[ToolManifest, Tool
     });
 }
 
-// ── Folder-presence arbitraries (install-and-provisioning-overhaul) ───────────
-// Drives the folder-presence discovery property (Property 1) and the gating
-// properties (Property 2/3) that share the same `tools/` input space.
+// ── Folder-presence arbitraries ───────────
+// Drives the folder-presence discovery property and the gating properties
+// that share the same `tools/` input space.
 
 /** How a generated `tools/<name>/` folder is named on disk. */
 export type ToolFolderKind = 'normal' | 'hidden' | 'template';

@@ -3,9 +3,8 @@ import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Route-level tests for the manifest-driven `/api/tags` endpoint (task 20).
+ * Route-level tests for the manifest-driven `/api/tags` endpoint.
  *
- * Validates: Requirements 9.1, 9.2
  *
  * Strategy: the route's FALLBACK path is now selected by the manifest's
  * `tags.strategy` (resolved via `getToolCapabilities`) instead of `tool === ...`

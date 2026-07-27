@@ -1,7 +1,7 @@
 // scripts/manifests/fs-helpers.ts
 //
 // Filesystem helpers shared by every manifest consumer (compose-gen,
-// runner-step-render, the hub project-count guard, ...). See design §4.2.2.
+// runner-step-render, the hub project-count guard, ...).
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ToolProjectsConfig } from './types.js';

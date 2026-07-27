@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { MAX_HISTORY, openLocalDb } from '../local-db.js';
 
 /**
- * Property 26 — History capped at MAX_HISTORY (R12.6).
+ * History capped at MAX_HISTORY.
  *
  * After appending any number of history records, the stored history never
  * exceeds MAX_HISTORY (200) records, and the retained records are exactly the
@@ -60,8 +60,8 @@ function expectedNewestIds(records: RunRecord[], cap: number): Set<string> {
   return new Set(newestFirst.slice(0, cap).map((r) => r.id));
 }
 
-describe('openLocalDb history cap (Property 26)', () => {
-  // Feature: one-stop-service-upgrade, Property 26: History capped at MAX_HISTORY
+describe('openLocalDb history cap', () => {
+  // History capped at MAX_HISTORY
   it('caps stored history at MAX_HISTORY and retains exactly the newest records', () => {
     fc.assert(
       fc.property(offsetsArb, (offsets) => {

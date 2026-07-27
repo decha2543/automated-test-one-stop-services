@@ -13,11 +13,11 @@ import { getDb } from './db.js';
  * one row per RunRecord with typed columns (status, command, timestamps,
  * exit_code, report_path, and the flattened `req_*` request columns). Reads
  * come back ordered newest first; `appendHistory` inserts then trims to
- * MAX_HISTORY=200 (R12.6).
+ * MAX_HISTORY=200.
  *
- * Silent runs: the no-trace gate lives entirely in the runner (Area C). The
+ * Silent runs: the no-trace gate lives entirely in the runner. The
  * runner only calls `historyStore.append` for NON-silent runs, so a silent run
- * never reaches this store and never touches Local_DB (R13.1/R13.2). This file
+ * never reaches this store and never touches Local_DB. This file
  * deliberately adds NO silent-specific logic — it simply persists whatever it
  * is given.
  */
@@ -36,7 +36,7 @@ class HistoryStore {
   /**
    * Get all records (newest first, capped at MAX_HISTORY).
    * `readCollection('history')` returns rows ordered by `started_at DESC` as a
-   * deep clone (R12.2); the snapshot is memoized until the next write.
+   * deep clone; the snapshot is memoized until the next write.
    */
   getAll(): RunRecord[] {
     if (this.cache === null) {
@@ -47,7 +47,7 @@ class HistoryStore {
 
   /**
    * Append a finished run record. `appendHistory` inserts inside a transaction
-   * then trims the table back to the newest MAX_HISTORY=200 records (R12.6).
+   * then trims the table back to the newest MAX_HISTORY=200 records.
    *
    * Only called for non-silent runs (the runner gates this) — see class docs.
    */

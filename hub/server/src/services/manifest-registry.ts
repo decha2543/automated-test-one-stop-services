@@ -23,7 +23,7 @@ export interface ToolProjectsConfig {
   readonly sectionAxis: boolean;
 }
 
-// ── Optional capability blocks (Phase B, design §7.1) ───────────────────────
+// ── Optional capability blocks ───────────────────────
 // Mirror of the shapes in `scripts/manifests/types.ts`. All optional; absent
 // blocks resolve to safe defaults via the canonical `resolveCapabilities()`
 // (exposed through `getManifestModule()` below).
@@ -75,7 +75,7 @@ export interface ResolvedCapabilities {
 /**
  * Neutral run context the command-builder maps a `RunRequest` onto before
  * delegating to the canonical `buildRunCommandFromInput()` in
- * `scripts/manifests/runner-command.ts` (design §7.2). Mirror of the shared
+ * `scripts/manifests/runner-command.ts`. Mirror of the shared
  * `RunCommandInput`. `quote` escapes task-var values for safe shell pass-through.
  */
 export interface RunCommandInput {
@@ -102,7 +102,7 @@ export interface ToolManifest {
   readonly projects: ToolProjectsConfig;
   readonly runner: { readonly taskNamespace: string };
   readonly docker: { readonly baseImage: string };
-  // Optional capability blocks (design §7.1); absent ⇒ safe defaults.
+  // Optional capability blocks; absent ⇒ safe defaults.
   readonly run?: ToolRunCapability;
   readonly reports?: ToolReportsCapability;
   readonly tags?: ToolTagsCapability;
@@ -215,8 +215,7 @@ export async function getToolManifest(id: ToolId): Promise<ToolManifest | undefi
  * defaults via the canonical `resolveCapabilities()` in `scripts/manifests`.
  * Returns `undefined` only when the tool id is unknown/disabled — callers treat
  * that the same as "no capabilities" (e.g. `tags.strategy` → `'none'`). Never
- * throws: an unknown `tags.strategy` is normalised to `'none'` by the resolver
- * (design §7.3, requirement 10.4).
+ * throws: an unknown `tags.strategy` is normalised to `'none'` by the resolver.
  */
 export async function getToolCapabilities(id: ToolId): Promise<ResolvedCapabilities | undefined> {
   const manifest = await getToolManifest(id);

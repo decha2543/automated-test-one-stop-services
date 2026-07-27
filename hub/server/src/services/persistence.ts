@@ -18,12 +18,12 @@ import { getDb } from './db.js';
  * `loadJson`/`saveJson` contract unchanged so callers need no edits.
  *
  * Semantics preserved from the file-based layer:
- *   - Isolation (R12.2): `loadJson` hands back a deep clone — `readDoc` already
+ *   - Isolation: `loadJson` hands back a deep clone — `readDoc` already
  *     `structuredClone`s the stored value, and `saveJson` serialises the
  *     payload synchronously so later caller mutations cannot leak into the DB.
- *   - Atomic writes (R12.3/12.4): `writeCollection` wraps `BEGIN IMMEDIATE …
+ *   - Atomic writes: `writeCollection` wraps `BEGIN IMMEDIATE …
  *     COMMIT` and rolls back + rethrows on failure.
- *   - Serialized per-store writes (R12.5): `DatabaseSync` runs synchronously on
+ *   - Serialized per-store writes: `DatabaseSync` runs synchronously on
  *     the main thread, so writes are serialised by call order with no
  *     interleaving — the old per-file write queue is no longer needed.
  *   - Read-after-write consistency: `saveJson` commits synchronously, so a
@@ -46,7 +46,7 @@ function clone<T>(value: T): T {
 /**
  * Synchronous read used during constructor wiring (runner/scheduler load their
  * state before the event loop starts). Safe because `getDb()` opens the
- * Local_DB synchronously with a fully-prepared schema (R12.1).
+ * Local_DB synchronously with a fully-prepared schema.
  *
  * Returns a deep clone so callers cannot mutate the stored value. When the
  * dataset is absent, a clone of `fallback` is returned.
@@ -62,7 +62,7 @@ export function loadJson<T>(name: string, fallback: T): T {
  * Persist atomically. The payload is serialised synchronously inside a single
  * transaction, so future `loadJson` calls always see a consistent snapshot —
  * even if the caller mutates the array/object after `saveJson` returns. Writes
- * to the same store are serialised by call order (R12.5).
+ * to the same store are serialised by call order.
  *
  * The payload may be an array or a plain object; `writeCollection` serialises
  * whatever it is given, so we cast through `unknown[]` to satisfy its

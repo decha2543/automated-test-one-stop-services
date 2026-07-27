@@ -24,7 +24,7 @@ import {
 } from './db-schema.js';
 
 /**
- * Local_DB — node:sqlite backing store with a NORMALIZED schema (Area E).
+ * Local_DB — node:sqlite backing store with a NORMALIZED schema.
  *
  * Each core dataset is a real table with one column per scalar field; the
  * embedded `RunRequest` is flattened into `req_*` columns and one-to-many
@@ -37,18 +37,18 @@ import {
  * contract change — the row<->object mapping happens inside the repositories.
  *
  * Semantics preserved from the previous layer:
- *   - boot-time synchronous load (R12.1): `DatabaseSync` is synchronous;
+ *   - boot-time synchronous load: `DatabaseSync` is synchronous;
  *     `openLocalDb` prepares the whole schema (and runs any legacy upgrade)
  *     before returning.
- *   - isolation (R12.2): every read builds fresh objects from columns, so the
+ *   - isolation: every read builds fresh objects from columns, so the
  *     returned value never aliases internal state.
- *   - atomic + serialized writes (R12.3/12.4/12.5): `writeCollection` /
+ *   - atomic + serialized writes: `writeCollection` /
  *     `appendHistory` wrap `BEGIN IMMEDIATE … COMMIT`, `ROLLBACK` + rethrow on
  *     failure; `DatabaseSync` runs synchronously so writes never interleave.
- *   - MAX_HISTORY = 200 (R12.6): `appendHistory` inserts then trims.
+ *   - MAX_HISTORY = 200: `appendHistory` inserts then trims.
  */
 
-/** Maximum number of history records retained (R12.6). */
+/** Maximum number of history records retained. */
 export const MAX_HISTORY = 200;
 
 /** Dataset stored in the dedicated `history` table. */
@@ -92,7 +92,7 @@ export interface LocalDb {
   readDoc<T>(name: string): T | undefined;
   /** Replace a whole collection / write a document inside one transaction. */
   writeCollection<T>(name: string, rows: T[]): void;
-  /** Append one history record then trim to MAX_HISTORY (R12.6, R13). */
+  /** Append one history record then trim to MAX_HISTORY. */
   appendHistory(rec: RunRecord): void;
   /** Read a meta marker (used by DB migration). */
   getMeta(key: string): string | undefined;
@@ -107,7 +107,7 @@ function asText(value: unknown): string | undefined {
 
 /**
  * Open (or create) the Local_DB at `dbPath`, upgrade any legacy blob tables,
- * prepare the normalized schema, and return synchronously (R12.1). Pass
+ * prepare the normalized schema, and return synchronously. Pass
  * `':memory:'` for an ephemeral DB (tests). Parent dir is created for
  * file-backed databases.
  */

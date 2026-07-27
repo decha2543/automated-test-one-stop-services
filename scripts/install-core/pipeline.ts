@@ -1,15 +1,14 @@
 // scripts/install-core/pipeline.ts
 //
 // The headless install pipeline both the Hub Post_Install_Hook and the
-// headless CLI call, so they run the SAME deps + setup by construction
-//. install-and-provisioning-overhaul, C5, D3-B; Property 10.
+// headless CLI call, so they run the SAME deps + setup by construction.
 //
 // The pipeline is pure: it drives an injected `InstallEffects` port set and the
 // SHARED setup-planner decision logic (`planToolSetup` / `aggregateSetupFailures`
 // from `scripts/manifests/setup-planner.ts`), so the "which deps / which setup /
 // how failures are reported" decision is never duplicated. Injecting the
 // effects keeps Fastify / hub-config / scanner / `withResync` out of install-core
-// (those stay Hub-server concerns) and lets Property 10 assert ZERO side effects
+// (those stay Hub-server concerns) and lets its property test assert ZERO side effects
 // on invalid input with a spy.
 
 import {
@@ -66,7 +65,7 @@ function errMessage(err: unknown): string {
  * Run the headless install pipeline: validate → (registry) clone → install deps
  * → run the tool's `setup` task.
  *
- * Property 10: the `validate` stage gates ALL side effects.
+ * the `validate` stage gates ALL side effects.
  * No `effects` method is touched until the id (and, for a registry install, the
  * git URL) pass their safe patterns — rejection always precedes any side effect.
  */
@@ -97,7 +96,7 @@ export function runInstallPipeline(
     }
   }
 
-  // ── Decide deps + setup via the SHARED planner (R5.5 — no duplicated logic) ─
+  // ── Decide deps + setup via the SHARED planner (no duplicated logic) ─
   const facts = effects.gatherFacts(id);
   const plan = planToolSetup(facts ? [facts] : []);
   const step = plan.steps[0];

@@ -1,4 +1,4 @@
-// Feature: one-stop-service-upgrade, Property 15: Schedule completion toast specification
+// Schedule completion toast specification
 import type { RunStatus } from '@hub/shared';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -9,9 +9,8 @@ import {
 } from '../schedule-toast-helpers';
 
 /**
- * Property test for Task 7.4 — Schedule completion toast specification.
+ * Property test for Schedule completion toast specification.
  *
- * Validates: Requirements 9.1, 9.2, 9.3, 9.4, 10.1, 10.2
  *
  * For any `schedule-finished` event, `buildScheduleToast` produces a toast spec
  * that is consistent with the run's final status:
@@ -68,7 +67,7 @@ const failingEventWithReasonArb: fc.Arbitrary<ScheduleFinishedEvent> = fc
     message: reason,
   }));
 
-describe('Property 15: Schedule completion toast specification', () => {
+describe('Schedule completion toast specification', () => {
   it('maps passed → success/green/5000ms and non-passed → error/red/10000ms', () => {
     fc.assert(
       fc.property(eventArb, (event) => {

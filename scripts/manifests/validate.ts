@@ -2,10 +2,9 @@
 //
 // Schema validation for `tool.manifest.json`. Two layers:
 //   1. `validateManifest()` — single-manifest schema check (zod). Never throws;
-//      always returns a structured result (design §9 Property 6, req 1.15).
+//      always returns a structured result (never throws — property-tested).
 //   2. `validateRegistry()` — cross-manifest invariants (alias / namespace
-//      uniqueness, folder-vs-id match) applied after individual validation
-//      (design §4.1.3, §6.4, req 1.4/1.6/1.8/2.5).
+//      uniqueness, folder-vs-id match) applied after individual validation.
 //
 // The zod schema mirrors `scripts/manifests/schemas/tool.manifest.schema.json`; keep the
 // two in sync when either changes.
@@ -67,11 +66,11 @@ const RunnerStepSchema = z.discriminatedUnion('kind', [
 ]);
 
 /**
- * Optional capability blocks (design §7.1). All fields are optional and the
+ * Optional capability blocks. All fields are optional and the
  * blocks themselves are optional on the manifest; `schemaVersion` stays "1"
  * because every addition is additive. `tags.strategy` is an open string here —
  * unknown values are tolerated at parse time and normalised to `'none'` by
- * `resolveCapabilities()` (design §7.3).
+ * `resolveCapabilities()`.
  */
 const RunVarSchema = z.object({
   name: z.string(),
@@ -95,8 +94,8 @@ const TagsCapabilitySchema = z.object({
 /**
  * Full `tool.manifest.json` schema. Refinements encode the two cross-field
  * invariants that cannot be expressed structurally:
- *   - `typeAxis === false` ⇒ `fixedType` must be a non-null string (req 1.13).
- *   - `runner.steps[].id` must be unique within the array (req 1.9).
+ *   - `typeAxis === false` ⇒ `fixedType` must be a non-null string.
+ *   - `runner.steps[].id` must be unique within the array.
  */
 export const ToolManifestSchema = z.object({
   $schema: z.string().optional(),
@@ -166,7 +165,7 @@ export const ToolManifestSchema = z.object({
     runCommands: z.record(z.string(), z.string()),
     artifactPaths: z.array(z.string()),
   }),
-  // Optional capability blocks (design §7.1) — additive, schemaVersion stays "1".
+  // Optional capability blocks — additive, schemaVersion stays "1".
   run: RunCapabilitySchema.optional(),
   reports: ReportsCapabilitySchema.optional(),
   tags: TagsCapabilitySchema.optional(),
@@ -194,7 +193,7 @@ function issuesToErrors(issues: readonly z.core.$ZodIssue[]): ManifestError[] {
 /**
  * Validate an arbitrary JSON value against the manifest schema.
  *
- * Guarantees (design §9 Property 6, req 1.15): NEVER throws. Returns either
+ * Guarantee (property-tested): NEVER throws. Returns either
  * `{ ok: true, manifest }` with a fully-typed manifest, or `{ ok: false, errors }`
  * with at least one `ManifestError` carrying a specific code. The outer
  * try/catch is a belt-and-braces guard so even an unexpected zod internal error
@@ -218,11 +217,11 @@ export function validateManifest(input: unknown): ValidateManifestResult {
 
 /**
  * Default report glob used when a manifest declares no `reports.resultGlob`.
- * Generic enough to surface any HTML report a tool emits (design §7.3).
+ * Generic enough to surface any HTML report a tool emits.
  */
 export const DEFAULT_REPORT_GLOB = '**/*.html';
 
-/** Known tag strategies; anything else resolves to `'none'` (design §7.3). */
+/** Known tag strategies; anything else resolves to `'none'`. */
 const KNOWN_TAGS_STRATEGIES: ReadonlySet<ToolTagsStrategy> = new Set([
   'playwright-list',
   'robot-files',
@@ -231,7 +230,7 @@ const KNOWN_TAGS_STRATEGIES: ReadonlySet<ToolTagsStrategy> = new Set([
 
 /**
  * Resolve a manifest's optional capability blocks to fully-populated, safe
- * defaults (design §7.1, §7.3; requirement 10.4 "degrade, don't break").
+ * defaults ("degrade, don't break").
  *
  * Default-resolution contract — an ABSENT block yields:
  *   - `run`:     `{ vars: [], headlessVar: null }`     (no extra run vars)
@@ -239,7 +238,7 @@ const KNOWN_TAGS_STRATEGIES: ReadonlySet<ToolTagsStrategy> = new Set([
  *   - `tags`:    `{ strategy: 'none' }`                 (no tag pre-scan)
  *
  * An UNKNOWN `tags.strategy` (any value outside the known set) also resolves to
- * `'none'` rather than throwing. Downstream Phase B consumers (tasks 17–20)
+ * `'none'` rather than throwing. Downstream consumers
  * call this once and read the resolved shape, never the raw optional fields.
  */
 export function resolveCapabilities(manifest: ToolManifest): ResolvedCapabilities {
@@ -277,12 +276,12 @@ function withError(record: ToolManifestRecord, error: ManifestError): ToolManife
 
 /**
  * Apply cross-manifest invariants after individual schema validation
- * (design §4.1.3, §6.4):
+ * — the cross-manifest rules:
  *   - FOLDER_ID_MISMATCH — `manifest.id` must equal the containing folder name
- *     (req 1.4). Applies to every record carrying a manifest.
+ *     — applies to every record carrying a manifest.
  *   - DUPLICATE_ALIAS / DUPLICATE_NAMESPACE — no two ENABLED manifests may share
  *     an `alias` or `runner.taskNamespace`. ALL members of a colliding group are
- *     marked invalid so neither silently wins (req 1.6/1.8/2.5, §6.4).
+ *     marked invalid so neither silently wins.
  *
  * Records already `status === 'invalid'` are passed through untouched (uniqueness
  * is only meaningful for otherwise-valid manifests). Returns a new array; inputs

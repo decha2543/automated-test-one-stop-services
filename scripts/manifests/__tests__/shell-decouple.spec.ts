@@ -1,7 +1,7 @@
 // scripts/manifests/__tests__/shell-decouple.spec.ts
 //
-// Test for the Windows shell/coreutils decoupling step (design C9 / D5-A,
-// follow-up: cross-shell `task` by default).
+// Test for the Windows shell/coreutils decoupling step (cross-shell `task` by
+// default).
 //
 // Once the Taskfiles stopped calling the GNU-only `find` (the empty-dir prune,
 // the artifact/node_modules sweeps, and `pull`'s `.git` discovery were ported to
@@ -10,7 +10,7 @@
 // needed by any recipe. Appending Git's usr\bin to the USER PATH therefore makes
 // EVERY remaining (non-colliding) external resolvable in cmd/PowerShell — so the
 // decoupling was flipped from opt-in to ON BY DEFAULT (opt OUT via
-// KIRO_DISABLE_SHELL_DECOUPLE), while keeping its native-safety posture.
+// SETUP_DISABLE_SHELL_DECOUPLE), while keeping its native-safety posture.
 //
 // Strategy was VERIFIED against the installed task 3.x / mvdan.cc/sh:
 //   * `task` resolves a Taskfile external through mvdan/sh by walking PATH
@@ -18,18 +18,17 @@
 //   * Windows composes a process PATH as Machine-scope first, then User-scope,
 //     and System32 lives in the Machine PATH. So APPENDING Git's usr\bin to the
 //     USER PATH leaves native System32 find.exe/sort.exe ahead of it for bare
-//     `find`/`sort` in cmd/PowerShell — they keep working (R11.3) — while the
-//     non-colliding GNU tools become resolvable in every shell (R11.1).
+//     `find`/`sort` in cmd/PowerShell — they keep working — while the
+//     non-colliding GNU tools become resolvable in every shell.
 //
 // Asserts:
 //  (a) decoupling is ON by default and gated only by an opt-OUT flag, is
 //      best-effort (warn-only, never exits non-zero), and is neither a Core
-//      `[step]` nor a verify target — a Core install passes regardless (R11.4);
+//      `[step]` nor a verify target — a Core install passes regardless;
 //  (b) the PATH strategy keeps native Windows binaries working — APPENDS to the
 //      USER PATH (never Machine, never an admin/RunAs prepend ahead of System32)
-//      and documents that bare find/sort stay the native binaries (R11.3).
+//      and documents that bare find/sort stay the native binaries.
 //
-// Validates: Requirements 11.3, 11.4
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -49,28 +48,28 @@ function verifyTargets(script: string): string[] {
   return [...script.matchAll(/(?:call :)?verify\s+([a-z0-9-]+)\s+"/g)].map((m) => m[1]);
 }
 
-describe('Shell decoupling is ON by default with an opt-out (R11.4)', () => {
+describe('Shell decoupling is ON by default with an opt-out', () => {
   it('wires the step into setup and defines the routine', () => {
     expect(WIN).toMatch(/call :shellDecouple\b/);
     expect(WIN).toMatch(/^:shellDecouple\b/m);
   });
 
   it('runs by default and is gated only by an opt-OUT flag', () => {
-    // When KIRO_DISABLE_SHELL_DECOUPLE=1 the routine returns early; otherwise it
+    // When SETUP_DISABLE_SHELL_DECOUPLE=1 the routine returns early; otherwise it
     // falls through, announces it is ON, and proceeds to resolve Git's usr\bin.
-    expect(WIN).toMatch(/"%KIRO_DISABLE_SHELL_DECOUPLE%"=="1"[\s\S]{0,240}?goto :eof/);
+    expect(WIN).toMatch(/"%SETUP_DISABLE_SHELL_DECOUPLE%"=="1"[\s\S]{0,240}?goto :eof/);
     expect(WIN).toMatch(/Shell decoupling ON \^\(default\^\)/);
   });
 
   it('no longer references the removed opt-in flag', () => {
-    // The old opt-in gate (KIRO_ENABLE_SHELL_DECOUPLE) is gone entirely.
-    expect(WIN).not.toMatch(/KIRO_ENABLE_SHELL_DECOUPLE/);
+    // The old opt-in gate (SETUP_ENABLE_SHELL_DECOUPLE) is gone entirely.
+    expect(WIN).not.toMatch(/SETUP_ENABLE_SHELL_DECOUPLE/);
   });
 
   it('never force-sets the opt-out flag (stays default-on unless the caller opts out)', () => {
-    // A real `set "KIRO_DISABLE_SHELL_DECOUPLE=1"` assignment would live at the
+    // A real `set "SETUP_DISABLE_SHELL_DECOUPLE=1"` assignment would live at the
     // start of a line; comment/echo mentions (REM .../echo ...) must not count.
-    expect(WIN).not.toMatch(/^\s*set\s+"?KIRO_DISABLE_SHELL_DECOUPLE\s*=\s*1/im);
+    expect(WIN).not.toMatch(/^\s*set\s+"?SETUP_DISABLE_SHELL_DECOUPLE\s*=\s*1/im);
   });
 
   it('is not a Core step and not a verify target — a Core install ignores it', () => {
@@ -89,7 +88,7 @@ describe('Shell decoupling is ON by default with an opt-out (R11.4)', () => {
   });
 });
 
-describe('PATH strategy keeps native Windows binaries working (R11.3)', () => {
+describe('PATH strategy keeps native Windows binaries working', () => {
   it('persists onto the USER PATH scope, never the Machine PATH', () => {
     expect(WIN).toMatch(/SetEnvironmentVariable\('PATH',\s*[^,]+,\s*'User'\)/);
     expect(WIN).not.toMatch(/SetEnvironmentVariable\('PATH',\s*[^,]+,\s*'Machine'\)/);

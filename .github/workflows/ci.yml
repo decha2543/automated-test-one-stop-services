@@ -7,8 +7,8 @@
 # NOT present in a CI checkout. This pipeline validates only the main-repo code:
 # script modules (scripts/manifests, scripts/install-core), the Hub
 # (hub/shared, hub/server, hub/client), and the workspace script tests
-# (scripts/__tests__). The AI layer (.kiro/) + brain vault live in their own
-# repos, so this pipeline never references them.
+# (scripts/__tests__). The optional AI layer and knowledge vault live in their
+# own separate repos, so this pipeline never references them.
 # No uv/Python, no Playwright browsers, no Docker, no secrets needed.
 #
 # Node + pnpm match package.json `volta` (node 26.x, pnpm 11.10.0).
@@ -85,6 +85,17 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      # The installers are not code-signed, so publish checksums next to them.
+      # Run from scripts/setup so the file holds plain basenames — after both
+      # assets are downloaded into one folder, `sha256sum -c` / `shasum -c` works.
+      - name: Generate SHA256 checksums for installers
+        working-directory: scripts/setup
+        run: |
+          sha256sum \
+            automated-test-one-stop-service_installer_windows.bat \
+            automated-test-one-stop-service_installer_mac-and-linux.sh \
+            > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - name: Publish GitHub Release with installers
         uses: softprops/action-gh-release@v2
         with:
@@ -94,6 +105,12 @@ jobs:
 
             One-click installers (download the file for your OS and run it; it
             bootstraps git, clones the workspace, and runs setup):
+
+            The installers are not code-signed. To check you got the published
+            file, download SHA256SUMS.txt into the same folder, then:
+            - Windows: `certutil -hashfile <file> SHA256` and compare the hash.
+            - macOS / Linux: `shasum -a 256 -c SHA256SUMS.txt`
           files: |
             scripts/setup/automated-test-one-stop-service_installer_windows.bat
             scripts/setup/automated-test-one-stop-service_installer_mac-and-linux.sh
+            scripts/setup/SHA256SUMS.txt

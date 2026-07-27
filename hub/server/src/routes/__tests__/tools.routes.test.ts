@@ -3,9 +3,8 @@ import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Route-level tests for M2 tool-plugin endpoints.
+ * Route-level tests for the tool-plugin endpoints.
  *
- * Validates: Requirements 6.2–6.5, 6.7, 11.1–11.4, 13.1–13.7
  *
  * Strategy: mock the service layer (`tool-plugins` and `workspace-sync`)
  * entirely, then exercise each route via Fastify's `inject()` method.
@@ -119,7 +118,7 @@ vi.mock('../../services/workspace-sync.js', () => ({
 
 // ─── Test setup ──────────────────────────────────────────────────────────────
 
-describe('tools routes (M2 endpoints)', () => {
+describe('tools routes', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {

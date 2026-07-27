@@ -104,7 +104,10 @@
       "!!**/__tests__",
       "!**/package*.json",
       "!**/tsconfig.json",
-      "!**/*lock.json"
+      "!**/*lock.json",
+      "!config/pipeline.json",
+      "!tools/*",
+      "tools/tool-template-example/**"
     ]
   },
   "vcs": {

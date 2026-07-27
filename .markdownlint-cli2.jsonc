@@ -3,7 +3,7 @@
 //
 // Scope: every *.md in the workspace, minus generated/vendor folders.
 // Per-folder overrides live next to the content they govern:
-//   - .kiro/.markdownlint-cli2.jsonc  → Kiro steering syntax (#[[file:...]])
+//   - .kiro/.markdownlint-cli2.jsonc  → AI-layer steering syntax (#[[file:...]])
 //   - brain/.markdownlint-cli2.jsonc  → Obsidian wikilinks, vault conventions
 //
 // Rule philosophy (Phase 1 — permissive baseline):

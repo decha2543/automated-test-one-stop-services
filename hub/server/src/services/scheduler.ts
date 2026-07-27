@@ -11,7 +11,7 @@ const SCHEDULES_FILE = 'schedules.json';
 /**
  * Derive a human-readable failure reason for a `schedule-finished` event.
  * Only non-successful terminal outcomes carry a message; passed/skipped
- * return `undefined` so a success toast shows without extra text (R9.2).
+ * return `undefined` so a success toast shows without extra text.
  */
 function deriveFailureMessage(record: RunRecord): string | undefined {
   switch (record.status) {
@@ -74,7 +74,7 @@ class SchedulerService {
     this.listenerAttached = true;
     runner.on('event', (event: WsServerEvent) => {
       if (event.kind !== 'run-finished') return;
-      // A run not bound to a schedule produces no schedule-finished event (R9.5).
+      // A run not bound to a schedule produces no schedule-finished event.
       const scheduleId = this.runToSchedule.get(event.runId);
       if (!scheduleId) return;
       this.runToSchedule.delete(event.runId);
@@ -89,8 +89,8 @@ class SchedulerService {
   /**
    * Re-emit a `schedule-finished` event on the same runner event bus that
    * `ws.ts` subscribes to, so every connected client can surface a
-   * Corner_Toast for the completed schedule (R9.1/R9.2). Only runs bound to a
-   * schedule reach here — unbound runs never emit (R9.5).
+   * Corner_Toast for the completed schedule. Only runs bound to a
+   * schedule reach here — unbound runs never emit.
    */
   private emitScheduleFinished(schedule: Schedule, record: RunRecord): void {
     const message = deriveFailureMessage(record);
@@ -98,7 +98,7 @@ class SchedulerService {
       kind: 'schedule-finished',
       runId: record.id,
       scheduleId: schedule.id,
-      // Fall back to the schedule id when it has no name (R9.1/R9.2).
+      // Fall back to the schedule id when it has no name.
       scheduleName: schedule.name?.trim() ? schedule.name : schedule.id,
       status: record.status,
       silent: schedule.config.silent === true,

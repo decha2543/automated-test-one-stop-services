@@ -84,7 +84,7 @@ interface ActiveRun {
   /**
    * Set to `true` by `cancel(id)` when a cancellation has been requested for
    * this run. The close handler consults it so the terminal status is
-   * `cancelled` regardless of how the OS reports the kill (R7.3). This matters
+   * `cancelled` regardless of how the OS reports the kill. This matters
    * on Windows where `taskkill /F` produces a non-zero exit code and no
    * signal, which would otherwise be misclassified as `failed`.
    */
@@ -277,7 +277,7 @@ class RunnerService extends EventEmitter {
 
     // For silent runs, create an ephemeral temp dir to absorb any output the
     // task would otherwise write under outputs/. It is deleted in
-    // purgeRunArtifacts so the persistent outputs/ tree never changes (R6.4).
+    // purgeRunArtifacts so the persistent outputs/ tree never changes.
     let silentTmpDir: string | null = null;
     if (silent) {
       silentTmpDir = silentTmpDirFor(record.id);
@@ -357,14 +357,14 @@ class RunnerService extends EventEmitter {
       const chunk = buf.toString('utf8');
       const run = this.active.get(id);
       if (run) appendBounded(run, chunk);
-      // R6.2: never stream stdout for a silent run.
+      // never stream stdout for a silent run.
       if (!silent) this.emitEvent({ kind: 'run-stdout', runId: id, chunk });
     });
     child.stderr?.on('data', (buf: Buffer) => {
       const chunk = buf.toString('utf8');
       const run = this.active.get(id);
       if (run) appendBounded(run, `\x1b[31m${chunk}\x1b[0m`);
-      // R6.2: never stream stderr for a silent run.
+      // never stream stderr for a silent run.
       if (!silent) this.emitEvent({ kind: 'run-stderr', runId: id, chunk });
     });
 
@@ -372,7 +372,7 @@ class RunnerService extends EventEmitter {
       // A cancellation requested via cancel(id) always yields a `cancelled`
       // terminal status, even on Windows where taskkill /F reports a non-zero
       // exit code and no signal (which would otherwise look like `failed`).
-      // POSIX SIGINT/SIGTERM are still treated as cancellations too (R7.3).
+      // POSIX SIGINT/SIGTERM are still treated as cancellations too.
       const cancelled =
         this.active.get(id)?.cancelRequested === true ||
         signal === 'SIGINT' ||
@@ -382,7 +382,7 @@ class RunnerService extends EventEmitter {
     });
 
     // A spawn-level error (e.g. shell missing) is still a terminal outcome.
-    // Route it through the same gate so no trace logic diverges (R6.6).
+    // Route it through the same gate so no trace logic diverges.
     child.on('error', () => {
       if (!this.active.has(id)) return;
       this.finishRun(record, 'error', undefined);
@@ -392,8 +392,8 @@ class RunnerService extends EventEmitter {
   /**
    * Single terminal path for every run regardless of outcome
    * (passed/failed/cancelled/error). All persistence side effects are gated
-   * by `silent` here so a silent run leaves no trace (R6.1–R6.6, R13.*),
-   * while still flowing through one code path (R6.6).
+   * by `silent` here so a silent run leaves no trace,
+   * while still flowing through one code path.
    */
   private finishRun(record: RunRecord, finalStatus: RunStatus, exitCode?: number): void {
     const id = record.id;
@@ -432,13 +432,13 @@ class RunnerService extends EventEmitter {
     run?.killJob?.release();
 
     if (!silent) {
-      // History append (R6.1), last-status index (R6.3) and report cache
-      // refresh (R6.4) only happen for non-silent runs.
+      // History append, last-status index and report cache
+      // refresh only happen for non-silent runs.
       historyStore.append(finished);
       this.updateLastStatus(finished);
       invalidateReportsCache();
     } else {
-      // R6.4/R6.5: drop the output buffer, active entry and ephemeral temp
+      // drop the output buffer, active entry and ephemeral temp
       // dir immediately so nothing about the run remains in memory or on disk.
       this.purgeRunArtifacts(id);
     }
@@ -465,7 +465,7 @@ class RunnerService extends EventEmitter {
    * buffer, its active-list entry, and its ephemeral silent temp dir. Safe to
    * call for any run id (no-op when nothing is tracked). Synchronous removals
    * happen immediately; the temp-dir delete is fire-and-forget but scheduled
-   * right away so it completes well within 1s (R6.5).
+   * right away so it completes well within 1s.
    */
   purgeRunArtifacts(id: string): void {
     const run = this.active.get(id);
@@ -485,10 +485,10 @@ class RunnerService extends EventEmitter {
 
   cancel(id: string): boolean {
     const run = this.active.get(id);
-    // R7.4: a run id that is not in the active list is rejected with `false`
+    // a run id that is not in the active list is rejected with `false`
     // and the active list is left untouched (the route then responds 404).
     if (!run) return false;
-    // R7.3: record the cancel intent so the close handler marks this run as
+    // record the cancel intent so the close handler marks this run as
     // `cancelled` within the 5s budget, even when the kill is reported by the
     // OS as a plain non-zero exit (Windows taskkill /F). This matches by run
     // identifier, so any active run can be cancelled — not only the silent run

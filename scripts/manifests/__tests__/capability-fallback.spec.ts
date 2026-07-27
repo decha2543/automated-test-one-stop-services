@@ -1,6 +1,6 @@
 // scripts/manifests/__tests__/capability-fallback.spec.ts
 //
-// Property 5 — "graceful degrade" (design §7.3; task 21). An installed tool
+// "graceful degrade". An installed tool
 // whose manifest declares NO capability blocks (`run` / `reports` / `tags`) must
 // still be runnable and report-viewable: every downstream consumer falls back to
 // a safe default instead of throwing.
@@ -16,7 +16,6 @@
 // tool-specific run vars and no headless token, even when a section / headless
 // intent is supplied.
 //
-// Validates: Requirements 9.1, 10.1, 10.4
 import { describe, expect, it } from 'vitest';
 import {
     buildHeadlessToken,

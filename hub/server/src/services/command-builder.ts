@@ -7,8 +7,7 @@ import { getManifestModule, getToolManifest } from './manifest-registry.js';
  * byte-for-byte in step with the interactive CLI runner — there are NO tool
  * literals here (k6 `SECTION`/`PERFORMANCE_TYPE`, robot `HEADLESS`, playwright
  * `--headed` all come from the tool's manifest). A shared parity test asserts
- * the CLI and Hub emit identical strings for the built-ins (anti-drift, design
- * R3).
+ * the CLI and Hub emit identical strings for the built-ins (anti-drift).
  *
  * Async because the manifest is loaded from the manifest registry. The
  * `TRACK=none` opt-out (usage-logging) is a Hub orchestration concern, so it is

@@ -1,12 +1,11 @@
 // scripts/manifests/__tests__/versions-source.spec.ts
 //
-// Example test for the single tool-version source of truth (design D6-A).
+// Example test for the single tool-version source of truth.
 // Asserts scripts/setup/versions.env is the only place the Node/Python version
 // literals live: both platform installers reference versions.env and neither
 // re-declares a NODE_VERSION/PYTHON_VERSION literal. Also guards drift against
 // the Volta pin in package.json (the Node runtime authority).
 //
-// Validates: Requirements 5.4
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';

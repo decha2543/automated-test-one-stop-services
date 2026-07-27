@@ -8,6 +8,7 @@
   },
   "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
     "updater": "pnpm up -i -L -r",
     "check": "biome check . && biome format --write .",

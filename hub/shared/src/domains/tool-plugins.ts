@@ -1,5 +1,5 @@
 // ============================================================================
-// Tool Plugins — marketplace, lifecycle, and registry types (M2/M3)
+// Tool Plugins — marketplace, lifecycle, and registry types
 // ============================================================================
 
 /** Status of a tool in the workspace. */

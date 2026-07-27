@@ -43,6 +43,10 @@ All optional — every one has a working default, so the Hub runs with an empty 
 | `HUB_DB_PATH` | `hub/server/data/hub.db` | SQLite file. `:memory:` gives an ephemeral DB (used by tests). |
 | `HUB_CLIENT_DIST` | `hub/client/dist` | Static bundle served in production. |
 | `HUB_LOG_MAX_BYTES` | `5242880` (5 MB) | Size at which `hub/.run/hub.log` rotates to `hub.log.1` on start. `0` disables rotation. |
+| `HUB_SHORTCUT_DIR` | the user's Desktop | Where `hub-service install-shortcut` writes the launcher. On Linux `XDG_DESKTOP_DIR` is honoured next. |
+| `APPIUM_PORT` | `4723` | Port the managed Appium server listens on (mobile runs). |
+| `HUB_E2E_HOST` | `127.0.0.1` | Bind address for the Playwright E2E suite's own Hub instance. |
+| `HUB_E2E_PORT` | `5199` | Port for that E2E instance — deliberately not `5174`, so a running Hub is never disturbed. |
 
 ## Architecture
 

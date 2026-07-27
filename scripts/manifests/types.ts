@@ -3,7 +3,7 @@
 // Canonical TypeScript shapes for the manifest layer.
 // This is the single source of truth that every consumer (sync-projects,
 // create-project, runner, pipeline.json, hub server, hub client) derives from.
-// See design §3.1.1 (tool manifest) and §3.6 (tool registry).
+// Two shapes live here: the tool manifest and the tool registry.
 
 /**
  * Branded-string helper. Produces a nominal type so a plain `string` cannot be
@@ -136,12 +136,12 @@ export interface ToolPipelineConfig {
   readonly artifactPaths: readonly string[];
 }
 
-// ── Optional capability blocks (Phase B, design §7.1) ───────────────────────
+// ── Optional capability blocks ───────────────────────
 // All three blocks are OPTIONAL and additive; `schemaVersion` stays "1".
 // An absent block resolves to a safe default via `resolveCapabilities()`
 // (see validate.ts): no extra run vars, a generic `**/*.html` report glob, and
 // `tags.strategy: 'none'`. This satisfies the "degrade, don't break" contract
-// (design §7.3, requirement 10.4) so an installed tool with no capability
+// so an installed tool with no capability
 // blocks is still runnable / report-viewable with safe generic behaviour.
 
 /**
@@ -179,7 +179,7 @@ export interface ToolReportsCapability {
 
 /**
  * Known tag-discovery strategies. Unknown / absent values resolve to `'none'`
- * (design §7.3) so a new tool degrades to "no tag pre-scan" instead of throwing.
+ * so a new tool degrades to "no tag pre-scan" instead of throwing.
  */
 export type ToolTagsStrategy = 'playwright-list' | 'robot-files' | 'none';
 
@@ -194,7 +194,7 @@ export interface ToolTagsCapability {
 
 /**
  * Capability blocks resolved with their safe defaults. Downstream Phase B
- * consumers (tasks 17–20) read this shape via `resolveCapabilities(manifest)`
+ * consumers read this shape via `resolveCapabilities(manifest)`
  * rather than touching the optional raw fields directly, so a missing block can
  * never surface as `undefined`.
  */
@@ -238,7 +238,7 @@ export interface ToolManifest {
   readonly runner: ToolRunnerConfig;
   readonly pipeline: ToolPipelineConfig;
 
-  // Optional capability blocks (design §7.1); absent ⇒ safe defaults via
+  // Optional capability blocks; absent ⇒ safe defaults via
   // `resolveCapabilities()`. `schemaVersion` stays "1" — these are additive.
   readonly run?: ToolRunCapability;
   readonly reports?: ToolReportsCapability;
@@ -248,7 +248,7 @@ export interface ToolManifest {
 /**
  * Discrete failure code attached to a broken / invalid manifest. Each rejection
  * path maps to exactly one of these codes so consumers can branch on `code`
- * without parsing free-form messages. See design §4.1.1.
+ * without parsing free-form messages.
  */
 export type ManifestErrorCode =
   | 'SCHEMA_FAIL'
@@ -268,7 +268,7 @@ export interface ManifestError {
 /**
  * Outcome of loading + validating a single `tool.manifest.json`. A registry is
  * a list of these — broken manifests are kept (status `'invalid'`) so consumers
- * can surface them instead of silently dropping a tool. See design §4.1.1.
+ * can surface them instead of silently dropping a tool.
  */
 export interface ToolManifestRecord {
   readonly path: string;
@@ -280,7 +280,7 @@ export interface ToolManifestRecord {
 // ── Tool Registry types (formerly registry.types.ts) ────────────────────────
 // Shape of `config/tool-registry.json` — the workspace-local list of
 // installable tool repositories. Repository pointers only; no manifest content
-// is embedded. See design §3.6.
+// is embedded.
 
 export interface ToolRegistryEntry {
   /** Folder name to clone into (must match the manifest's `id`). */

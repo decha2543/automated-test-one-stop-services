@@ -17,13 +17,16 @@
 //  installed it owns the process and start/stop/restart delegate to it instead
 //  of spawning a daemonless copy.
 //
-//  Usage:  node hub/bin/hub-service.mjs <start|stop|restart|status|enable-boot|disable-boot|open|install-shortcut>
+//  Usage:  node hub/bin/hub-service.mjs
+//          <start|stop|restart|status|enable-boot|disable-boot|open|install-shortcut|remove-shortcut>
 //
 //  open            wait for readiness, then open the Hub in the default browser.
 //  install-shortcut  drop a native "Test Hub" desktop shortcut (Win .url / mac
 //                  .webloc / Linux .desktop) that opens the Hub URL. Both are
 //                  best-effort, cross-OS, and used by the setup/installer scripts
 //                  so the end-user experience is identical on every OS.
+//  remove-shortcut inverse of install-shortcut; used by the uninstaller
+//                  (scripts/setup/uninstall.mjs) to undo what setup created.
 //
 //  enable-boot registers the Hub to start automatically at login/boot, user-scope
 //  (no admin): a logon Scheduled Task (Windows), a systemd --user unit with
@@ -35,7 +38,7 @@
 //  Tunables (env, all optional):
 //    HUB_HOST             bind host   (default 127.0.0.1)
 //    HUB_PORT             bind port   (default 5174)
-//    KIRO_SHORTCUT_DIR    where `install-shortcut` writes (default: ~/Desktop)
+//    HUB_SHORTCUT_DIR    where `install-shortcut` writes (default: ~/Desktop)
 //
 //  Build is NOT this script's job — the caller builds first (pnpm -C hub run
 //  build). `start` refuses to run daemonless if `server/dist/index.js` is absent.
@@ -43,6 +46,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -146,7 +150,7 @@ function clearPid() {
 /**
  * Start the built server as a detached background process, writing pid + log
  * under hub/.run/. `unref()` lets this launcher exit while the Hub keeps
- * running. ponytail: daemonless mode has NO auto-restart-on-crash; the upgrade
+ * running. Note: daemonless mode has NO auto-restart-on-crash; the upgrade
  * path is `enable-boot`, which registers an OS-native user supervisor
  * (systemd --user / launchd with KeepAlive) that restarts it. Acceptable for a
  * localhost dev tool.
@@ -231,9 +235,54 @@ async function waitForPortClosed(host, port, timeoutMs) {
   return false;
 }
 
-/** Best-effort: free the port via `kill-port` when a stray process holds it. */
-async function freePortIfStuck() {
+/**
+ * Is the thing listening on the port one of ours? `GET /api/health` answers
+ * `{ status: 'ok', ... }` only from the Hub server, so it identifies the holder
+ * without needing OS-specific port→pid lookups.
+ */
+function respondsAsHub(host, port, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const req = http.get({ host, port, path: '/api/health', timeout: timeoutMs }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => {
+        if (body.length < 512) body += chunk;
+      });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(body)?.status === 'ok');
+        } catch {
+          resolve(false);
+        }
+      });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.on('error', () => resolve(false));
+  });
+}
+
+/**
+ * Best-effort: free the port when a stray Hub holds it.
+ *
+ * `kill-port` kills whatever owns the port, so it is only safe once we know the
+ * holder is ours: either it still answers as the Hub, or it stopped answering
+ * but a pid file proves a Hub ran here (`hadPid`, captured before the pid file
+ * is cleared). Anything else is a foreign process — the installer used to kill
+ * it silently, so now we leave it alone and say what to do instead.
+ */
+async function freePortIfStuck({ hadPid = false } = {}) {
   if (!(await portOpen(HOST, PORT, 500))) return;
+  const isHub = await respondsAsHub(HOST, PORT);
+  if (!isHub && !hadPid) {
+    console.warn(
+      `  WARNING: ${HOST}:${PORT} is held by another program, not the Hub — leaving it running.`,
+    );
+    console.warn(`  Close that program, or start the Hub on a free port: HUB_PORT=<port>`);
+    return;
+  }
   // String + shell:true (not array) to avoid Node's DEP0190; PORT is numeric.
   spawnSync(`kill-port ${PORT}`, {
     stdio: 'ignore',
@@ -539,9 +588,20 @@ async function openBrowser() {
 
 /** Where `install-shortcut` writes. Env override, else the user's Desktop. */
 function shortcutDir() {
-  if (process.env.KIRO_SHORTCUT_DIR) return process.env.KIRO_SHORTCUT_DIR;
+  if (process.env.HUB_SHORTCUT_DIR) return process.env.HUB_SHORTCUT_DIR;
   if (IS_LINUX && process.env.XDG_DESKTOP_DIR) return process.env.XDG_DESKTOP_DIR;
   return path.join(os.homedir(), 'Desktop');
+}
+
+/**
+ * The shortcut file this launcher owns, per OS. Single definition so
+ * `install-shortcut` and `remove-shortcut` can never disagree on the name.
+ */
+function shortcutPath() {
+  const dir = shortcutDir();
+  if (IS_WIN) return path.join(dir, 'Test Hub.url');
+  if (IS_MAC) return path.join(dir, 'Test Hub.webloc');
+  return path.join(dir, 'Test Hub.desktop');
 }
 
 /**
@@ -552,7 +612,7 @@ function shortcutDir() {
  * Windows `.url`, macOS `.webloc`, Linux `.desktop`. Best-effort: a missing
  * Desktop (headless box) or a write error only warns.
  *
- * ponytail: a pure-URL shortcut shows the browser's connect-error page if the
+ * Known ceiling: a pure-URL shortcut shows the browser's connect-error page if the
  * Hub happens to be down; acceptable since `enable-boot` keeps it up. Upgrade
  * path if that ever bites: point the shortcut at `hub-service open` instead.
  */
@@ -564,14 +624,12 @@ function installShortcut() {
       console.warn(`  [warn] No Desktop folder at ${dir}; skipping the "Test Hub" shortcut (non-fatal).`);
       return 0;
     }
-    let file;
+    const file = shortcutPath();
     let content;
     let makeExecutable = false;
     if (IS_WIN) {
-      file = path.join(dir, 'Test Hub.url');
       content = `[InternetShortcut]\r\nURL=${url}\r\nIconIndex=0\r\n`;
     } else if (IS_MAC) {
-      file = path.join(dir, 'Test Hub.webloc');
       content = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -582,7 +640,6 @@ function installShortcut() {
 </plist>
 `;
     } else {
-      file = path.join(dir, 'Test Hub.desktop');
       content = [
         '[Desktop Entry]',
         'Version=1.0',
@@ -611,6 +668,26 @@ function installShortcut() {
   return 0;
 }
 
+/**
+ * `remove-shortcut` — delete the "Test Hub" desktop shortcut. The inverse of
+ * `install-shortcut`, so uninstalling can undo exactly what setup created.
+ * Best-effort: an already-missing file or a permission error only reports.
+ */
+function removeShortcut() {
+  const file = shortcutPath();
+  try {
+    if (!fs.existsSync(file)) {
+      console.log(`  No desktop shortcut to remove (${file}).`);
+      return 0;
+    }
+    fs.rmSync(file, { force: true });
+    console.log(`  Removed desktop shortcut: ${file}`);
+  } catch (e) {
+    console.warn(`  [warn] Could not remove the desktop shortcut (${e.message}); non-fatal.`);
+  }
+  return 0;
+}
+
 // ── Commands ──────────────────────────────────────────────────────────────────
 
 /** Stop whatever is running (boot supervisor if any, else the daemonless instance). */
@@ -624,8 +701,12 @@ async function stop() {
     launchctl(['unload', LAUNCHD_PLIST_PATH], { capture: true });
     return;
   }
+  // Read the pid file BEFORE stopDaemonless clears it: it is the evidence that
+  // a Hub ran here, which freePortIfStuck needs to tell a stale Hub apart from
+  // an unrelated program that happens to hold the port.
+  const hadPid = readPid() !== null;
   await stopDaemonless(); // no-op when no pid file exists
-  await freePortIfStuck();
+  await freePortIfStuck({ hadPid });
 }
 
 /** Start the Hub (idempotent — clears any previous instance first). */
@@ -718,9 +799,11 @@ async function main() {
       return openBrowser();
     case 'install-shortcut':
       return installShortcut();
+    case 'remove-shortcut':
+      return removeShortcut();
     default:
       console.error(
-        `Unknown command: ${cmd}. Use: start | stop | restart | status | enable-boot | disable-boot | open | install-shortcut`,
+        `Unknown command: ${cmd}. Use: start | stop | restart | status | enable-boot | disable-boot | open | install-shortcut | remove-shortcut`,
       );
       return 2;
   }

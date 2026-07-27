@@ -18,15 +18,15 @@ import { DoctorPanel } from '../DoctorPanel';
 const PROVISION_LABEL = new RegExp(en['doctor.provision'], 'i');
 
 /**
- * Unit tests for DoctorPanel rendering (one-stop-service-upgrade, task 2.10;
- * provision button + no-mirror guidance follow-up).
+ * Unit tests for DoctorPanel rendering (including the provision button and the
+ * no-mirror guidance).
  *
  * Covers acceptance criteria:
- *   R3.1  loading / not-ready -> "Checking environment..." indicator, no groups
- *   R3.4  ok=false check renders a fail icon (TbCircleX / TbAlertTriangle)
- *   R3.5  failing check WITH a hint renders the hint text
- *   R3.7  ok check WITH a version renders the version text
- *   R3.10 clicking the header toggles expand/collapse (when not auto-expanded)
+ *   loading / not-ready -> "Checking environment..." indicator, no groups
+ *   ok=false check renders a fail icon (TbCircleX / TbAlertTriangle)
+ *   failing check WITH a hint renders the hint text
+ *   ok check WITH a version renders the version text
+ *   clicking the header toggles expand/collapse (when not auto-expanded)
  *   Provision: failing tool check renders a Provision button that triggers the
  *   mutation; pending shows a spinner; failure surfaces the in-band message; the
  *   "How to fix" block shows no-mirror-first guidance (env-key names only).
@@ -165,7 +165,7 @@ function iconForCheck(name: string): HTMLElement {
 }
 
 describe('DoctorPanel rendering', () => {
-  it('shows the checking-environment indicator and no groups while loading (R3.1)', () => {
+  it('shows the checking-environment indicator and no groups while loading', () => {
     renderPanel(<DoctorPanel doctor={undefined} isLoading />);
 
     expect(screen.getByText(/Checking environment/i)).toBeInTheDocument();
@@ -175,14 +175,14 @@ describe('DoctorPanel rendering', () => {
     expect(screen.queryByText('Environment Status')).not.toBeInTheDocument();
   });
 
-  it('shows the checking-environment indicator when the report is not ready (R3.1)', () => {
+  it('shows the checking-environment indicator when the report is not ready', () => {
     renderPanel(<DoctorPanel doctor={undefined} isLoading={false} />);
 
     expect(screen.getByText(/Checking environment/i)).toBeInTheDocument();
     expect(screen.queryByText('Required')).not.toBeInTheDocument();
   });
 
-  it('renders a fail icon for ok=false checks and a check icon for ok=true checks (R3.4)', () => {
+  it('renders a fail icon for ok=false checks and a check icon for ok=true checks', () => {
     renderPanel(<DoctorPanel doctor={reportWithIssues} isLoading={false} />);
 
     // required-install failure -> TbCircleX
@@ -193,14 +193,14 @@ describe('DoctorPanel rendering', () => {
     expect(iconForCheck('hub/server')).toHaveAttribute('data-testid', 'TbCircleCheck');
   });
 
-  it('renders the hint text for a failing check that has a hint (R3.5)', () => {
+  it('renders the hint text for a failing check that has a hint', () => {
     renderPanel(<DoctorPanel doctor={reportWithIssues} isLoading={false} />);
 
     expect(screen.getByText('Run: pnpm install')).toBeInTheDocument();
     expect(screen.getByText('Run: npx playwright install')).toBeInTheDocument();
   });
 
-  it('renders the version text for an ok check that has a version (R3.7)', () => {
+  it('renders the version text for an ok check that has a version', () => {
     renderPanel(<DoctorPanel doctor={reportWithIssues} isLoading={false} />);
 
     expect(screen.getByText('v20.0.0-installed')).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe('DoctorPanel rendering', () => {
     expect(within(failCard).queryByText('v20.0.0-installed')).not.toBeInTheDocument();
   });
 
-  it('toggles expand/collapse when the header is clicked (R3.10)', async () => {
+  it('toggles expand/collapse when the header is clicked', async () => {
     const user = userEvent.setup();
     renderPanel(<DoctorPanel doctor={reportAllOk} isLoading={false} />);
 

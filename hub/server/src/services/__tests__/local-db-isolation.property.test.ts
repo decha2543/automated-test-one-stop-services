@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { openLocalDb } from '../local-db.js';
 
 /**
- * Property 24 — Local_DB read isolation (deep clone) (R12.2).
+ * Local_DB read isolation (deep clone).
  *
  * For any collection written to Local_DB, reading it back returns a deep clone:
  *   (i)  mutating the returned copy does NOT affect internally stored data
@@ -62,8 +62,8 @@ function deepMutate(value: unknown): void {
   }
 }
 
-describe('openLocalDb read isolation (Property 24)', () => {
-  // Feature: one-stop-service-upgrade, Property 24: Local_DB read isolation (deep clone)
+describe('openLocalDb read isolation', () => {
+  // Local_DB read isolation (deep clone)
   it('mutating a returned copy never affects internally stored data', () => {
     let counter = 0;
     fc.assert(
@@ -88,7 +88,7 @@ describe('openLocalDb read isolation (Property 24)', () => {
     );
   });
 
-  // Feature: one-stop-service-upgrade, Property 24: Local_DB read isolation (deep clone)
+  // Local_DB read isolation (deep clone)
   it('a previously returned copy is unaffected by later internal writes (and by mutating a newer copy)', () => {
     let counter = 0;
     fc.assert(

@@ -1,10 +1,8 @@
 // scripts/install-core/__tests__/provision.properties.spec.ts
 //
-// Property-based tests for the Playwright provisioning decision
-// (install-and-provisioning-overhaul). One property per test (`it`); ≥100
-// iterations; fast-check under vitest, mirroring the install-core convention.
-//
-// Validates: Requirements 7.1, 7.2, 7.4, 7.7 (Property 5); 7.8 (Property 6)
+// Property-based tests for the Playwright provisioning decision. One property
+// per test (`it`); ≥100 iterations; fast-check under vitest, mirroring the
+// install-core convention.
 
 import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -12,7 +10,6 @@ import { decideProvisionAction, effectiveRevision, reportCoreInstall } from '../
 import { arbBrowserProvisionOutcome, arbProvisionInputs } from './arbitraries.js';
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 5
 // Playwright provision decision never reuses a mismatched revision.
 // For any (mirrorHost, requiredRevision, presentRevision), decideProvisionAction
 // yields `mirror` when the mirror is configured; otherwise `reuse` when
@@ -20,9 +17,8 @@ import { arbBrowserProvisionOutcome, arbProvisionInputs } from './arbitraries.js
 // whose effective revision equals requiredRevision — so no chosen action ever
 // reuses or installs a revision different from the one required by the installed
 // Playwright version.
-// **Validates: Requirements 7.1, 7.2, 7.4, 7.7**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 5', () => {
+describe('Playwright provision decision never reuses a mismatched revision', () => {
   it('follows the mirror > reuse > reprovision > archive precedence and never lands a mismatched revision', () => {
     fc.assert(
       fc.property(arbProvisionInputs, (inputs) => {
@@ -30,23 +26,23 @@ describe('Feature: install-and-provisioning-overhaul, Property 5', () => {
         const mirrorConfigured =
           inputs.mirrorHost !== null && inputs.mirrorHost.trim().length > 0;
 
-        // 1) The precedence holds exactly (R7.1 > R7.2 > R7.7).
+        // 1) The precedence holds exactly: mirror > reuse > reprovision > archive.
         if (mirrorConfigured) {
-          expect(action.kind).toBe('mirror'); // R7.1
+          expect(action.kind).toBe('mirror');
         } else if (inputs.presentRevision === inputs.requiredRevision) {
-          expect(action.kind).toBe('reuse'); // R7.2
+          expect(action.kind).toBe('reuse');
         } else if (inputs.presentRevision !== null) {
-          expect(action).toEqual({ kind: 'reprovision', reason: 'revision-mismatch' }); // R7.7
+          expect(action).toEqual({ kind: 'reprovision', reason: 'revision-mismatch' });
         } else {
-          expect(action.kind).toBe('archive'); // R7.7 (manual archive)
+          expect(action.kind).toBe('archive'); // manual archive
         }
 
-        // 2) Headline safety invariant (R7.4/R7.7): whatever ends up on disk is
+        // 2) Headline safety invariant: whatever ends up on disk is
         //    ALWAYS the required revision — no action reuses/installs a different one.
         expect(effectiveRevision(action, inputs)).toBe(inputs.requiredRevision);
 
         // 3) `reuse` is selected ONLY when the present build already matches —
-        //    a present-but-different build can never be reused (R7.7).
+        //    a present-but-different build can never be reused.
         if (action.kind === 'reuse') {
           expect(inputs.presentRevision).toBe(inputs.requiredRevision);
         }
@@ -57,13 +53,11 @@ describe('Feature: install-and-provisioning-overhaul, Property 5', () => {
 });
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 6
 // Browser provisioning is non-fatal to the Core install.
 // For any browser-provisioning outcome, including failure, the Core_Tool_Set
 // install result is unchanged and still reported successful.
-// **Validates: Requirements 7.8**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 6', () => {
+describe('Browser provisioning is non-fatal to the Core install', () => {
   it('reports the Core result from Core steps alone, regardless of any provisioning outcome', () => {
     fc.assert(
       fc.property(fc.boolean(), arbBrowserProvisionOutcome, (coreStepsOk, outcome) => {
@@ -77,7 +71,7 @@ describe('Feature: install-and-provisioning-overhaul, Property 6', () => {
       { numRuns: 200 },
     );
 
-    // R7.8 spotlight: a FAILED browser provision with healthy Core stays successful.
+    // spotlight: a FAILED browser provision with healthy Core stays successful.
     const report = reportCoreInstall(true, { ok: false, message: 'public CDN blocked' });
     expect(report.coreOk).toBe(true);
     expect(report.provisioningFailed).toBe(true);

@@ -9,22 +9,25 @@
 #
 # Parameters:
 #   -AndroidApi   API level for the system image (default: 34 = Android 14).
-#                 Override via the parameter or the KIRO_ANDROID_API env var
-#                 (forwarded by setup-windows.bat).
+#                 Override via the parameter or the SETUP_ANDROID_API env var.
+#
+# ANDROID_HOME is honoured when already set, so an SDK another tool manages
+# (Android Studio) is reused instead of provisioning a second copy. Same
+# precedence as set-android-home.sh.
 #
 # Re-runnable: existing AVDs are detected and preserved unless the user
-# explicitly opts in to overwriting them via KIRO_RECREATE_AVD=1.
+# explicitly opts in to overwriting them via SETUP_RECREATE_AVD=1.
 
 param(
-    [string]$AndroidApi = $env:KIRO_ANDROID_API
+    [string]$AndroidApi = $env:SETUP_ANDROID_API
 )
 
 if (-not $AndroidApi) {
     $AndroidApi = "34"
 }
 
-# Config: Android SDK path
-$androidDir = "$env:USERPROFILE\AppData\Local\Android\Sdk"
+# Config: Android SDK path — a pre-set ANDROID_HOME wins, else the Windows default.
+$androidDir = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { "$env:USERPROFILE\AppData\Local\Android\Sdk" }
 
 Write-Host ""
 Write-Host "Setting ANDROID_HOME to $androidDir ..."
@@ -54,12 +57,12 @@ $sdkManager = "$androidDir\cmdline-tools\latest\bin\sdkmanager.bat"
 if (-not (Test-Path $sdkManager)) {
     Write-Host "Command Line Tools not found - bootstrapping into $androidDir ..."
     # Resolve the current commandlinetools zip URL from the official downloads
-    # page so the build number is never pinned. Override with KIRO_ANDROID_CLT_URL
+    # page so the build number is never pinned. Override with SETUP_ANDROID_CLT_URL
     # for offline / internal-mirror installs.
-    # ponytail: scraping developer.android.com for the URL has a ceiling (page
-    # markup change / network-gated). Upgrade path: set KIRO_ANDROID_CLT_URL to a
+    # Known ceiling: scraping developer.android.com for the URL is brittle (page
+    # markup change / network-gated). Upgrade path: set SETUP_ANDROID_CLT_URL to a
     # mirrored commandlinetools-win-<build>_latest.zip.
-    $cltUrl = $env:KIRO_ANDROID_CLT_URL
+    $cltUrl = $env:SETUP_ANDROID_CLT_URL
     if (-not $cltUrl) {
         try {
             $studio = Invoke-WebRequest -UseBasicParsing -Uri "https://developer.android.com/studio"
@@ -70,7 +73,7 @@ if (-not (Test-Path $sdkManager)) {
     }
     if (-not $cltUrl) {
         Write-Host "[ERROR] Command Line Tools URL unavailable." -ForegroundColor Red
-        Write-Host "Set KIRO_ANDROID_CLT_URL to a commandlinetools-win-<build>_latest.zip and re-run." -ForegroundColor Yellow
+        Write-Host "Set SETUP_ANDROID_CLT_URL to a commandlinetools-win-<build>_latest.zip and re-run." -ForegroundColor Yellow
         exit 1
     }
     $cltZip = Join-Path $env:TEMP "commandlinetools-win.zip"
@@ -121,12 +124,12 @@ if (-not (Test-Path $avdManager)) {
 $avdList = & cmd.exe /c "`"$avdManager`" list avd" 2>$null
 $avdExists = $avdList -match "Name:\s+QA_Emulator"
 
-if ($avdExists -and -not $env:KIRO_RECREATE_AVD) {
+if ($avdExists -and -not $env:SETUP_RECREATE_AVD) {
     Write-Host "QA_Emulator already exists - keeping current AVD." -ForegroundColor Cyan
-    Write-Host "Set KIRO_RECREATE_AVD=1 to overwrite it." -ForegroundColor DarkGray
+    Write-Host "Set SETUP_RECREATE_AVD=1 to overwrite it." -ForegroundColor DarkGray
 } else {
     if ($avdExists) {
-        Write-Host "KIRO_RECREATE_AVD=1 set - overwriting existing QA_Emulator..." -ForegroundColor Yellow
+        Write-Host "SETUP_RECREATE_AVD=1 set - overwriting existing QA_Emulator..." -ForegroundColor Yellow
     }
     cmd.exe /c "echo no | `"$avdManager`" create avd -n QA_Emulator -k `"$systemImage`" --device `"pixel`" --force"
     if ($LASTEXITCODE -eq 0) {

@@ -2,19 +2,16 @@
 //
 // Integration tests for the manifest-driven drop-in and removal workflows.
 //
-// Task 17 — Drop-in integration test (design §8.2, §7 M1 #1, §9 Property 1):
+// Drop-in integration test:
 //   Copies the cypress-mock fixture into a temp workspace, runs syncWorkspace,
 //   and asserts: docker-compose.yml is generated, pipeline.json carries
 //   cypress-related keys, and no file outside tools/cypress/ is modified.
 //
-// Task 18 — Removal integration test (design §7 M1 #2, §9 Property 2):
+// Removal integration test:
 //   After the drop-in sync, deletes tools/cypress/, runs syncWorkspace again,
 //   and asserts: all cypress keys gone from pipeline.json, and the remaining
 //   tools' generated artefacts (docker-compose.yml, tsconfig.json) are
 //   byte-identical to their pre-removal state.
-//
-// Validates: Requirements 4.1–4.7, design §7 M1 #1, §7 M1 #2,
-//            §9 Property 1, §9 Property 2
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -107,7 +104,7 @@ function readIfExists(filePath: string): string | null {
  * drop-in suite copies their REAL manifests, so skip when not present. */
 const TOOLS_PRESENT = realToolsPresent(WORKSPACE_ROOT, EXISTING_TOOL_IDS);
 
-describe.skipIf(!TOOLS_PRESENT)('integration: drop-in and removal (Tasks 17 & 18)', () => {
+describe.skipIf(!TOOLS_PRESENT)('integration: drop-in and removal', () => {
   let tmpDir: string;
   let syncWorkspace: SyncWorkspaceModule['syncWorkspace'];
 
@@ -122,33 +119,33 @@ describe.skipIf(!TOOLS_PRESENT)('integration: drop-in and removal (Tasks 17 & 18
     rmTmpDir(tmpDir);
   });
 
-  // ── Task 17: Drop-in ──────────────────────────────────────────────────────
+  // ── Drop-in ──────────────────────────────────────────────────────
 
-  describe('Task 17: drop-in — new tool appears without central edits', () => {
+  describe('drop-in — new tool appears without central edits', () => {
     beforeAll(async () => {
       await syncWorkspace({ root: tmpDir });
     });
 
-    it('generates tools/cypress/docker-compose.yml (req 4.1)', () => {
+    it('generates tools/cypress/docker-compose.yml', () => {
       const composePath = path.join(tmpDir, 'tools', 'cypress', 'docker-compose.yml');
       expect(fs.existsSync(composePath)).toBe(true);
     });
 
-    it('pipeline.json contains target_paths.cypress_web referencing the cypress folder (req 4.5)', () => {
+    it('pipeline.json contains target_paths.cypress_web referencing the cypress folder', () => {
       const pipeline = readPipeline(tmpDir);
       const targetPaths = pipeline.target_paths as Record<string, unknown>;
       expect(typeof targetPaths.cypress_web).toBe('string');
       expect(targetPaths.cypress_web as string).toContain('tools/cypress/projects/web');
     });
 
-    it('pipeline.json run_commands.cypress.local contains task cypress:run-local (req 4.5)', () => {
+    it('pipeline.json run_commands.cypress.local contains task cypress:run-local', () => {
       const pipeline = readPipeline(tmpDir);
       const runCommands = pipeline.run_commands as Record<string, Record<string, string>>;
       expect(runCommands.cypress).toBeDefined();
       expect(runCommands.cypress.local).toContain('task cypress:run-local');
     });
 
-    it('no file outside tools/cypress/ is modified by drop-in sync (req 4.6, §9 Property 1)', () => {
+    it('no file outside tools/cypress/ is modified by drop-in sync', () => {
       // Verify the manifests for all three existing tools are byte-identical to
       // what was seeded — syncWorkspace must not touch files outside tools/cypress/
       for (const id of EXISTING_TOOL_IDS) {
@@ -168,9 +165,9 @@ describe.skipIf(!TOOLS_PRESENT)('integration: drop-in and removal (Tasks 17 & 18
     });
   });
 
-  // ── Task 18: Removal ──────────────────────────────────────────────────────
+  // ── Removal ──────────────────────────────────────────────────────
 
-  describe('Task 18: removal — deleted tool disappears, others unchanged (req 4.7, §9 Property 2)', () => {
+  describe('removal — deleted tool disappears, others unchanged', () => {
     /** Artefact contents captured BEFORE cypress removal (after drop-in sync). */
     let beforeArtefacts: Record<string, string | null>;
 
@@ -192,51 +189,51 @@ describe.skipIf(!TOOLS_PRESENT)('integration: drop-in and removal (Tasks 17 & 18
         ),
       };
 
-      // Delete tools/cypress/ — simulates removal of the tool folder (req 4.7).
+      // Delete tools/cypress/ — simulates removal of the tool folder.
       fs.rmSync(path.join(tmpDir, 'tools', 'cypress'), { recursive: true });
 
       // Run sync again with cypress gone.
       await syncWorkspace({ root: tmpDir });
     });
 
-    it('pipeline.json does NOT contain target_paths.cypress_web (req 4.7)', () => {
+    it('pipeline.json does NOT contain target_paths.cypress_web', () => {
       const pipeline = readPipeline(tmpDir);
       const targetPaths = pipeline.target_paths as Record<string, unknown>;
       expect(targetPaths.cypress_web).toBeUndefined();
     });
 
-    it('pipeline.json does NOT contain any cypress_* keys in target_paths (req 4.7)', () => {
+    it('pipeline.json does NOT contain any cypress_* keys in target_paths', () => {
       const pipeline = readPipeline(tmpDir);
       const targetPaths = pipeline.target_paths as Record<string, unknown>;
       const cypressKeys = Object.keys(targetPaths).filter((k) => k.startsWith('cypress'));
       expect(cypressKeys).toHaveLength(0);
     });
 
-    it('pipeline.json does NOT contain run_commands.cypress (req 4.7)', () => {
+    it('pipeline.json does NOT contain run_commands.cypress', () => {
       const pipeline = readPipeline(tmpDir);
       const runCommands = pipeline.run_commands as Record<string, unknown>;
       expect(runCommands.cypress).toBeUndefined();
     });
 
-    it('pipeline.json does NOT contain env_injection.cypress (req 4.7)', () => {
+    it('pipeline.json does NOT contain env_injection.cypress', () => {
       const pipeline = readPipeline(tmpDir);
       const envInjection = pipeline.env_injection as Record<string, unknown>;
       expect(envInjection.cypress).toBeUndefined();
     });
 
-    it('pipeline.json does NOT contain artifact_paths.cypress (req 4.7)', () => {
+    it('pipeline.json does NOT contain artifact_paths.cypress', () => {
       const pipeline = readPipeline(tmpDir);
       const artifactPaths = pipeline.artifact_paths as Record<string, unknown>;
       expect(artifactPaths.cypress).toBeUndefined();
     });
 
-    it('pipeline.json does NOT contain docker_base_images.cypress (req 4.7)', () => {
+    it('pipeline.json does NOT contain docker_base_images.cypress', () => {
       const pipeline = readPipeline(tmpDir);
       const dockerBaseImages = pipeline.docker_base_images as Record<string, unknown>;
       expect(dockerBaseImages.cypress).toBeUndefined();
     });
 
-    it('playwright docker-compose.yml is byte-identical to pre-removal state (§9 Property 2)', () => {
+    it('playwright docker-compose.yml is byte-identical to pre-removal state', () => {
       const afterContent = readIfExists(
         path.join(tmpDir, 'tools', 'playwright', 'docker-compose.yml'),
       );
@@ -244,7 +241,7 @@ describe.skipIf(!TOOLS_PRESENT)('integration: drop-in and removal (Tasks 17 & 18
       expect(afterContent).toBe(beforeArtefacts['playwright-compose']);
     });
 
-    it('robot-framework docker-compose.yml is byte-identical to pre-removal state (§9 Property 2)', () => {
+    it('robot-framework docker-compose.yml is byte-identical to pre-removal state', () => {
       const afterContent = readIfExists(
         path.join(tmpDir, 'tools', 'robot-framework', 'docker-compose.yml'),
       );
@@ -252,13 +249,13 @@ describe.skipIf(!TOOLS_PRESENT)('integration: drop-in and removal (Tasks 17 & 18
       expect(afterContent).toBe(beforeArtefacts['robot-compose']);
     });
 
-    it('k6 docker-compose.yml is byte-identical to pre-removal state (§9 Property 2)', () => {
+    it('k6 docker-compose.yml is byte-identical to pre-removal state', () => {
       const afterContent = readIfExists(path.join(tmpDir, 'tools', 'k6', 'docker-compose.yml'));
       expect(afterContent).not.toBeNull();
       expect(afterContent).toBe(beforeArtefacts['k6-compose']);
     });
 
-    it('playwright tsconfig.json is byte-identical to pre-removal state (§9 Property 2)', () => {
+    it('playwright tsconfig.json is byte-identical to pre-removal state', () => {
       const afterContent = readIfExists(path.join(tmpDir, 'tools', 'playwright', 'tsconfig.json'));
       expect(afterContent).not.toBeNull();
       expect(afterContent).toBe(beforeArtefacts['playwright-tsconfig']);

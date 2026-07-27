@@ -1,9 +1,8 @@
 // scripts/install-core/__tests__/cli.spec.ts
 //
-// Tests for the headless install CLI (scripts/install-tool.ts, Task 12 of
-// install-and-provisioning-overhaul):
-//   - Property 11 (12.1): the CLI reports the failing stage and exits non-zero.
-//   - Example (12.2): Hub / CLI command parity — both run the SAME fixed-constant
+// Tests for the headless install CLI (scripts/install-tool.ts):
+//   the CLI reports the failing stage and exits non-zero.
+//   - Example: Hub / CLI command parity — both run the SAME fixed-constant
 //     `task ... setup` for a given tool, and the CLI delegates to the shared
 //     `runInstallPipeline` rather than re-implementing deps/setup.
 //
@@ -107,14 +106,12 @@ const arbScenario: fc.Arbitrary<Scenario> = fc.oneof(
 );
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 11
 // CLI reports the failing stage and exits non-zero.
 // For any stage that fails during a CLI install, the result has `ok === false`
 // with `failedStage` set to the failing stage, and the derived process exit code
 // is non-zero; a successful install yields `ok === true` and exit code 0.
-// **Validates: Requirements 9.4**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 11', () => {
+describe('CLI reports the failing stage and exits non-zero', () => {
   it('sets ok=false + failedStage and derives a non-zero exit per failing stage (success → exit 0)', () => {
     fc.assert(
       fc.property(arbScenario, (scenario) => {
@@ -166,16 +163,16 @@ function recordingEffects(): { effects: InstallEffects; calls: string[] } {
  * The Hub Post_Install_Hook command, replicated byte-identically in
  * `hub/server/src/services/tool-plugins.ts` (`runToolSetupTask`):
  *   task --taskfile tools/<id>/Taskfile.yml --dir tools/<id> setup
- * Hub↔CLI parity (R9.2) is at this command level.
+ * Hub↔CLI parity is at this command level.
  */
 function hubHookCommand(id: string): string {
   return `task --taskfile tools/${id}/Taskfile.yml --dir tools/${id} setup`;
 }
 
 // =============================================================================
-// Example (Task 12.2): Hub / CLI parity (R9.2)
+// Example (Task): Hub / CLI parity
 // =============================================================================
-describe('Hub / CLI tool-setup parity (Requirement 9.2)', () => {
+describe('Hub / CLI tool-setup parity', () => {
   it('runs the SAME fixed-constant `task ... setup` command as the Hub hook for the same id', () => {
     for (const id of ['playwright', 'k6', 'robot-framework', 'my-tool']) {
       const inv = buildToolSetupInvocation(id);

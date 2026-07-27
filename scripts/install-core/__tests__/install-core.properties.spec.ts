@@ -1,31 +1,27 @@
 // scripts/install-core/__tests__/install-core.properties.spec.ts
 //
 // Property-based tests for the shared install-core library
-// (install-and-provisioning-overhaul). One property per test; ≥100 iterations;
+// . One property per test; ≥100 iterations;
 // fast-check under vitest, mirroring the `scripts/manifests/__tests__/`
 // convention (plain vitest + fc.assert).
-//
-// Validates: Requirements 8.5, 12.2 (Property 9); 9.3, 9.5, 12.1 (Property 10)
 
 import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-  buildToolSetupInvocation,
-  runInstallPipeline,
-  SAFE_ID,
-  TOOL_SETUP_TIMEOUT_MS,
+    buildToolSetupInvocation,
+    runInstallPipeline,
+    SAFE_ID,
+    TOOL_SETUP_TIMEOUT_MS,
 } from '../index.js';
 import { arbRejectableRequest, arbValidToolId, makeSpyEffects } from './arbitraries.js';
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 9
 // Tool tasks run via a fixed command constant.
 // For any tool id, the command used to run a Tool_Setup_Task is built from a
 // fixed command constant plus a SAFE_ID-validated path slot only; no
 // tool-supplied string is interpolated into the shell.
-// **Validates: Requirements 8.5, 12.2**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 9', () => {
+describe('Tool tasks run via a fixed command constant', () => {
   it('builds a fixed argv (task --taskfile tools/<id>/Taskfile.yml --dir tools/<id> setup) with the id only in the path slots', () => {
     fc.assert(
       fc.property(arbValidToolId, (id) => {
@@ -35,7 +31,7 @@ describe('Feature: install-and-provisioning-overhaul, Property 9', () => {
         expect(inv.file).toBe('task');
 
         // The whole argv is exactly the fixed template: 3 constant tokens plus the
-        // 2 `tools/<id>/…` path slots — nothing extra is interpolated (R12.2).
+        // 2 `tools/<id>/…` path slots — nothing extra is interpolated.
         expect(inv.args).toEqual([
           '--taskfile',
           `tools/${id}/Taskfile.yml`,
@@ -69,14 +65,12 @@ describe('Feature: install-and-provisioning-overhaul, Property 9', () => {
 });
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 10
 // Validation gates all side effects.
 // For any tool id that fails SAFE_ID, or any git URL that fails SAFE_GIT_URL, the
 // install path performs no clone, dependency install, or other side-effecting
 // action — rejection always precedes any side effect.
-// **Validates: Requirements 9.3, 9.5, 12.1**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 10', () => {
+describe('Validation gates all side effects', () => {
   it('rejects an invalid id or git URL at the validate stage with ZERO side-effecting calls', () => {
     fc.assert(
       fc.property(arbRejectableRequest, (request) => {

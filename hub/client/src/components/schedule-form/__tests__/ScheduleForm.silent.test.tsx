@@ -7,12 +7,12 @@ import { ScheduleForm } from '../ScheduleForm.js';
 import { fromConfigSilent } from '../schedule-silent.js';
 
 /**
- * Unit test for Task 5.8 — ScheduleForm default silent state.
+ * Unit test for ScheduleForm default silent state.
  *
- * Validates Requirement 8.1: when the create form opens for a NEW schedule the
- * "Silent mode" checkbox defaults to OFF (silent = false).
+ * When the create form opens for a NEW schedule the "Silent mode" checkbox
+ * defaults to OFF (silent = false).
  *
- * This pairs with the pure-helper property test (Property 14) and the
+ * This pairs with the pure-helper property test and the
  * server-side scheduler/runner tests in
  * hub/server/src/services/scheduler-runner-cancel.test.ts.
  *
@@ -67,16 +67,16 @@ function renderForm(ui: ReactElement) {
   );
 }
 
-describe('ScheduleForm default silent state (R8.1)', () => {
+describe('ScheduleForm default silent state', () => {
   it('renders the create form with the Silent mode checkbox unchecked by default', () => {
     renderForm(<ScheduleForm mode="create" opened onClose={() => {}} onSuccess={() => {}} />);
 
     const silent = screen.getByRole('checkbox', { name: /silent mode/i });
-    // R8.1: a brand-new schedule defaults silent = false (checkbox OFF).
+    // a brand-new schedule defaults silent = false (checkbox OFF).
     expect(silent).not.toBeChecked();
   });
 
-  it('keeps the pure default mapping consistent with the checkbox (R8.1)', () => {
+  it('keeps the pure default mapping consistent with the checkbox', () => {
     // The component seeds `silent` from `defaults.silent = false`; the same
     // value round-trips through the shared helper the form uses on edit.
     expect(fromConfigSilent({ silent: undefined })).toBe(false);

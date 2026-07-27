@@ -12,12 +12,12 @@ interface FakeChild extends EventEmitter {
 }
 
 /**
- * Property 12 — Silent run active-list lifecycle (R7.1, R7.2).
+ * Silent run active-list lifecycle.
  *
  * For any Silent_Run: once started it appears in `getActive()` with a unique
- * run identifier (while running, R7.1), and once it reaches any terminal state
- * (passed / failed / cancelled / error) it is removed from `getActive()`
- * (R7.2). The requirement's 1s figure is an upper bound — the runner removes
+ * run identifier (while running), and once it reaches any terminal state
+ * (passed / failed / cancelled / error) it is removed from `getActive()`.
+ * The 1s budget is an upper bound — the runner removes
  * the run synchronously inside its terminal handler, so we assert the
  * near-synchronous removal that happens the moment the child finishes rather
  * than waiting a real second.
@@ -87,7 +87,7 @@ function terminate(child: FakeChild, outcome: Terminal): void {
 
 const activeIds = (): string[] => runner.getActive().map((r) => r.id);
 
-/** Silent RunRequest generator (silent is always true for Property 12). */
+/** Silent RunRequest generator (silent is always true in this suite). */
 const silentReqArb: fc.Arbitrary<RunRequest> = fc
   .record({
     tool: fc.constantFrom('playwright', 'robot-framework', 'k6'),
@@ -104,12 +104,12 @@ const terminalArb: fc.Arbitrary<Terminal> = fc.constantFrom(
   'error',
 );
 
-describe('runner silent run active-list lifecycle (Property 12)', () => {
+describe('runner silent run active-list lifecycle', () => {
   // Raise concurrency so every started run spawns immediately (none queued),
   // keeping the active list and our fake-child mapping in lock-step.
   runner.setMaxConcurrency(100);
 
-  // Feature: one-stop-service-upgrade, Property 12: Silent run active-list lifecycle
+  // Silent run active-list lifecycle
   it('a silent run is present in getActive() while running and absent after any terminal state', () => {
     fc.assert(
       fc.property(silentReqArb, terminalArb, (req, outcome) => {
@@ -117,12 +117,12 @@ describe('runner silent run active-list lifecycle (Property 12)', () => {
         const record = runner.start(req, 'task test:run');
         const child = spawnedChildren[spawnedChildren.length - 1] as FakeChild;
         try {
-          // R7.1: present while running, with a unique identifier (appears once).
+          // present while running, with a unique identifier (appears once).
           const ids = activeIds();
           expect(ids).toContain(record.id);
           expect(ids.filter((id) => id === record.id)).toHaveLength(1);
 
-          // R7.2: reaching a terminal state removes it from the active list.
+          // reaching a terminal state removes it from the active list.
           terminate(child, outcome);
           expect(activeIds()).not.toContain(record.id);
         } finally {
@@ -137,7 +137,7 @@ describe('runner silent run active-list lifecycle (Property 12)', () => {
     );
   });
 
-  // Feature: one-stop-service-upgrade, Property 12: Silent run active-list lifecycle
+  // Silent run active-list lifecycle
   it('concurrent silent runs all appear with distinct identifiers and each is removed on terminal', () => {
     fc.assert(
       fc.property(
@@ -151,13 +151,13 @@ describe('runner silent run active-list lifecycle (Property 12)', () => {
           });
           try {
             const ids = activeIds();
-            // R7.1: every running silent run is present...
+            // every running silent run is present...
             for (const s of started) expect(ids).toContain(s.record.id);
             // ...with unique run identifiers across the active set.
             const startedIds = started.map((s) => s.record.id);
             expect(new Set(startedIds).size).toBe(startedIds.length);
 
-            // R7.2: terminating each run (varying the outcome) removes exactly
+            // terminating each run (varying the outcome) removes exactly
             // that run from the active list.
             started.forEach((s, i) => {
               const [, outcome] = scenarios[i] as [unknown, Terminal];

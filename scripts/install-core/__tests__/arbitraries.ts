@@ -1,7 +1,7 @@
 // scripts/install-core/__tests__/arbitraries.ts
 //
 // fast-check arbitraries + a spy effects factory for the install-core property
-// tests (install-and-provisioning-overhaul, Property 9 / Property 10). Generators
+// tests. Generators
 // constrain to the relevant input space: valid/invalid SAFE_IDs and git URLs, and
 // the set of requests that MUST be rejected at the `validate` stage.
 
@@ -66,7 +66,7 @@ const arbRef: fc.Arbitrary<string> = fc.constantFrom('main', 'v1.0.0', 'develop'
 
 /**
  * Requests that MUST be rejected at the `validate` stage before ANY side effect
- * (Property 10): an invalid id (registry or local source), or a valid id with an
+ * an invalid id (registry or local source), or a valid id with an
  * invalid registry git URL.
  */
 export const arbRejectableRequest: fc.Arbitrary<InstallRequest> = fc.oneof(
@@ -93,7 +93,7 @@ export const arbRejectableRequest: fc.Arbitrary<InstallRequest> = fc.oneof(
 );
 
 /**
- * A spy `InstallEffects` that records every call by name. Used by Property 10 to
+ * A spy `InstallEffects` that records every call by name. Used to
  * assert ZERO side-effecting calls happen when a request is rejected at validate.
  */
 export function makeSpyEffects(): { effects: InstallEffects; calls: string[] } {
@@ -118,7 +118,7 @@ export function makeSpyEffects(): { effects: InstallEffects; calls: string[] } {
 }
 
 // =============================================================================
-// Playwright provisioning decision (Property 5) + Core non-fatality (Property 6)
+// Playwright provisioning decision + Core non-fatality
 // =============================================================================
 
 /** A browser revision token, as parsed from `playwright install --dry-run`. */
@@ -132,7 +132,7 @@ const arbMirrorHost: fc.Arbitrary<string> = fc.constantFrom(
 );
 
 /**
- * Random provision inputs for Property 5, constrained to EXERCISE every branch:
+ * Random provision inputs, constrained to EXERCISE every branch:
  *  - `mirrorHost`: null / blank (unset) or a non-blank host (mirror path);
  *  - `presentRevision`: absent (null), matching the required revision (reuse), or
  *    a guaranteed-different value (reprovision) — so reuse / reprovision / archive
@@ -158,7 +158,7 @@ export const arbProvisionInputs: fc.Arbitrary<ProvisionInputs> = fc
     return { mirrorHost, requiredRevision, presentRevision };
   });
 
-/** Random browser-provisioning outcomes for Property 6, including failures. */
+/** Random browser-provisioning outcomes, including failures. */
 export const arbBrowserProvisionOutcome: fc.Arbitrary<BrowserProvisionOutcome> = fc.oneof(
   fc.record({ ok: fc.constant(true) }),
   fc.record({ ok: fc.constant(false), message: fc.string({ minLength: 1 }) }),

@@ -5,7 +5,7 @@
 //
 // Responsibilities:
 //   - `createManifestRegistry()` — a cached, re-scannable view of every
-//     `tool.manifest.json` in the workspace (design §4.1.1).
+//     `tool.manifest.json` in the workspace.
 //   - `setToolEnabled()` — flip `manifest.enabled` on disk (commit scope) and
 //     return the refreshed record.
 //   - `loadToolRegistry()` — read `config/tool-registry.json`.
@@ -145,7 +145,7 @@ function validateToolRegistry(input: unknown): ValidateToolRegistryResult {
  * A cached, re-scannable registry of tool manifests. Discovery + validation run
  * on `refresh()`; query methods read the in-memory snapshot so repeated calls
  * are IO-free. After mutating disk (hub install / disable, `setToolEnabled`),
- * call `refresh()` to rebuild the snapshot. See design §4.1.1.
+ * call `refresh()` to rebuild the snapshot.
  */
 export interface ManifestRegistry {
   /** Every discovered manifest record: ok, disabled, and invalid alike. */
@@ -165,7 +165,7 @@ export interface ManifestRegistry {
  * RESOLUTION POINT — this is the single seam where local overrides slot in.
  * The resolver is produced by `createEnabledResolver()` (`overrides.ts`), which
  * reads `config/.tool-overrides.json` and applies the documented precedence
- * (local override > manifest.enabled > implicit true). See design §4.1.4.
+ * (local override > manifest.enabled > implicit true).
  */
 export type EnabledResolver = (manifest: ToolManifest) => boolean;
 
@@ -258,8 +258,8 @@ export function createManifestRegistry(workspaceRoot: string): ManifestRegistry 
  * refreshed record. Preserves the manifest's key order by mutating the parsed
  * object in place rather than re-serialising from a typed shape.
  *
- * Local-override (`scope: 'local'`) writes are handled by task 4 / the hub
- * service; this function always writes the committed manifest file.
+ * Local-override (`scope: 'local'`) writes are handled by the overrides module
+ * and the hub service; this function always writes the committed manifest file.
  */
 export async function setToolEnabled(
   registry: ManifestRegistry,
@@ -292,7 +292,7 @@ const EMPTY_REGISTRY: ToolRegistry = { schemaVersion: '1', tools: [] };
  * Read `config/tool-registry.json`. Returns an empty registry when
  * the file is absent or malformed (fail-closed) so callers can treat both cases
  * the same as "registry with no tools". Validates the loaded JSON against the
- * `ToolRegistry` schema (requirements 9.10–9.12, 13.4).
+ * `ToolRegistry` schema.
  */
 export async function loadToolRegistry(workspaceRoot: string): Promise<ToolRegistry> {
   const registryPath = path.join(workspaceRoot, TOOL_REGISTRY_PATH);

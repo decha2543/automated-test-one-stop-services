@@ -1,10 +1,10 @@
 // scripts/manifests/setup-planner.ts
 //
-// Setup_Task provisioning planner (install-and-provisioning-overhaul, C1, D1-A).
+// Setup_Task provisioning planner.
 //
 // The SINGLE source of the tool-provisioning decision logic. Both the root
 // `Taskfile.yml` `setup` target (via the `plan` / `report` CLI below) and the
-// Task 8 `scripts/install-core/` library import these pure functions, so the
+// `scripts/install-core/` library import these pure functions, so the
 // "which tools get deps / which get a setup-task invocation / empty-set is
 // clean / how failures are reported" decision is never duplicated.
 //
@@ -22,10 +22,10 @@
 // SETUP <id> run the tool's own `setup` task by taskfile path
 // Dependency lines are emitted before SETUP lines so a tool's setup runs
 // after its deps. An empty `tools/` set prints nothing (Core completes
-// cleanly, R6.6).
+// cleanly).
 // tsx scripts/manifests/setup-planner.ts report <id> [<id> ...]
 // → prints the aggregated failure report (names each failing tool id + a
-// remediation hint, R6.5). Always exits 0 — tool-setup failures are
+// remediation hint). Always exits 0 — tool-setup failures are
 // non-fatal to the Core install.
 
 import * as fs from 'node:fs';
@@ -83,10 +83,9 @@ export interface SetupPlan {
  * no-op,
  * - an empty facts set yields an empty plan, so Core finishes cleanly.
  *
- * No I/O: the root Taskfile loop (via the `plan` CLI) and the Task 8
- * `install-core` both call THIS function, so the decision lives in one place
- *. Adding/removing a tool changes only the facts array, never this logic
- *.
+ * No I/O: the root Taskfile loop (via the `plan` CLI) and `install-core` both
+ * call THIS function, so the decision lives in one place. Adding or removing a
+ * tool changes only the facts array, never this logic.
  */
 export function planToolSetup(facts: readonly ToolSetupFacts[]): SetupPlan {
   const steps: ToolSetupStep[] = facts.map((f) => ({
@@ -147,11 +146,11 @@ export function aggregateSetupFailures(outcomes: readonly ToolSetupOutcome[]): S
  * two-space-indented `setup:` key — the repo's go-task convention (the same way
  * `android-decoupling.spec.ts` probes for `setup-android:`).
  *
- * ponytail: a regex over the raw Taskfile, not a YAML parse — no YAML dependency
+ * Simplification: a regex over the raw Taskfile, not a YAML parse — no YAML dependency
  * and the convention is a fixed top-level `setup` task. Ceiling: a
  * `setup` task contributed via `includes:` or written with non-standard
  * indentation is not detected, so that tool gets deps-only (a safe no-op,
- * R6.3). The design's blessed alternative — attempt the task and treat
+ * ). The blessed alternative — attempt the task and treat
  * go-task's "task does not exist" exit as a no-op — would cover that case at the
  * cost of distinguishing that exit from a genuine setup failure.
  */

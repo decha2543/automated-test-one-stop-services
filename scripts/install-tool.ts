@@ -1,7 +1,7 @@
 // scripts/install-tool.ts
 //
-// Headless install CLI with Hub parity (install-and-provisioning-overhaul, C5,
-// D3-B; Requirements 9.1–9.5). Run via tsx, mirroring `scripts/runner.ts` /
+// Headless install CLI with Hub parity — the CLI and the Hub run the SAME
+// pipeline. Run via tsx, mirroring `scripts/runner.ts` /
 // `scripts/create-project.ts`:
 //
 // tsx scripts/install-tool.ts <id> [--from-registry]
@@ -38,7 +38,7 @@ import {
 } from './install-core/index.js';
 import { loadToolRegistry } from './manifests/index.js';
 
-// ── Result shape (design Data Models §"CLI result", R9.4) ────────────────────
+// ── Result shape ────────────────────
 //
 // Structurally identical to install-core's `InstallResult`, so the pipeline's
 // result IS a `CliInstallResult` — no second shape to keep in sync.
@@ -60,7 +60,7 @@ const STAGE_EXIT_CODE: Record<InstallStage, number> = {
 /**
  * Derive the process exit code from a {@link CliInstallResult}: 0 on success,
  * the stage's distinct non-zero code on failure (a defensive `1` if a failure
- * ever lacks a stage). Pure — the testable half of R9.4.
+ * ever lacks a stage). Pure — the testable half of.
  */
 export function exitCodeForResult(result: CliInstallResult): number {
   if (result.ok) return 0;
@@ -155,7 +155,7 @@ async function resolveRequest(args: CliArgs, workspaceRoot: string): Promise<Res
   };
 }
 
-// ── Install (the delegation seam, R9.1/R9.2) ─────────────────────────────────
+// ── Install (the delegation seam) ─────────────────────────────────
 
 /**
  * Run a headless install by delegating to install-core's shared pipeline. This

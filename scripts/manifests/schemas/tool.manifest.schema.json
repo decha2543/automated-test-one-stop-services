@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://kiro.local/schemas/tool.manifest.schema.json",
+  "$id": "https://autoqa.local/schemas/tool.manifest.schema.json",
   "title": "ToolManifest",
-  "description": "Single source of truth describing one test tool plugin. Mirrors scripts/manifests/validate.ts (ToolManifestSchema). See design section 3.1.",
+  "description": "Single source of truth describing one test tool plugin. Mirrors scripts/manifests/validate.ts (ToolManifestSchema).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -65,7 +65,7 @@
     "run": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Optional run-capability block (design 7.1). Absent resolves to no extra run vars.",
+      "description": "Optional run-capability block. Absent resolves to no extra run vars.",
       "properties": {
         "vars": {
           "type": "array",
@@ -88,7 +88,7 @@
     "reports": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Optional reports-capability block (design 7.1). Absent resolves to a generic **/*.html listing.",
+      "description": "Optional reports-capability block. Absent resolves to a generic **/*.html listing.",
       "properties": {
         "resultGlob": { "type": "string" },
         "kind": { "type": "string" }
@@ -97,7 +97,7 @@
     "tags": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Optional tags-capability block (design 7.1). Unknown/absent strategy resolves to 'none'.",
+      "description": "Optional tags-capability block. Unknown/absent strategy resolves to 'none'.",
       "properties": {
         "strategy": { "type": "string" }
       }

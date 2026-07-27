@@ -4,7 +4,7 @@
 // folders (names starting with `.`), and returns the matching paths in a
 // stable sorted order. Deterministic ordering is a correctness property
 // — consumers must never depend on the
-// filesystem's inode iteration order. See design §4.1.2.
+// filesystem's inode iteration order.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -22,13 +22,13 @@ export const TEMPLATE_EXAMPLE_SUFFIX = '-template-example';
 /**
  * Discover every `tools/<id>/tool.manifest.json` under `workspaceRoot`.
  *
- * - Folders whose name starts with `.` are excluded (req 2.1).
+ * - Folders whose name starts with `.` are excluded.
  * - Folders whose name ends with `-template-example` are excluded — they are
  * shared scaffolds, not real tools.
  * - Only directories that actually contain a manifest file are returned.
  * - Sorted by folder id (the `<id>` segment) so repeated scans of the same
- * workspace yield an identical list regardless of directory-entry order
- * (req 2.2). The sort runs on the bare folder name, NOT the full path:
+ * workspace yield an identical list regardless of directory-entry order.
+ * The sort runs on the bare folder name, NOT the full path:
  * sorting full paths is OS-dependent because the separator that follows the
  * id differs by code point (`/`=47 on POSIX, `\`=92 on Windows), so a prefix
  * pair like `p` / `p0` would order differently per OS (`0`=48 sits between
@@ -54,10 +54,10 @@ export function discoverManifestPaths(workspaceRoot: string): string[] {
 /**
  * The tool ids present under `tools/` — the folder name of every directory
  * `discoverManifestPaths()` returns. This is the single folder-presence source
- * consumed by the Doctor (gating checks, design §C6) and the root `Setup_Task`
- * (delegation loop, design §C1) so neither re-implements an `fs` scan.
+ * consumed by the Doctor (gating checks) and the root `Setup_Task` (delegation
+ * loop) so neither re-implements an `fs` scan.
  *
- * Inherits `discoverManifestPaths()`'s exclusions and stable sort (req 6.2):
+ * Inherits `discoverManifestPaths()`'s exclusions and stable sort:
  * `.`-prefixed and `*-template-example` folders never appear, and the list is
  * sorted by folder id independently of filesystem iteration order. Because the
  * underlying sort already runs on the `<id>` segment, mapping each path back to
@@ -70,13 +70,13 @@ export function discoverToolIds(workspaceRoot: string): string[] {
 /**
  * Folder-presence predicate: is tool `id` provisioned under `tools/`?
  *
- * Shared gating primitive (req 6.2). A tool counts as present **iff** its folder
+ * Shared gating primitive. A tool counts as present **iff** its folder
  * is discovered by `discoverManifestPaths()` — it holds a `tool.manifest.json`
  * and is neither `.`-prefixed nor a `*-template-example` scaffold. Consumers
- * (Doctor §C6, `Setup_Task` §C1) call this instead of each re-scanning `tools/`,
+ * (the Doctor, `Setup_Task`) call this instead of each re-scanning `tools/`,
  * so presence stays consistent with discovery rather than diverging.
  *
- * ponytail: each call re-scans `tools/` (one `readdirSync`). For the Doctor's
+ * Note: each call re-scans `tools/` (one `readdirSync`). For the Doctor's
  * handful of checks that cost is negligible; a consumer doing many lookups
  * should call `discoverToolIds()` once and test membership against a `Set`.
  */

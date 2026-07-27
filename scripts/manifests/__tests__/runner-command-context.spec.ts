@@ -1,21 +1,20 @@
 // scripts/manifests/__tests__/runner-command-context.spec.ts
 //
-// Unit tests for the capability-driven execution-context builders added in
-// task 17 (design §7.1, §7.2): `RunnerContext`, `buildRunVarTokens`, and
-// `buildHeadlessToken`. These extend the runner command-builder so the CLI
-// runner and the Hub (task 18) construct tool-specific run vars + the headless
-// token from `manifest.run` alone — no tool literals.
+// Unit tests for the capability-driven execution-context builders:
+// `RunnerContext`, `buildRunVarTokens`, and `buildHeadlessToken`. These extend
+// the runner command-builder so the CLI runner and the Hub construct
+// tool-specific run vars + the headless token from `manifest.run` alone — no
+// tool literals.
 //
 // Fixtures are constructed INLINE (not read from `tools/*/tool.manifest.json`)
-// so this suite is independent of the parallel built-in backfill (task 16):
+// so this suite is independent of the built-in manifests:
 //   - k6:        run.vars = [SECTION@sectionAxis, PERFORMANCE_TYPE@always]
 //   - robot:     run.headlessVar = '--variable HEADLESS:{value}'
 //   - playwright: no run block (capabilities resolve to safe defaults)
 //
-// The assembled-command tests show how task 18 slots the capability tokens into
+// The assembled-command tests show how the Hub slots the capability tokens into
 // the exact legacy built-in command tails (local + docker + headless).
 //
-// Validates: Requirements 9.1
 import { describe, expect, it } from 'vitest';
 import { buildHeadlessToken, buildRunVarTokens, type RunnerContext } from '../runner-command.js';
 import type { ToolManifest } from '../types.js';
@@ -137,7 +136,7 @@ describe('buildHeadlessToken — robot (headlessVar declared)', () => {
     expect(buildHeadlessToken(robot, ctx)).toBe('');
   });
 
-  it('docker forces HEADLESS:True regardless of headless flag (Requirement 4.12)', () => {
+  it('docker forces HEADLESS:True regardless of headless flag', () => {
     expect(buildHeadlessToken(robot, { mode: 'docker' })).toBe('--variable HEADLESS:True');
     expect(buildHeadlessToken(robot, { mode: 'docker', headless: false })).toBe(
       '--variable HEADLESS:True',
@@ -162,7 +161,7 @@ describe('buildHeadlessToken — tools without a headlessVar', () => {
 // ---------------------------------------------------------------------------
 // Assembled built-in command strings (local + docker + headless)
 //
-// Demonstrates how task 18 composes the capability tokens onto the manifest
+// Demonstrates how the Hub composes the capability tokens onto the manifest
 // base command, reproducing the exact legacy strings for the built-ins.
 // ---------------------------------------------------------------------------
 

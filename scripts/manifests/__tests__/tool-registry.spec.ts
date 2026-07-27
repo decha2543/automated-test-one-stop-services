@@ -1,7 +1,6 @@
 // scripts/manifests/__tests__/tool-registry.spec.ts
 //
-// Tests for `loadToolRegistry()` with schema validation (Task 29).
-// Requirements: 9.10–9.12, 13.4.
+// Tests for `loadToolRegistry()` with schema validation.
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';

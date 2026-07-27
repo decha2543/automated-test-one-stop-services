@@ -3,14 +3,14 @@
 // Projects the enabled tool manifests into the `config/pipeline.json`
 // shape consumed by every agent skill (Auto, TCD, Defect, Delivery, …).
 //
-// `pipeline.json` is option B from design §4.5: a *generated projection* of
+// `pipeline.json` is a *generated projection* of
 // manifest data rather than a separate source of truth. Agents keep their
 // current contract; this module just composes each enabled tool's
 // `manifest.pipeline.*` into the familiar section layout.
 //
 // The static (manifest-independent) sections — `routing` and `id_conventions`
 // — live in `config/pipeline.static.json` and are spread in verbatim
-// via `staticParts`. See design §4.5.
+// via `staticParts`.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ManifestRegistry } from './index.js';
@@ -20,7 +20,8 @@ import type { ManifestRegistry } from './index.js';
  * name. It is replaced by `ENV_KEY_SAMPLE` so the generated `env_injection`
  * section reads the same way the hand-authored `pipeline.json` always has —
  * e.g. `process.env.{KEY}` → `process.env.ENV_X`, `%{{KEY}}` → `%{ENV_X}`,
- * `__ENV.{KEY}` → `__ENV.ENV_X`. See design §3.3–§3.5 and req 5 byte-identity.
+ * `__ENV.{KEY}` → `__ENV.ENV_X`. The output stays byte-identical to the
+ * committed `pipeline.json` for unchanged inputs.
  */
 const ENV_KEY_PLACEHOLDER = '{KEY}';
 const ENV_KEY_SAMPLE = 'ENV_X';
@@ -66,7 +67,7 @@ export interface PipelineStaticParts {
 /**
  * The full generated `pipeline.json` shape. Section keys mirror the historical
  * file exactly so existing skills do not change when manifests become the
- * source of truth. See design §4.5.
+ * source of truth.
  */
 export interface PipelineProjection {
   readonly _comment: string;
@@ -88,14 +89,14 @@ function projectEnvToken(envToken: string): string {
 /**
  * Compose the enabled tools in `registry` into a `PipelineProjection`.
  *
- * Composed-key rule for `target_paths` (design §4.5, req 5.4 / 5.5):
+ * Composed-key rule for `target_paths`:
  *   - a `default` pipeline key → the bare tool id (`<id>`)
  *   - any other key            → `<id>_<key>` (e.g. `playwright_web`)
  *
  * Iteration follows `registry.enabled()`, whose order is the discovery sort
- * order, so the projection is deterministic and order-independent (req 2.3).
+ * order, so the projection is deterministic and order-independent.
  * Disabled tools are absent from `enabled()` and therefore omitted from every
- * section (req 5.6).
+ * section.
  */
 export function projectPipeline(
   registry: ManifestRegistry,

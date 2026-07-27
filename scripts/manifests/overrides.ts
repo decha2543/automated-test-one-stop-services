@@ -2,7 +2,7 @@
 //
 // Local override resolution (no-commit disable). Reads the gitignored
 // `config/.tool-overrides.json` and produces an enabled-resolver that the
-// manifest registry plugs into its resolution seam. See design §4.1.4.
+// manifest registry plugs into its resolution seam.
 //
 // Resolution order (highest precedence first):
 //   1. local override        — `config/.tool-overrides.json` entry for the tool
@@ -29,7 +29,7 @@ export type ToolOverrides = Readonly<Record<string, ToolOverrideEntry>>;
 /**
  * Read + parse `config/.tool-overrides.json`. Never throws: an absent,
  * unreadable, or malformed file resolves to "no overrides" (`{}`) so a stray
- * local file can never break discovery for the whole workspace (design §6.2).
+ * local file can never break discovery for the whole workspace.
  */
 export function readOverrides(workspaceRoot: string): ToolOverrides {
   const overridesPath = path.join(workspaceRoot, TOOL_OVERRIDES_PATH);

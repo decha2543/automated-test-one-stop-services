@@ -1,6 +1,6 @@
-// hub/server/src/routes/__tests__/m2-acceptance.test.ts
+// hub/server/src/routes/__tests__/tool-lifecycle-acceptance.test.ts
 //
-// M2 Acceptance Test — end-to-end lifecycle on a temp workspace.
+// Tool-lifecycle acceptance test — end-to-end on a temp workspace.
 //
 // Seeds a temporary workspace with the three real tool manifests + compose
 // templates + pipeline.static.json, then exercises the full lifecycle:
@@ -14,8 +14,6 @@
 // wired to a custom service layer parameterized with the temp workspace root,
 // bypassing the config module's hardcoded WORKSPACE_ROOT.
 //
-// Validates: Requirements 3.3, 3.4, 6.7, 7.6, 11.4, 11.5
-// Design: §7 M2 acceptance #1–#6
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -94,7 +92,7 @@ interface SyncModule {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeTmpDir(prefix = 'm2-acceptance-'): string {
+function makeTmpDir(prefix = 'tool-lifecycle-'): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
@@ -339,7 +337,7 @@ const TOOLS_PRESENT = EXISTING_TOOL_IDS.every((id) =>
   fs.existsSync(path.join(REAL_TOOLS_DIR, id, 'tool.manifest.json')),
 );
 
-describe.skipIf(!TOOLS_PRESENT)('M2 acceptance: end-to-end lifecycle on temp workspace', () => {
+describe.skipIf(!TOOLS_PRESENT)('tool lifecycle: end-to-end on temp workspace', () => {
   let tmpDir: string;
   let app: FastifyInstance;
 
@@ -365,7 +363,7 @@ describe.skipIf(!TOOLS_PRESENT)('M2 acceptance: end-to-end lifecycle on temp wor
 
   // ── Scenario 1: GET /api/tools returns three entries, all enabled ─────────
 
-  it('GET /api/tools returns three tools, all status === "enabled" (M2 #1)', async () => {
+  it('GET /api/tools returns three tools, all status === "enabled"', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/tools' });
     expect(res.statusCode).toBe(200);
     const tools = res.json<ToolView[]>();
@@ -379,7 +377,7 @@ describe.skipIf(!TOOLS_PRESENT)('M2 acceptance: end-to-end lifecycle on temp wor
 
   // ── Scenario 2: POST /api/tools/k6/disable (commit scope) ─────────────────
 
-  it('POST /api/tools/k6/disable carries resynced:true and regeneratedFiles includes pipeline.json (M2 #2, Req 11.4)', async () => {
+  it('POST /api/tools/k6/disable carries resynced:true and regeneratedFiles includes pipeline.json', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/tools/k6/disable',
@@ -393,7 +391,7 @@ describe.skipIf(!TOOLS_PRESENT)('M2 acceptance: end-to-end lifecycle on temp wor
     expect(body.result.id).toBe('k6');
   });
 
-  it('after disable, tools/k6/tool.manifest.json has enabled === false (Req 3.4)', () => {
+  it('after disable, tools/k6/tool.manifest.json has enabled === false', () => {
     const manifestPath = path.join(tmpDir, 'tools', 'k6', 'tool.manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     expect(manifest.enabled).toBe(false);
@@ -401,7 +399,7 @@ describe.skipIf(!TOOLS_PRESENT)('M2 acceptance: end-to-end lifecycle on temp wor
 
   // ── Scenario 3: POST /api/tools/k6/enable reverses the change ─────────────
 
-  it('POST /api/tools/k6/enable flips enabled back to true (M2 #3, Req 7.6)', async () => {
+  it('POST /api/tools/k6/enable flips enabled back to true', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/tools/k6/enable',
@@ -414,7 +412,7 @@ describe.skipIf(!TOOLS_PRESENT)('M2 acceptance: end-to-end lifecycle on temp wor
     expect(body.result.id).toBe('k6');
   });
 
-  it('after enable, tools/k6/tool.manifest.json has enabled === true (Req 3.5)', () => {
+  it('after enable, tools/k6/tool.manifest.json has enabled === true', () => {
     const manifestPath = path.join(tmpDir, 'tools', 'k6', 'tool.manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     expect(manifest.enabled).toBe(true);
@@ -422,7 +420,7 @@ describe.skipIf(!TOOLS_PRESENT)('M2 acceptance: end-to-end lifecycle on temp wor
 
   // ── Scenario 4: POST /api/tools/k6/disable { scope: 'local' } ─────────────
 
-  it('POST /api/tools/k6/disable with scope:local writes config/.tool-overrides.json (M2 #4, Req 3.3)', async () => {
+  it('POST /api/tools/k6/disable with scope:local writes config/.tool-overrides.json', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/tools/k6/disable',
@@ -461,9 +459,9 @@ describe.skipIf(!TOOLS_PRESENT)('M2 acceptance: end-to-end lifecycle on temp wor
 
   // ── Scenario 5: Broken template → resync fails with RESYNC_FAILED ─────────
 
-  it('broken compose template: disable on another tool returns resynced:false and resyncError.code === RESYNC_FAILED (M2 #6, Req 11.4, 11.5)', async () => {
+  it('broken compose template: disable on another tool returns resynced:false and resyncError.code === RESYNC_FAILED', async () => {
     // Force a scenario where syncWorkspace actually throws. The compose-gen is
-    // tolerant of missing templates (logs ⚠ and continues per design §4.2.2),
+    // tolerant of missing templates (logs ⚠ and continues),
     // so renaming a template alone won't cause a throw. Instead, corrupt
     // pipeline.static.json so that JSON.parse fails inside loadPipelineStatic,
     // which propagates up through syncWorkspace as an unhandled throw.

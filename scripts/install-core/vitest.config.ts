@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 // Minimal vitest config scoped to the install-core library tests
-// (install-and-provisioning-overhaul, design §Testing Strategy). Mirrors the
+// . Mirrors the
 // `scripts/manifests/vitest.config.ts` convention (node env, globals on,
 // single-run). Source files use `.js`-extension ESM imports that resolve to
 // their `.ts` sources — vite's resolver handles this out of the box, including

@@ -1,8 +1,8 @@
 // scripts/install-core/index.ts
 //
-// Public entry point for the shared install pipeline (install-and-provisioning-
-// overhaul, C5, D3-B). Both consumers depend on THIS module:
-// - the headless CLI (`scripts/install-tool.ts`, Task 12) imports it directly;
+// Public entry point for the shared install pipeline. Both consumers depend on
+// THIS module:
+// - the headless CLI (`scripts/install-tool.ts`) imports it directly;
 // - the Hub Post_Install_Hook reaches it by runtime dynamic import
 // (`pathToFileURL` + `await import` through the tsx ESM loader registered in
 // `hub/server/src/index.ts`) — the SAME mechanism the Hub already uses for

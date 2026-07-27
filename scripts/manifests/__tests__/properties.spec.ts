@@ -1,8 +1,8 @@
 // scripts/manifests/__tests__/properties.spec.ts
 //
-// Property-based tests for the 10 correctness properties from design §9.
-// Each test uses fast-check arbitraries (see `arbitraries.ts`) and references
-// the requirement(s) it validates per the closing note of design §9.
+// Property-based tests for the 10 correctness properties of the manifest module.
+// Each test uses fast-check arbitraries (see `arbitraries.ts`) and states the
+// invariant it holds in its own title.
 //
 // Uses fc.assert(fc.asyncProperty(...)) / fc.assert(fc.property(...)) with vitest
 // (no @fast-check/vitest package in this workspace — plain vitest + fc.assert).
@@ -76,11 +76,10 @@ function stripTimestamp(p: ReturnType<typeof projectPipeline>): string {
 }
 
 // =============================================================================
-// Property 1 — Drop-in completeness
-// **Validates: Requirements 4.1, 4.5, 4.6**
-// Design §9 Property 1: new tool appears in registry + pipeline after sync.
+// Drop-in completeness
+// new tool appears in registry + pipeline after sync.
 // =============================================================================
-describe('Property 1 — drop-in completeness', () => {
+describe('drop-in completeness', () => {
   it('enabled tool appears in pipeline target_paths, run_commands and docker_base_images after sync', async () => {
     await fc.assert(
       fc.asyncProperty(arbToolManifest(), async (manifest) => {
@@ -109,11 +108,10 @@ describe('Property 1 — drop-in completeness', () => {
 });
 
 // =============================================================================
-// Property 2 — Removal cleanliness
-// **Validates: Requirements 4.7, 2.3**
-// Design §9 Property 2: removed tool disappears from all sections.
+// Removal cleanliness
+// removed tool disappears from all sections.
 // =============================================================================
-describe('Property 2 — removal cleanliness', () => {
+describe('removal cleanliness', () => {
   it('after removing a tool folder its pipeline sections disappear; bystander tool is unaffected', async () => {
     await fc.assert(
       fc.asyncProperty(arbToolManifest(), async (manifest) => {
@@ -163,11 +161,10 @@ describe('Property 2 — removal cleanliness', () => {
 });
 
 // =============================================================================
-// Property 3 — Discovery idempotence
-// **Validates: Requirements 2.1, 2.2**
-// Design §9 Property 3: same registry regardless of filesystem iteration order.
+// Discovery idempotence
+// same registry regardless of filesystem iteration order.
 // =============================================================================
-describe('Property 3 — discovery idempotence', () => {
+describe('discovery idempotence', () => {
   it('discoverManifestPaths returns an identical sorted list on repeated scans', () => {
     fc.assert(
       fc.property(
@@ -197,11 +194,10 @@ describe('Property 3 — discovery idempotence', () => {
 });
 
 // =============================================================================
-// Property 4 — Determinism (multiple refreshes yield identical output)
-// **Validates: Requirements 2.2, 2.3**
-// Design §9 Property 4: same tools → identical pipeline.json across refreshes.
+// Determinism (multiple refreshes yield identical output)
+// same tools → identical pipeline.json across refreshes.
 // =============================================================================
-describe('Property 4 — determinism across multiple refreshes', () => {
+describe('determinism across multiple refreshes', () => {
   it('pipeline projection is byte-identical across multiple registry refreshes (modulo timestamp)', async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -273,11 +269,10 @@ describe('Property 4 — determinism across multiple refreshes', () => {
 });
 
 // =============================================================================
-// Property 5 — Isolation (disabled-tool invisibility)
-// **Validates: Requirements 4.10, 5.6**
-// Design §9 Property 5: disabled tools absent from enabled() and all generated outputs.
+// Isolation (disabled-tool invisibility)
+// disabled tools absent from enabled() and all generated outputs.
 // =============================================================================
-describe('Property 5 — disabled-tool invisibility', () => {
+describe('disabled-tool invisibility', () => {
   it('disabled tool is absent from enabled() and all pipeline sections', async () => {
     await fc.assert(
       fc.asyncProperty(arbToolManifest(), async (manifest) => {
@@ -311,11 +306,10 @@ describe('Property 5 — disabled-tool invisibility', () => {
 });
 
 // =============================================================================
-// Property 6 — Validation soundness (never throws)
-// **Validates: Requirements 1.15**
-// Design §9 Property 6: validateManifest never throws on fc.anything().
+// Validation soundness (never throws)
+// validateManifest never throws on fc.anything().
 // =============================================================================
-describe('Property 6 — validator never throws on arbitrary input', () => {
+describe('validator never throws on arbitrary input', () => {
   it('validateManifest never throws and always returns a structured result', () => {
     fc.assert(
       fc.property(fc.anything(), (input) => {
@@ -342,11 +336,10 @@ describe('Property 6 — validator never throws on arbitrary input', () => {
 });
 
 // =============================================================================
-// Property 7 — Command identity (buildTaskCommand same inputs = same output)
-// **Validates: Requirements 4.8**
-// Design §9 Property 7: buildTaskCommand is pure / deterministic.
+// Command identity (buildTaskCommand same inputs = same output)
+// buildTaskCommand is pure / deterministic.
 // =============================================================================
-describe('Property 7 — buildTaskCommand identity', () => {
+describe('buildTaskCommand identity', () => {
   it('buildTaskCommand is pure: same manifest + answers always yields the same command', () => {
     fc.assert(
       fc.property(arbToolManifest(), (manifest) => {
@@ -397,11 +390,10 @@ describe('Property 7 — buildTaskCommand identity', () => {
 });
 
 // =============================================================================
-// Property 8 — Disabled omission round-trip (enable/disable inverse)
-// **Validates: Requirements 3.5, 7.6**
-// Design §9 Property 8: disable→enable restores the original on-disk state.
+// Disabled omission round-trip (enable/disable inverse)
+// disable→enable restores the original on-disk state.
 // =============================================================================
-describe('Property 8 — enable/disable inverse', () => {
+describe('enable/disable inverse', () => {
   it('disabling then re-enabling restores the tool to the enabled() list', async () => {
     await fc.assert(
       fc.asyncProperty(arbToolManifest(), async (manifest) => {
@@ -459,11 +451,10 @@ describe('Property 8 — enable/disable inverse', () => {
 });
 
 // =============================================================================
-// Property 9 — Template exclusion (*-template-example projects never in compose services)
-// **Validates: Requirements 4.1, 9.8**
-// Design §9 Property 9: *-template-example projects never appear in compose services.
+// Template exclusion (*-template-example projects never in compose services)
+// *-template-example projects never appear in compose services.
 // =============================================================================
-describe('Property 9 — *-template-example folders are excluded from project lists', () => {
+describe('*-template-example folders are excluded from project lists', () => {
   it('isTemplate returns true for any name containing -template-example', () => {
     fc.assert(
       fc.property(fc.string({ minLength: 1, maxLength: 20 }), (prefix) => {
@@ -511,11 +502,10 @@ describe('Property 9 — *-template-example folders are excluded from project li
 });
 
 // =============================================================================
-// Property 10 — Namespace uniqueness invariant + validation completeness
-// **Validates: Requirements 1.8, 2.5, 9.8**
-// Design §9 Property 10: duplicate namespace/alias → both tools get broken status.
+// Namespace uniqueness invariant + validation completeness
+// duplicate namespace/alias → both tools get broken status.
 // =============================================================================
-describe('Property 10 — namespace uniqueness invariant', () => {
+describe('namespace uniqueness invariant', () => {
   it('two enabled tools sharing taskNamespace are both marked broken with DUPLICATE_NAMESPACE', () => {
     fc.assert(
       fc.property(arbTwoManifestsSameNamespace(), ([mA, mB]) => {
@@ -557,7 +547,7 @@ describe('Property 10 — namespace uniqueness invariant', () => {
   });
 
   it('every ManifestError produced by validateRegistry has a non-empty code string (validation completeness)', () => {
-    // **Validates: Requirements 1.15, 9.8** — validation completeness:
+    // Validation completeness:
     // every ManifestError has a code.
     fc.assert(
       fc.property(arbToolManifest(), (manifest) => {

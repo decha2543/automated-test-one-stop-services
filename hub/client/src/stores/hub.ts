@@ -24,10 +24,10 @@ interface Preferences {
   sidebarCollapsed: boolean;
   /**
    * Per-scheduleId switch for silent-schedule completion toasts. A missing
-   * entry means enabled (default-enabled, R10.6). Setting an entry to `false`
-   * suppresses the Corner_Toast for that silent schedule (R10.5). This lives
+   * entry means enabled (default-enabled). Setting an entry to `false`
+   * suppresses the Corner_Toast for that silent schedule. This lives
    * in preferences (ephemeral UI intent) and is intentionally kept out of the
-   * persisted notifications store (R10.4).
+   * persisted notifications store.
    */
   silentScheduleToast: Record<string, boolean>;
 }

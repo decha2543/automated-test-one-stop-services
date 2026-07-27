@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Unit tests for the tool-plugins service (M2 surface).
+ * Unit tests for the tool-plugins service.
  *
- * Validates: Requirements 6.2–6.5, 6.7, 3.3, 3.4
  *
  * Strategy: vi.mock the config and scanner modules; intercept the dynamic ESM
  * import by providing a mock manifest-module factory that controls registry

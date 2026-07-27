@@ -1,13 +1,13 @@
 // scripts/manifests/runner-command.ts
 //
-// Pure, deterministic `task` command builder for the interactive runner
-// (design §4.3.2). Given a validated manifest and a set of collected answers,
+// Pure, deterministic `task` command builder for the interactive runner.
+// Given a validated manifest and a set of collected answers,
 // it produces the exact shell command the runner spawns — with NO prompts and
 // NO filesystem / process IO. This is the seam that replaces the hardcoded
 // `toolMapping` / `tool === 'k6'` command construction in `scripts/runner.ts`.
 //
 // Reproduces the legacy command strings for every tool / answer combination
-// (Requirement 4.8, 4.11–4.14; design §9 Property 7) with two reconciliations
+// (kept pure and deterministic, covered by a property test) with two reconciliations
 // that keep the output identical to the pre-refactor runner:
 //
 //   1. The task target is sourced from the matching
@@ -19,7 +19,7 @@
 //      clause governs prompt VISIBILITY (the renderer); `dockerOverride` is the
 //      build-time docker value for a step that is only prompted locally. This
 //      reproduces legacy's forced `--variable HEADLESS:True` for Robot/docker
-//      (Requirement 4.12).
+//      when running in docker.
 import type {
   ToolManifest,
   ToolRunnerSelectStep,
@@ -40,11 +40,11 @@ export interface RunnerAnswers {
 }
 
 /**
- * Execution context for the capability-driven builders (task 17, design §7.2).
+ * Execution context for the capability-driven builders.
  *
  * `mode` is the local/docker selector — it is the same axis as
  * `RunnerAnswers.environment`, surfaced under the name the Hub command-builder
- * (task 18) uses when it maps its `RunRequest` onto this shared builder.
+ * uses when it maps its `RunRequest` onto this shared builder.
  * `headless` carries the headed/headless intent for tools that declare a
  * `run.headlessVar` (Robot Framework); tools without one (Playwright, k6)
  * ignore it. `undefined` means "unspecified" — locally it emits no headless
@@ -114,7 +114,7 @@ function stepApplies(step: ToolRunnerStep, answers: RunnerAnswers): boolean {
 
 /**
  * Resolve a step's effective value. In the `docker` environment a defined
- * `dockerOverride` wins over the collected answer (Requirement 4.12); otherwise
+ * `dockerOverride` wins over the collected answer; otherwise
  * the answer keyed by `step.id` is used, defaulting to the empty string.
  */
 export function resolveValue(step: ToolRunnerStep, answers: RunnerAnswers): string {
@@ -154,7 +154,7 @@ export function matchesWhen(when: ToolRunnerWhen, answers: RunnerAnswers): boole
 
 /**
  * Build the capability-driven, tool-specific task vars (`KEY=VALUE`) declared by
- * `manifest.run.vars` (design §7.1), in declaration order. A var is emitted when:
+ * `manifest.run.vars`, in declaration order. A var is emitted when:
  *   - `when: 'always'`      — unconditionally; or
  *   - `when: 'sectionAxis'` — only when `manifest.projects.sectionAxis` is true
  *     (k6 `SECTION`). Tools without a section axis silently drop it.
@@ -181,13 +181,13 @@ export function buildRunVarTokens(
 }
 
 /**
- * Build the headless token from `manifest.run.headlessVar` (design §7.1), a
+ * Build the headless token from `manifest.run.headlessVar`, a
  * template carrying a single `{value}` placeholder that resolves to `True` /
  * `False` (e.g. Robot's `--variable HEADLESS:{value}`):
  *
  *   - `docker` mode forces `True` regardless of `context.headless` — this
  *     reproduces the legacy Robot `dockerOverride` (`--variable HEADLESS:True`,
- *     Requirement 4.12);
+ *     forced by docker mode);
  *   - `local` mode with `context.headless === undefined` emits `''` (no token),
  *     matching the Hub's "headless unspecified" behaviour;
  *   - `local` mode otherwise emits the template with `True` (headless) or
@@ -206,10 +206,10 @@ export function buildHeadlessToken(manifest: ToolManifest, context: RunnerContex
 
 /**
  * Neutral run context the Hub command-builder maps its `RunRequest` onto before
- * delegating to {@link buildRunCommandFromInput} (design §7.2). Keeping this
+ * delegating to {@link buildRunCommandFromInput}. Keeping this
  * shape — and the mapping logic — in the shared module means the Hub and the
  * interactive CLI runner build commands from ONE place: no tool literals, no
- * duplicated command logic (anti-drift, design R3).
+ * duplicated command logic (anti-drift).
  *
  * `quote` is the value-escaping hook. The Hub injects its `shellQuote` (the
  * command is spawned through a shell, so regex tags like `(?=.*@x)` must be
@@ -259,7 +259,7 @@ export function resolveHeadlessStepValue(manifest: ToolManifest, headless: boole
 
 /**
  * Build the `task …` run command for the Hub from a neutral
- * {@link RunCommandInput}, delegating to {@link buildTaskCommand} (design §7.2).
+ * {@link RunCommandInput}, delegating to {@link buildTaskCommand}.
  *
  * The Hub's run fields are mapped onto the manifest's runner answer keys
  * (`type`/`project`/`tag`/`section`/`performance_type`/`mode`/`args`) — the

@@ -1,4 +1,4 @@
-// Feature: one-stop-service-upgrade, Property 5: DoctorPanel auto-expand predicate
+// DoctorPanel auto-expand predicate
 import type { DoctorCategory, DoctorCheck, DoctorReport } from '@hub/shared';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +10,7 @@ const CATEGORIES: readonly DoctorCategory[] = [
   'optional-process',
 ] as const;
 
-/** The category set whose failures should trigger auto-expand (R3.8). */
+/** The category set whose failures should trigger auto-expand. */
 const EXPAND_CATEGORIES: ReadonlySet<DoctorCategory> = new Set<DoctorCategory>([
   'required-install',
   'optional-install',
@@ -44,7 +44,7 @@ function expectedAutoExpand(report: DoctorReport): boolean {
   return report.checks.some((check) => !check.ok && EXPAND_CATEGORIES.has(check.category));
 }
 
-describe('Property 5: DoctorPanel auto-expand predicate', () => {
+describe('DoctorPanel auto-expand predicate', () => {
   it('returns true iff some required-install or optional-install check has ok === false', () => {
     fc.assert(
       fc.property(reportArb, (report) => {

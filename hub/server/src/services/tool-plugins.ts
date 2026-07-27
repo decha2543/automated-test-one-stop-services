@@ -79,7 +79,7 @@ function installToolDependencies(
   }
 }
 
-// ─── Post-install hook (Post_Install_Hook, C4, Req 8) ────────────────────────
+// ─── Post-install hook (Post_Install_Hook) ────────────────────────
 
 /** Max wall-clock time for a tool's `setup` task (mirrors DEPS_INSTALL_TIMEOUT_MS). */
 const POST_INSTALL_TIMEOUT_MS = 180_000;
@@ -238,7 +238,7 @@ const SAFE_GIT_URL = /^(?:https:\/\/|ssh:\/\/git@|git@)[A-Za-z0-9._:/~@?=+-]+(?:
 /**
  * List all discovered tools as `ToolView[]` — the shape consumed by
  * `GET /api/tools`. Computes `projectCount` per tool from `listProjectDirs()`
- * excluding `*-template-example` folders (per design §4.6.3).
+ * excluding `*-template-example` folders.
  */
 export async function listToolViews(): Promise<readonly ToolView[]> {
   const reg = await getRegistry();
@@ -495,7 +495,7 @@ export async function uninstall(
   });
 }
 
-// ─── Two-phase install service (M3) ─────────────────────────────────────────
+// ─── Two-phase install service ─────────────────────────────────────────
 
 /** Options for the two-phase install flow. */
 export interface InstallOpts {
@@ -582,8 +582,6 @@ export type InstallResult =
  * Python tools: the `[tool.uv.workspace]` pyproject.toml edit is gated behind
  * `opts.editPyproject` — it is NOT auto-applied. The install confirmation dialog
  * must surface this as an explicit checkbox.
- *
- * Requirements: 9.1–9.7, 12.2, 12.3
  */
 export async function installFromRegistry(
   name: string,
@@ -750,7 +748,7 @@ export async function installFromRegistry(
   return preview;
 }
 
-// ─── Tool Update (M3) ────────────────────────────────────────────────────────
+// ─── Tool Update ────────────────────────────────────────────────────────
 
 /** Error shape returned by `updateTool` when the operation cannot proceed. */
 export interface UpdateToolError {
@@ -778,8 +776,6 @@ export type UpdateToolResult =
  *
  * On success: invalidates caches, runs the workspace re-sync hook, and returns
  * `LifecycleResult<{ from, to }>` with the previous and new commit SHAs.
- *
- * Requirements: 10.1–10.7
  */
 export async function updateTool(id: string, ref?: string): Promise<UpdateToolResult> {
   // Defence in depth: `id` is interpolated into `git -C "${toolDir}"` shell
@@ -920,7 +916,7 @@ function getDefaultBranch(toolDir: string): string {
   }
 }
 
-// ─── Manual-clone deps install (M4-A.4) ──────────────────────────────────────
+// ─── Manual-clone deps install ──────────────────────────────────────
 
 /** Returned when the tool id is not a known, enabled manifest. */
 export interface InstallDepsToolNotFoundError {
@@ -940,7 +936,7 @@ export type InstallDepsResult = InstallResult | InstallDepsToolNotFoundError;
 /**
  * Wire + install dependencies for a manually-cloned tool.
  *
- * Discovery (M1) picks up any `tools/<id>/tool.manifest.json` on the next
+ * Discovery picks up any `tools/<id>/tool.manifest.json` on the next
  * registry refresh; this entry point lets a manually-cloned tool be wired into
  * the workspace and have its dependencies installed without going through the
  * registry-install flow. The tool's `origin` is reported as `'local'` when it
@@ -955,8 +951,6 @@ export type InstallDepsResult = InstallResult | InstallDepsToolNotFoundError;
  * which runs inside `withResync` — no duplicated package-manager spawn logic.
  * The `[tool.uv.workspace]` pyproject edit stays gated behind `editPyproject`
  * consent, exactly like the registry-install flow.
- *
- * Requirements: 6.1, 6.2, 8.1, 8.2, 8.3
  */
 export async function installDepsForTool(
   id: string,
@@ -1046,8 +1040,6 @@ function safelyRemoveDir(dirPath: string): void {
  * Append a workspace member entry to pyproject.toml [tool.uv.workspace].
  * Only called when the user explicitly consents via `opts.editPyproject`.
  * Idempotent — skips if the entry already exists.
- *
- * Requirements: 12.2, 12.3
  */
 function appendPyprojectWorkspaceEntry(toolName: string): void {
   if (!fs.existsSync(PYPROJECT_PATH)) return;

@@ -1,16 +1,16 @@
 // scripts/manifests/__tests__/setup-delegation.spec.ts
 //
-// Example tests for Task 6 of the install-and-provisioning-overhaul spec
-// (root Setup_Task delegation loop + central-hardcode removal, C1):
+// Example tests for the tool-setup delegation seam
+// (root Setup_Task delegation loop + central-hardcode removal):
 //  - The root `setup` target no longer runs a hardcoded `playwright install`
-//    (R5.1) — provisioning is delegated to each tool's own `setup` task.
+// — provisioning is delegated to each tool's own `setup` task.
 //  - The setup path sets no `NODE_TLS_REJECT_UNAUTHORIZED=0` default; TLS
-//    validation is never disabled by default (R12.5).
+//    validation is never disabled by default.
 //  - The target delegates via the shared planner and runs each tool's `setup`
-//    by taskfile path (folder-presence delegation, R5.5 / R6.1).
+//    by taskfile path (folder-presence delegation).
 //  - `gatherToolSetupFacts` + `planToolSetup` reflect folder-presence end to end.
 //
-// Validates: Requirements 5.1, 12.5 (with R5.5 / R6.1 delegation guards)
+// Guards: the delegation seam stays folder-presence driven, no hardcoded ids.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -34,7 +34,7 @@ function taskBody(taskfile: string, name: string): string {
   return nextHeader < 0 ? rest : rest.slice(0, `  ${name}:`.length + nextHeader);
 }
 
-describe('Root setup target removes central hardcodes (R5.1, R12.5)', () => {
+describe('Root setup target removes central hardcodes', () => {
   const setupBody = taskBody(TASKFILE, 'setup');
 
   it('extracts only the setup target, not setup-android', () => {
@@ -42,23 +42,23 @@ describe('Root setup target removes central hardcodes (R5.1, R12.5)', () => {
     expect(setupBody).not.toMatch(/setup-android:/);
   });
 
-  it('runs no hardcoded `playwright install` in the setup body (R5.1)', () => {
+  it('runs no hardcoded `playwright install` in the setup body', () => {
     expect(setupBody).not.toMatch(/playwright\s+install/i);
   });
 
-  it('sets no NODE_TLS_REJECT_UNAUTHORIZED=0 TLS-disabling default (R12.5)', () => {
+  it('sets no NODE_TLS_REJECT_UNAUTHORIZED=0 TLS-disabling default', () => {
     expect(setupBody).not.toMatch(/NODE_TLS_REJECT_UNAUTHORIZED/);
   });
 
-  it('documents the proxy/mirror-CA path instead of disabling TLS (R12.5)', () => {
+  it('documents the proxy/mirror-CA path instead of disabling TLS', () => {
     expect(setupBody).toMatch(/HTTPS_PROXY/);
   });
 
-  it('delegates provisioning via the shared planner (R5.5)', () => {
+  it('delegates provisioning via the shared planner', () => {
     expect(setupBody).toMatch(/setup-planner\.ts plan/);
   });
 
-  it('runs each tool\'s own setup task by taskfile path (R6.1)', () => {
+  it('runs each tool\'s own setup task by taskfile path', () => {
     expect(setupBody).toMatch(/--taskfile "tools\/\$id\/Taskfile\.yml"/);
     expect(setupBody).toMatch(/--dir "tools\/\$id" setup/);
   });
@@ -107,7 +107,7 @@ describe('gatherToolSetupFacts + planToolSetup reflect folder-presence', () => {
     }
   });
 
-  it('an empty tools/ set produces a clean empty plan (R6.6)', () => {
+  it('an empty tools/ set produces a clean empty plan', () => {
     const ws = makeTmpDir('setup-deleg-empty-');
     try {
       fs.mkdirSync(path.join(ws, 'tools'), { recursive: true });

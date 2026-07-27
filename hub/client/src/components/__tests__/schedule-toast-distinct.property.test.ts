@@ -1,4 +1,4 @@
-// Feature: one-stop-service-upgrade, Property 17: Concurrent schedule toasts are distinct
+// Concurrent schedule toasts are distinct
 import type { RunStatus } from '@hub/shared';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -9,9 +9,8 @@ import {
 } from '../schedule-toast-helpers';
 
 /**
- * Property test for Task 7.6 — Concurrent schedule toasts are distinct.
+ * Property test for Concurrent schedule toasts are distinct.
  *
- * Validates: Requirements 9.6
  *
  * When 2+ schedule-bound runs complete simultaneously, their toasts must be
  * distinct and never overwrite each other. The toast id is a pure function of
@@ -37,7 +36,7 @@ const RUN_STATUSES: readonly RunStatus[] = [
 /**
  * Smart generator for a `schedule-finished` event whose `runId` is supplied by
  * the caller. The remaining fields (scheduleId/name/status/silent/message) vary
- * freely because Property 17 must hold regardless of their values — the toast
+ * freely because the invariant must hold regardless of their values — the toast
  * id depends on `runId` alone.
  */
 function eventArbForRunId(runId: string): fc.Arbitrary<ScheduleFinishedEvent> {
@@ -69,7 +68,7 @@ const distinctEventsArb: fc.Arbitrary<ScheduleFinishedEvent[]> = distinctRunIdsA
   fc.tuple(...runIds.map((runId) => eventArbForRunId(runId))),
 );
 
-describe('Property 17: Concurrent schedule toasts are distinct', () => {
+describe('Concurrent schedule toasts are distinct', () => {
   it('produces pairwise-distinct toast ids for a batch of events with distinct runIds', () => {
     fc.assert(
       fc.property(distinctEventsArb, (events) => {

@@ -192,9 +192,6 @@
     "**/.venv",
     "**/node_modules"
   ],
-  "kiroAgent.agentIgnoreFiles": [
-    ".kiroignore"
-  ],
   "python.analysis.exclude": [
     "**/.venv",
     "**/node_modules",
@@ -276,8 +273,6 @@
   "robotcode.robocop.configFile": "tools/robot-framework/robot.toml",
   "robotcode.testExplorer.enabled": false,
   "robotcode.debug.outputLog": false,
-
-  "kiroAgent.enableTabAutocomplete": true,
 
   "typescript.tsdk": "node_modules\\typescript\\lib",
   "typescript.tsserver.log": "off",

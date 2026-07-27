@@ -14,13 +14,12 @@ import { openLocalDb } from '../local-db.js';
  *     `transact()` runs `BEGIN IMMEDIATE`, then `JSON.stringify(rows)`. A
  *     payload whose `toJSON()` throws fails AFTER BEGIN but BEFORE any DB
  *     mutation, so ROLLBACK unwinds an empty transaction (all-old). Rethrown
- *     to the caller (R12.4).
+ *     to the caller.
  *   - history path: `replaceAll` runs `DELETE FROM history` FIRST, then binds
  *     and INSERTs each record. A record with a non-scalar column value throws
  *     during its INSERT — AFTER real mutations (the DELETE and the first valid
  *     INSERT) — so ROLLBACK must undo them, restoring the prior committed
- *     state (all-old). The strongest demonstration of the atomic path
- *     (R12.3/R12.4).
+ *     state (all-old). The strongest demonstration of the atomic path.
  */
 
 /** Build a valid, JSON-serializable RunRecord for history rows. */
@@ -52,7 +51,7 @@ function sortById<T extends { id: string }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-describe('Local_DB atomic write — injected mid-write failure (R12.3/R12.4)', () => {
+describe('Local_DB atomic write — injected mid-write failure', () => {
   it('kv_store: a write that fails during serialization leaves the previous value intact (all-old), then a successful write yields all-new', () => {
     const db = openLocalDb(':memory:');
     const name = 'schedules';
@@ -77,7 +76,7 @@ describe('Local_DB atomic write — injected mid-write failure (R12.3/R12.4)', (
     ];
     expect(() => db.writeCollection(name, poison)).toThrow(/serialization failure injected/);
 
-    // R12.4: the failed write did NOT partially apply — read-back is exactly
+    // the failed write did NOT partially apply — read-back is exactly
     // the prior committed value (all-old), never partial/corrupt.
     expect(db.readCollection(name)).toEqual(original);
 
@@ -107,7 +106,7 @@ describe('Local_DB atomic write — injected mid-write failure (R12.3/R12.4)', (
     ];
     expect(() => db.writeCollection('history', failingWrite)).toThrow();
 
-    // R12.3/R12.4: never partial. The half-applied DELETE+INSERT was rolled
+    // never partial. The half-applied DELETE+INSERT was rolled
     // back; read-back equals the ORIGINAL committed state (all-old). The
     // 'new-valid' record that was momentarily inserted did NOT survive.
     const afterFailure = db.readCollection<RunRecord>('history');
@@ -125,7 +124,7 @@ describe('Local_DB atomic write — injected mid-write failure (R12.3/R12.4)', (
   });
 });
 
-describe('Local_DB silent partial-write rollback (R13.3)', () => {
+describe('Local_DB silent partial-write rollback', () => {
   it('a buggy code path that partially writes a silent run then fails leaves NO record referencing that run', () => {
     const db = openLocalDb(':memory:');
     const silentRunId = 'silent-run-xyz';
@@ -149,7 +148,7 @@ describe('Local_DB silent partial-write rollback (R13.3)', () => {
     ];
     expect(() => db.writeCollection('history', partialSilentWrite)).toThrow();
 
-    // R13.3: the atomic ROLLBACK guarantees no partial silent record survives.
+    // the atomic ROLLBACK guarantees no partial silent record survives.
     // Querying by the silent run id returns 0 records, and the committed state
     // is unchanged (the prior state, which never contained the silent run).
     const after = db.readCollection<RunRecord>('history');

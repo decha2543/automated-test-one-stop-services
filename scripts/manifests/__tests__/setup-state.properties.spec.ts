@@ -6,7 +6,6 @@
 // fast-check under vitest, mirroring the scripts/manifests/__tests__/ convention
 // (plain vitest + fc.assert, tmp-dir round-trip like the discovery property).
 //
-// Validates: Requirements 1.5, 2.4
 
 import * as path from 'node:path';
 import * as fc from 'fast-check';
@@ -26,14 +25,12 @@ const arbLedgerSteps = fc.record(
 );
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 12
 // Ledger round-trip and resume selection.
 // For any State_Ledger value, writing then reading the ledger yields an
 // equivalent value (round-trip), and the resume selector returns the first step
 // in STEP_ORDER whose recorded status is not `done`, skipping all `done` steps.
-// **Validates: Requirements 1.5, 2.4**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 12', () => {
+describe('Ledger round-trip and resume selection', () => {
   it('round-trips the ledger and resumes at the first non-done step', () => {
     const dir = makeTmpDir('setup-state-');
     tmpDirs.push(dir);

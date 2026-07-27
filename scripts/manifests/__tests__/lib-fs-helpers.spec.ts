@@ -32,7 +32,7 @@ function dir(...segments: string[]): void {
 }
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'kiro-fs-helpers-'));
+  root = mkdtempSync(join(tmpdir(), 'autoqa-fs-helpers-'));
 });
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });

@@ -30,7 +30,7 @@ let reportsCache: { value: ReportEntry[]; at: number } | null = null;
  * Per-tool walk config resolved from the manifest registry. `typeAxis` decides
  * the `outputs/` directory shape (type axis vs flat), `type` is the report type
  * label for flat tools (e.g. k6 -> 'performance'), and `resultGlob` selects the
- * tool's result HTML file (design §7.1/§7.3).
+ * tool's result HTML file.
  */
 interface ToolWalkConfig {
   readonly typeAxis: boolean;

@@ -1,20 +1,18 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-  type PostInstallHookEffects,
-  resolveConfirmPhaseErrors,
-  runPostInstallHook,
+    type PostInstallHookEffects,
+    resolveConfirmPhaseErrors,
+    runPostInstallHook,
 } from '../tool-plugins.js';
 
 /**
  * Property-based tests for the Hub Post_Install_Hook result shaping
- * (install-and-provisioning-overhaul, C4). One property per test; ≥100
+ * . One property per test; ≥100
  * iterations; fast-check under vitest, mirroring the hub/server property-test
  * convention. The hook's probe + spawn are injected as a FAKE
  * {@link PostInstallHookEffects} (success/fail runner), so no real `task` spawn
  * or filesystem read happens — only the pure shaping logic is exercised.
- *
- * Validates: Requirements 8.1, 8.2, 8.4 (Property 7); 8.3 (Property 8)
  */
 
 // ─── Generators ──────────────────────────────────────────────────────────────
@@ -47,15 +45,13 @@ function fakeEffects(
 }
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 7
 // Post-install hook result shaping.
 // postInstallError is present on the lifecycle result IFF the tool defines a
 // `setup` task AND that task failed; a tool with no `setup` task never yields a
 // postInstallError; and when present, the hook ran after dependency install
 // (deps are a prerequisite — a depsError skips the hook entirely).
-// Validates: Requirements 8.1, 8.2, 8.4
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 7', () => {
+describe('Post-install hook result shaping', () => {
   it('postInstallError present iff a setup task exists and failed; absent with no setup task; hook gated behind deps', () => {
     fc.assert(
       fc.property(
@@ -70,14 +66,14 @@ describe('Feature: install-and-provisioning-overhaul, Property 7', () => {
 
           if (depsError) {
             // Deps are a prerequisite: the hook NEVER runs after a deps failure,
-            // and only depsError is surfaced (the clone is kept either way, R8.3).
+            // and only depsError is surfaced (the clone is kept either way).
             expect(runs()).toBe(0);
             expect(errors.postInstallError).toBeUndefined();
             expect(errors.depsError).toEqual(depsError);
             return;
           }
 
-          // Clean deps install → the hook runs (after deps). R8.4: a tool with no
+          // Clean deps install → the hook runs (after deps). a tool with no
           // setup task never invokes the runner and never yields an error.
           expect(runs()).toBe(hasSetup ? 1 : 0);
 
@@ -100,14 +96,12 @@ describe('Feature: install-and-provisioning-overhaul, Property 7', () => {
 });
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 8
 // Clone is preserved across any hook outcome.
 // For any Post_Install_Hook outcome (success/failure, setup task present or not,
 // deps ok or failed), the installed tool's cloned directory remains — the hook
 // never triggers a clone rollback.
-// Validates: Requirements 8.3
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 8', () => {
+describe('Clone is preserved across any hook outcome', () => {
   it('never rolls back the clone for any hook outcome', () => {
     fc.assert(
       fc.property(
@@ -117,7 +111,7 @@ describe('Feature: install-and-provisioning-overhaul, Property 8', () => {
         arbDepsError,
         (id, hasSetup, exitCode, depsError) => {
           // Fake clone marker — set once the tool is "cloned". The hook path holds
-          // no reference to it, so no outcome can clear it (R8.3).
+          // no reference to it, so no outcome can clear it.
           const clone = { present: true };
           const { effects } = fakeEffects(hasSetup, exitCode);
 
@@ -141,7 +135,7 @@ describe('runPostInstallHook (examples)', () => {
     runSetup: () => ({ exitCode, stderr: exitCode === 0 ? '' : 'boom' }),
   });
 
-  it('no setup task → no-op, no error, runner never called (R8.4)', () => {
+  it('no setup task → no-op, no error, runner never called', () => {
     let ran = false;
     const effects: PostInstallHookEffects = {
       hasSetupTask: () => false,
@@ -154,17 +148,17 @@ describe('runPostInstallHook (examples)', () => {
     expect(ran).toBe(false);
   });
 
-  it('setup task succeeds → no postInstallError (R8.1)', () => {
+  it('setup task succeeds → no postInstallError', () => {
     expect(runPostInstallHook('playwright', ok(0))).toBeUndefined();
   });
 
-  it('setup task fails → POST_INSTALL_FAILED naming the tool (R8.2)', () => {
+  it('setup task fails → POST_INSTALL_FAILED naming the tool', () => {
     const err = runPostInstallHook('playwright', ok(2));
     expect(err?.code).toBe('POST_INSTALL_FAILED');
     expect(err?.message).toContain('playwright');
   });
 
-  it('depsError present → hook skipped, only depsError surfaced (R8.3 prerequisite)', () => {
+  it('depsError present → hook skipped, only depsError surfaced (prerequisite)', () => {
     let ran = false;
     const effects: PostInstallHookEffects = {
       hasSetupTask: () => true,

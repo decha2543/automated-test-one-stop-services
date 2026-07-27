@@ -2,18 +2,18 @@
 //
 // Manifest-driven generator for a tool's `docker-compose.yml`. Replaces the
 // hardcoded per-tool `generateDockerCompose(...)` calls that used to live in
-// `scripts/sync-projects.ts`. See design §4.2.2.
+// `scripts/sync-projects.ts`.
 //
 // Behaviour:
 //   - Reads the compose template named by `manifest.compose.template` from the
 //     tool's folder.
 //   - Re-emits everything up to and including the `services:` line, then writes
-//     one service entry per NON-TEMPLATE project (Requirement 4.1), each
+//     one service entry per NON-TEMPLATE project, each
 //     aliasing the template anchor `manifest.compose.anchor`.
 //   - Appends an external `networks:` block when `compose.networks` is non-empty.
 //   - When the template is absent it logs a warning and returns WITHOUT throwing
-//     so a single broken tool never aborts the whole sync (Requirement 4.6 /
-//     §6.2 broken-manifest tolerance).
+//     so a single broken tool never aborts the whole sync (broken-manifest
+//     tolerance).
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { listProjectDirs } from './fs-helpers.js';
@@ -22,7 +22,7 @@ import type { ToolManifest } from './types.js';
 /**
  * Generate `tools/<id>/docker-compose.yml` for a single tool from its compose
  * template + discovered projects. IO-only; never throws on a missing or
- * malformed template (logs and returns instead). See design §4.2.2.
+ * malformed template (logs and returns instead).
  */
 export function generateDockerCompose(workspaceRoot: string, tool: ToolManifest): void {
   const toolDir = path.join(workspaceRoot, 'tools', tool.id);

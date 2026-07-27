@@ -4,7 +4,7 @@ import { translate } from '~/i18n/index.js';
 /**
  * The `schedule-finished` variant of {@link WsServerEvent}. Extracted as a
  * standalone type so the pure helpers below operate on exactly the payload
- * the WS listener (task 7.3) hands them.
+ * the WS listener hands them.
  */
 export type ScheduleFinishedEvent = Extract<WsServerEvent, { kind: 'schedule-finished' }>;
 
@@ -17,7 +17,7 @@ export type ScheduleToastType = 'success' | 'error';
  * us property-test the decision logic without touching the DOM.
  */
 export interface ScheduleToastDescriptor {
-  /** Toast id tied to the runId so concurrent completions render as distinct toasts (R9.6). */
+  /** Toast id tied to the runId so concurrent completions render as distinct toasts. */
   id: string;
   /** High-level variant. */
   type: ScheduleToastType;
@@ -34,7 +34,7 @@ export interface ScheduleToastDescriptor {
 export interface ScheduleToastPreferences {
   /**
    * Per-scheduleId switch for silent-schedule toasts. A missing entry means
-   * enabled (R10.6 default-enabled). A `false` entry suppresses the toast (R10.5).
+   * enabled (default-enabled). A `false` entry suppresses the toast.
    */
   silentScheduleToast: Record<string, boolean>;
 }
@@ -42,7 +42,7 @@ export interface ScheduleToastPreferences {
 const SUCCESS_AUTO_CLOSE_MS = 5000;
 const FAILURE_AUTO_CLOSE_MS = 10000;
 
-/** Stable toast id bound to the runId so distinct runs never overwrite each other (R9.6). */
+/** Stable toast id bound to the runId so distinct runs never overwrite each other. */
 export function scheduleToastId(runId: string): string {
   return `schedule-${runId}`;
 }
@@ -50,13 +50,13 @@ export function scheduleToastId(runId: string): string {
 /**
  * Pure mapping from a `schedule-finished` event to a toast descriptor.
  *
- * - `passed` → success toast, auto-close 5000ms (R9.1, R9.3, R10.1)
+ * - `passed` → success toast, auto-close 5000ms
  * - any other terminal status (`failed`, `cancelled`, `error`, ...) → error toast,
- *   auto-close 10000ms (R9.2, R9.4, R10.2)
+ *   auto-close 10000ms
  *
  * The message always names the schedule (or its id when unnamed) and the final
- * status; for failures the event `message` (failure reason) is appended (R10.2).
- * The toast id is bound to the runId so concurrent completions stay distinct (R9.6).
+ * status; for failures the event `message` (failure reason) is appended.
+ * The toast id is bound to the runId so concurrent completions stay distinct.
  */
 export function buildScheduleToast(event: ScheduleFinishedEvent): ScheduleToastDescriptor {
   const isSuccess = event.status === 'passed';
@@ -92,7 +92,7 @@ export function buildScheduleToast(event: ScheduleFinishedEvent): ScheduleToastD
  *
  * - Non-silent schedules always show a toast.
  * - Silent schedules show a toast unless the user disabled the per-scheduleId
- *   `silentScheduleToast` preference (R10.5). Missing entry = enabled (R10.6).
+ *   `silentScheduleToast` preference. Missing entry = enabled.
  */
 export function shouldShowScheduleToast(
   event: ScheduleFinishedEvent,

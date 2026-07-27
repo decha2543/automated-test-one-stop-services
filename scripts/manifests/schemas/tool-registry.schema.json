@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ToolRegistry",
-  "description": "Workspace-local registry of installable tool repositories. Repository pointers only. See design section 3.6.",
+  "description": "Workspace-local registry of installable tool repositories. Repository pointers only.",
   "type": "object",
   "required": ["schemaVersion", "tools"],
   "additionalProperties": false,

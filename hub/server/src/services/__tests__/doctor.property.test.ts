@@ -1,4 +1,4 @@
-// Feature: install-and-provisioning-overhaul, Property 2: Folder-presence gates
+// Folder-presence gates
 // provisioning and doctor checks.
 //
 // For any tool id and any set of present/absent tool folders, a tool's Doctor
@@ -7,7 +7,6 @@
 // that never forces overall failure and never prevents a separate component
 // from independently declaring that tool required.
 //
-// **Validates: Requirements 4.2, 4.3, 4.4, 5.2, 5.3**
 //
 // One property; >=100 iterations; fast-check under Vitest. The unit under test
 // is the pure, exported gating core of `hub/server/src/services/doctor.ts`
@@ -64,7 +63,7 @@ function gateToCheck(gate: ToolGate): DoctorCheck {
   };
 }
 
-describe('Feature: install-and-provisioning-overhaul, Property 2', () => {
+describe('required-install classification follows tool-folder presence', () => {
   it('classifies required-install iff the tool folder is present; absent self-checks never force failure nor suppress an independent required check', () => {
     fc.assert(
       fc.property(arbToolGateSet, (gates) => {
@@ -73,11 +72,11 @@ describe('Feature: install-and-provisioning-overhaul, Property 2', () => {
 
         for (const { gate, check } of pairs) {
           if (gate.present) {
-            // Present folder -> mandatory required-install classification (R5.2).
+            // Present folder -> mandatory required-install classification.
             expect(check.category).toBe('required-install');
           } else {
             // Absent folder -> a non-required self-check, never required, and
-            // never itself a failure (R4.4, R5.3).
+            // never itself a failure.
             expect(check.category).toBe('optional-install');
             expect(check.category).not.toBe('required-install');
             expect(check.ok).toBe(true);
@@ -85,14 +84,14 @@ describe('Feature: install-and-provisioning-overhaul, Property 2', () => {
         }
 
         // `overallOk` is decided solely by present tools' probes; absent
-        // self-checks drop out entirely (R4.3, R4.4).
+        // self-checks drop out entirely.
         const expectedOverall = gates.filter((g) => g.present).every((g) => g.probeOk);
         expect(computeOverallOk(checks)).toBe(expectedOverall);
 
         // An absent tool's self-check never PREVENTS a separate component from
         // independently declaring that tool required: a failing required-install
         // check for the same absent tool still fails overall, proving the
-        // optional self-check neither suppresses nor overrides it (R5.2, R5.3).
+        // optional self-check neither suppresses nor overrides it.
         const absent = gates.find((g) => !g.present);
         if (absent) {
           const independentlyRequired: DoctorCheck = {

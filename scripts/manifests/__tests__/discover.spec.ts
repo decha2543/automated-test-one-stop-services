@@ -1,10 +1,9 @@
 // scripts/manifests/__tests__/discover.spec.ts
 //
-// Unit tests for `scripts/manifests/discover.ts` (design §8.1, §4.1.2).
+// Unit tests for `scripts/manifests/discover.ts`.
 // Covers empty `tools/`, hidden-folder exclusion, manifest-presence filtering,
 // sort stability, and idempotence.
 //
-// Validates: Requirements 2.1, 2.2
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -42,7 +41,7 @@ describe('discoverManifestPaths', () => {
     }
   });
 
-  it('excludes folders whose name starts with "." (req 2.1)', () => {
+  it('excludes folders whose name starts with "."', () => {
     writeToolManifest(ws, 'playwright');
     // A hidden folder that nonetheless contains a manifest must be skipped.
     const hiddenDir = mkDir(ws, 'tools', '.hidden-tool');
@@ -70,7 +69,7 @@ describe('discoverManifestPaths', () => {
     expect(paths).toHaveLength(1);
   });
 
-  it('returns a stably sorted list regardless of creation order (req 2.2)', () => {
+  it('returns a stably sorted list regardless of creation order', () => {
     // Create in deliberately non-alphabetical order.
     for (const id of ['zulu', 'alpha', 'mike', 'bravo']) {
       writeToolManifest(ws, id);
@@ -80,7 +79,7 @@ describe('discoverManifestPaths', () => {
     expect(paths).toEqual(sorted);
   });
 
-  it('is idempotent — repeated scans return identical lists (Property 3)', () => {
+  it('is idempotent — repeated scans return identical lists', () => {
     for (const id of ['robot-framework', 'k6', 'playwright']) {
       writeToolManifest(ws, id);
     }

@@ -1,6 +1,6 @@
 // scripts/manifests/__tests__/command-parity.spec.ts
 //
-// Anti-drift parity guard (design §7.2, R3; task 18). The Hub command-builder
+// Anti-drift parity guard. The Hub command-builder
 // (`hub/server/src/services/command-builder.ts`) delegates to the shared
 // `buildRunCommandFromInput()`, which itself delegates to the canonical CLI
 // builder `buildTaskCommand()`. This suite proves both code paths emit IDENTICAL
@@ -19,7 +19,6 @@
 //      (TYPE/PROJECT/TAG/SECTION/PERFORMANCE_TYPE) are single-quoted while cli
 //      args (headless flag, extra args) pass through verbatim.
 //
-// Validates: Requirements 9.1
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';

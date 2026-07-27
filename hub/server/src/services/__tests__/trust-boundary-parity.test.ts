@@ -6,7 +6,7 @@ import { WORKSPACE_ROOT } from '../../config.js';
 /**
  * Parity guard for the trust-boundary regexes that are DELIBERATELY duplicated.
  *
- * `hub/server` and `scripts/` cannot import each other (LESS-024: `scripts/` is
+ * `hub/server` and `scripts/` cannot import each other (`scripts/` is
  * outside the server tsconfig `include` and Biome bans deep `../../` imports),
  * and a few hub route/service files inline their own `SAFE_GIT_URL` copy rather
  * than importing the shared one. Every copy is meant to be byte-identical and
@@ -55,7 +55,7 @@ const CASES: ParityCase[] = [
   },
 ];
 
-describe('trust-boundary regex parity (LESS-024)', () => {
+describe('trust-boundary regex parity', () => {
   for (const { name, files } of CASES) {
     it(`${name} is byte-identical across all ${files.length} copies`, () => {
       const sources = files.map((rel) => regexLiteral(at(rel), name));

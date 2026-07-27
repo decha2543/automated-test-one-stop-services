@@ -37,7 +37,7 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
 
     function onEvent(event: WsServerEvent): void {
       // Broadcast schedule-finished to every socket regardless of
-      // subscription so a Corner_Toast can show on any page (R9.1/R9.2).
+      // subscription so a Corner_Toast can show on any page.
       // Otherwise only forward events the client subscribed to, plus the
       // global run-started announcement.
       if (

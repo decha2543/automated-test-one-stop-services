@@ -178,7 +178,7 @@ export async function toolPluginRoutes(app: FastifyInstance): Promise<void> {
     return syncWorkspaceInProcess();
   });
 
-  // ─── M3 Lifecycle Routes ─────────────────────────────────────────────────────
+  // ─── Lifecycle Routes ─────────────────────────────────────────────────────
 
   /** POST /api/tools/install — two-phase install from the tool registry. */
   app.post<{

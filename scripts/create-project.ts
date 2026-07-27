@@ -51,7 +51,7 @@ function copyDir(src: string, dest: string): void {
   }
 }
 
-// ── Destination folder resolution (design §4.4) ────────────────────────────
+// ── Destination folder resolution ────────────────────────────
 
 function pickDestFolder(
   root: string,

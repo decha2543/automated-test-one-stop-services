@@ -72,7 +72,7 @@ export function useToggleTool() {
   });
 }
 
-/** Fetches registry entries for the marketplace view (M3).
+/** Fetches registry entries for the marketplace view.
  *  Pass `enabled` (e.g. the modal's open state) so the registry — which probes
  *  remote git URLs server-side — is only fetched when actually needed, not on
  *  every Projects page load. */

@@ -1,8 +1,7 @@
 // scripts/manifests/__tests__/capabilities.spec.ts
 //
 // Unit tests for the optional manifest capability blocks (`run` / `reports` /
-// `tags`) and their default-resolution helper `resolveCapabilities()`
-// (design §7.1, §7.3; requirements 9.1, 9.2, 9.3, 10.4).
+// `tags`) and their default-resolution helper `resolveCapabilities()`.
 //
 // Three guarantees are covered:
 //   (a) a manifest WITH all three blocks parses and the values round-trip;
@@ -10,7 +9,6 @@
 //       (no extra vars, `**/*.html` glob, `tags.strategy: 'none'`);
 //   (c) an UNKNOWN `tags.strategy` resolves to `'none'` rather than throwing.
 //
-// Validates: Requirements 9.1, 9.2, 9.3, 10.4
 import { describe, expect, it } from 'vitest';
 import type { ToolManifest } from '../types.js';
 import { DEFAULT_REPORT_GLOB, resolveCapabilities, validateManifest } from '../validate.js';
@@ -25,7 +23,7 @@ function parseOrThrow(json: Record<string, unknown>): ToolManifest {
   return res.manifest;
 }
 
-describe('capability blocks — parse + round-trip (req 9.1)', () => {
+describe('capability blocks — parse + round-trip', () => {
   it('accepts a manifest carrying all three capability blocks and keeps schemaVersion "1"', () => {
     const m = baseManifest();
     m.run = {
@@ -75,7 +73,7 @@ describe('capability blocks — parse + round-trip (req 9.1)', () => {
   });
 });
 
-describe('capability blocks — absent ⇒ safe defaults (req 10.4, design §7.3)', () => {
+describe('capability blocks — absent ⇒ safe defaults', () => {
   it('parses a manifest with no capability blocks', () => {
     const m = baseManifest();
     expect(m.run).toBeUndefined();
@@ -112,7 +110,7 @@ describe('capability blocks — absent ⇒ safe defaults (req 10.4, design §7.3
   });
 });
 
-describe('capability blocks — unknown tags.strategy degrades to none (req 9.2, design §7.3)', () => {
+describe('capability blocks — unknown tags.strategy degrades to none', () => {
   it('resolves an unknown strategy string to "none" without throwing', () => {
     const m = baseManifest();
     m.tags = { strategy: 'cypress-grep' }; // not a known strategy

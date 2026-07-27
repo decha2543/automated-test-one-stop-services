@@ -2,13 +2,13 @@ import { LOCAL_DB_PATH } from '../config.js';
 import { type LocalDb, openLocalDb } from './local-db.js';
 
 /**
- * Process-wide Local_DB singleton (Area E).
+ * Process-wide Local_DB singleton.
  *
  * `persistence.ts` and `history-store.ts` are rewired to call into this one
  * shared `LocalDb` instead of reading/writing JSON/NDJSON files directly. We
  * open it lazily on first access so that:
  *   - the database is created (schema prepared) even when empty, and
- *   - boot-time reads are synchronous (R12.1) — `getDb()` returns a fully
+ *   - boot-time reads are synchronous — `getDb()` returns a fully
  *     prepared `LocalDb` the very first time persistence/history touch it,
  *     which happens during module construction before the event loop starts.
  *

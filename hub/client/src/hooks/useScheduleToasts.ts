@@ -9,24 +9,24 @@ import { notifyRunFinished } from '~/hooks/useDesktopNotification.js';
 import { usePreferences } from '~/stores/hub.js';
 
 /**
- * App-level listener for the `schedule-finished` WebSocket event (Area D).
+ * App-level listener for the `schedule-finished` WebSocket event.
  *
  * The server broadcasts `schedule-finished` to *every* socket regardless of
- * subscription (ws.ts, task 7.1), so this hook opens its own connection to
+ * subscription (ws.ts), so this hook opens its own connection to
  * `/ws` and surfaces a Corner_Toast on any page — independent of the per-run
  * socket owned by `RunSession`. `RunSession` has no `schedule-finished` case,
  * so it ignores the broadcast and there is no double-toast.
  *
  * Behaviour:
  * - Gate via `shouldShowScheduleToast(event, prefs)` — silent schedules whose
- *   per-scheduleId toast preference is disabled produce no toast (R10.5);
- *   a missing entry defaults to enabled (R10.6).
+ *   per-scheduleId toast preference is disabled produce no toast;
+ *   a missing entry defaults to enabled.
  * - Build the descriptor with `buildScheduleToast(event)` and show it through
  *   Mantine `notifications.show(...)` (passed → success/5s, otherwise
- *   error/10s — R9.1, R9.2, R10.1, R10.2). The toast id is bound to the runId
- *   so concurrent completions render as distinct toasts (R9.6).
+ *   error/10s). The toast id is bound to the runId
+ *   so concurrent completions render as distinct toasts.
  * - Corner_Toast is ephemeral: this never writes to the `useNotifications`
- *   store, localStorage, or run history (R10.4).
+ *   store, localStorage, or run history.
  */
 export function useScheduleToasts(): void {
   useEffect(() => {
@@ -43,11 +43,11 @@ export function useScheduleToasts(): void {
       }
       if (msg.kind !== 'schedule-finished') return;
 
-      // Read prefs lazily so the latest per-scheduleId switch is honoured (R10.5).
+      // Read prefs lazily so the latest per-scheduleId switch is honoured.
       if (!shouldShowScheduleToast(msg, usePreferences.getState())) return;
 
       const toast = buildScheduleToast(msg);
-      // Ephemeral only — do NOT persist to useNotifications/localStorage/history (R10.4).
+      // Ephemeral only — do NOT persist to useNotifications/localStorage/history.
       notifications.show({
         id: toast.id,
         color: toast.color,

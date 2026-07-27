@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { openLocalDb } from '../local-db.js';
 
 /**
- * Property 25 — Serialized writes never expose partial state (R12.5).
+ * Serialized writes never expose partial state.
  *
  * `DatabaseSync` is a synchronous API, so `writeCollection` calls serialize by
  * invocation order: each `BEGIN IMMEDIATE … COMMIT` transaction completes
@@ -52,8 +52,8 @@ function storedForm<T>(rows: T[]): T[] {
   return JSON.parse(JSON.stringify(rows)) as T[];
 }
 
-describe('openLocalDb serialized writes (Property 25)', () => {
-  // Feature: one-stop-service-upgrade, Property 25: Serialized writes never expose partial state
+describe('openLocalDb serialized writes', () => {
+  // Serialized writes never expose partial state
   it('a sequence of writes to one collection always reads back the full last-written state', () => {
     let counter = 0;
     fc.assert(
@@ -82,7 +82,7 @@ describe('openLocalDb serialized writes (Property 25)', () => {
     );
   });
 
-  // Feature: one-stop-service-upgrade, Property 25: Serialized writes never expose partial state
+  // Serialized writes never expose partial state
   it('interleaved writes to two collections never cross-contaminate (each reflects only its own last write)', () => {
     let counter = 0;
     fc.assert(

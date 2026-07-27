@@ -1,10 +1,10 @@
 // scripts/manifests/__tests__/fs-helpers.spec.ts
 //
-// Unit tests for `scripts/manifests/fs-helpers.ts` (design §8.1, §4.2.2).
+// Unit tests for `scripts/manifests/fs-helpers.ts`.
 // Covers depth=1 (with + without fixedType), depth=2, template-example
 // exclusion, hidden-folder exclusion, and missing-directory handling.
 //
-// Validates: Requirements 2.1, 2.2 (project enumeration determinism + exclusion)
+// Guards: project enumeration stays deterministic and honours the exclusions.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

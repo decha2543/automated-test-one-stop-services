@@ -6,7 +6,7 @@
  * This is a scoring / reporting harness, NOT a hard write-time gate. It
  * deliberately does NOT duplicate the existing gates:
  *   - biome / ruff / robocop  → syntax + style
- *   - .kiro/scripts/verify-write.mjs → secrets, raw-locator-in-spec, no `any`
+ *   - the AI layer's write-time gate → secrets, raw-locator-in-spec, no `any`
  *
  * Instead it measures quality dimensions those gates miss, so a team can track
  * the trend over time and catch drift (e.g. in CI as a soft signal):

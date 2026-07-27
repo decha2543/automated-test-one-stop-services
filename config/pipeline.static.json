@@ -58,7 +58,7 @@
   },
 
   "test_case_vocab": {
-    "_comment": "Controlled vocabulary for the test-case xlsx deliverable — the SINGLE source read by the content gate (.kiro/scripts/test-case-lint.py) and documented in steering test-case-docs.md + brain LESS-014/051/053. Edit here; the gate falls back to these same values if this section is absent.",
+    "_comment": "Controlled vocabulary for the test-case xlsx deliverable — the SINGLE source read by the AI layer's test-case content gate and documented in its own docs. Edit here; the gate falls back to these same values if this section is absent.",
     "severity_priority": ["Critical", "High", "Medium", "Low"],
     "test_type": ["Positive", "Negative", "Edge"],
     "remark": ["verified-live", "needs-live-confirm"],

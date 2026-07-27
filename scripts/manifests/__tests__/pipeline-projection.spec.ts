@@ -1,12 +1,11 @@
 // scripts/manifests/__tests__/pipeline-projection.spec.ts
 //
-// Unit tests for `scripts/manifests/pipeline-projection.ts` (design §4.5).
+// Unit tests for `scripts/manifests/pipeline-projection.ts`.
 // Verifies the composed-key rule, the `{KEY}` env-token substitution, the
 // docker-base-image format, disabled-tool omission, and the static-parts
 // spread. Builds an isolated temp workspace seeded with the three real
 // committed manifests so the projection is exercised against production data.
 //
-// Validates: Requirements 5.1, 5.2, 5.4, 5.5, 5.6, 5.8
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -59,14 +58,14 @@ describe.skipIf(!realToolsPresent(WORKSPACE_ROOT, TOOL_IDS))('projectPipeline', 
     rmTmpDir(ws);
   });
 
-  it('emits a _generated block sourced from tool.manifest.json with an ISO timestamp (req 5.1)', async () => {
+  it('emits a _generated block sourced from tool.manifest.json with an ISO timestamp', async () => {
     const p = await buildProjection(ws);
     expect(p._generated.from).toBe('tool.manifest.json');
     expect(() => new Date(p._generated.at).toISOString()).not.toThrow();
     expect(new Date(p._generated.at).toISOString()).toBe(p._generated.at);
   });
 
-  it('spreads the static routing + id_conventions sections (req 5.2)', async () => {
+  it('spreads the static routing + id_conventions sections', async () => {
     const p = await buildProjection(ws);
     const routing = p.routing as Record<string, unknown>;
     const idConv = p.id_conventions as Record<string, unknown>;
@@ -74,7 +73,7 @@ describe.skipIf(!realToolsPresent(WORKSPACE_ROOT, TOOL_IDS))('projectPipeline', 
     expect(idConv.BR).toBe('Business Rule (BR-001)');
   });
 
-  it('uses bare <id> for the default target_paths key (req 5.5)', async () => {
+  it('uses bare <id> for the default target_paths key', async () => {
     const p = await buildProjection(ws);
     // robot + k6 both use the "default" pipeline key.
     expect(p.target_paths.robot).toBe(
@@ -85,7 +84,7 @@ describe.skipIf(!realToolsPresent(WORKSPACE_ROOT, TOOL_IDS))('projectPipeline', 
     );
   });
 
-  it('uses composed <id>_<key> for non-default target_paths keys (req 5.4)', async () => {
+  it('uses composed <id>_<key> for non-default target_paths keys', async () => {
     const p = await buildProjection(ws);
     expect(p.target_paths.playwright_web).toBe(
       'tools/playwright/projects/web/{project}/automations/specs/{domain}/{kind}.spec.ts',
@@ -105,7 +104,7 @@ describe.skipIf(!realToolsPresent(WORKSPACE_ROOT, TOOL_IDS))('projectPipeline', 
     expect(env.k6).toBe('__ENV.ENV_X');
   });
 
-  it('formats docker_base_images as "<baseImage> (+ <extras…>)" (req 5.8)', async () => {
+  it('formats docker_base_images as "<baseImage> (+ <extras…>)"', async () => {
     const p = await buildProjection(ws);
     expect(p.docker_base_images.k6).toBe('grafana/k6:latest (+ task, pnpm, dotenvx, tsx)');
     expect(p.docker_base_images.robot).toBe(
@@ -125,7 +124,7 @@ describe.skipIf(!realToolsPresent(WORKSPACE_ROOT, TOOL_IDS))('projectPipeline', 
     ]);
   });
 
-  it('omits a disabled tool from every section (req 5.6)', async () => {
+  it('omits a disabled tool from every section', async () => {
     // Disable k6 by flipping enabled on the seeded copy.
     const k6Path = path.join(ws, 'tools', 'k6', 'tool.manifest.json');
     const k6 = JSON.parse(fs.readFileSync(k6Path, 'utf8')) as Record<string, unknown>;
@@ -142,7 +141,7 @@ describe.skipIf(!realToolsPresent(WORKSPACE_ROOT, TOOL_IDS))('projectPipeline', 
     expect(p.target_paths.playwright_web).toBeDefined();
   });
 
-  it('is order-independent — projection is identical across registry rebuilds (req 5/2.3)', async () => {
+  it('is order-independent — projection is identical across registry rebuilds', async () => {
     const a = await buildProjection(ws);
     const b = await buildProjection(ws);
     const strip = (p: PipelineProjection): string => {

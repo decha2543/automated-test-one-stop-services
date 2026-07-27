@@ -4,9 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { DOCTOR_CATEGORY_ORDER, groupByCategory, shouldShowGroup } from '../doctor-panel-helpers';
 
 /**
- * Property test for Task 2.7 — DoctorPanel category partition.
+ * Property test for DoctorPanel category partition.
  *
- * Validates: Requirements 3.2, 3.3, 3.6
  */
 
 /** The three valid Doctor categories a generated check may be drawn from. */
@@ -34,7 +33,7 @@ const checksArb: fc.Arbitrary<DoctorCheck[]> = fc.array(checkArb, { maxLength: 5
 
 describe('groupByCategory — DoctorPanel category partition', () => {
   it('partitions losslessly into exactly the 3 fixed groups, preserving per-category order', () => {
-    // Feature: one-stop-service-upgrade, Property 4: DoctorPanel category partition is lossless
+    // DoctorPanel category partition is lossless
     fc.assert(
       fc.property(checksArb, (checks) => {
         const groups = groupByCategory(checks);

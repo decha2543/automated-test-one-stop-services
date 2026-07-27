@@ -1,10 +1,10 @@
 // scripts/install-core/validation.ts
 //
 // Canonical trust-boundary validators for the shared install pipeline
-// (install-and-provisioning-overhaul, C5, D3-B). install-core owns ONE copy of
+// . install-core owns ONE copy of
 // `SAFE_ID` / `SAFE_GIT_URL` / `SAFE_GIT_REF`, and BOTH consumers of the
 // pipeline use this copy:
-// - the headless CLI (`scripts/install-tool.ts`, Task 12) imports it directly;
+// - the headless CLI (`scripts/install-tool.ts`) imports it directly;
 // - the Hub Post_Install_Hook reaches install-core by the SAME
 // runtime dynamic-import mechanism the Hub already uses for
 // `scripts/manifests` (`manifest-registry.ts` → `pathToFileURL` + `await

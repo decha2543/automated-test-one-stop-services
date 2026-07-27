@@ -8,9 +8,8 @@ import {
 } from '../schedule-toast-helpers';
 
 /**
- * Property test for Task 7.8 — disabled silent-schedule preference suppresses toast.
+ * Property test for disabled silent-schedule preference suppresses toast.
  *
- * Validates: Requirements 10.5
  */
 
 /** Every terminal/intermediate status a `schedule-finished` event may carry. */
@@ -50,7 +49,7 @@ const eventArb: fc.Arbitrary<ScheduleFinishedEvent> = fc.record({
 /**
  * Arbitrary preferences map keyed by the same scheduleId pool, with boolean
  * values, and a chance of being empty (missing entries) so the default-enabled
- * path (R10.6) is covered alongside explicit `true`/`false` entries (R10.5).
+ * path is covered alongside explicit `true`/`false` entries.
  */
 const prefsArb: fc.Arbitrary<ScheduleToastPreferences> = fc
   .dictionary(scheduleIdArb, fc.boolean())
@@ -58,7 +57,7 @@ const prefsArb: fc.Arbitrary<ScheduleToastPreferences> = fc
 
 describe('shouldShowScheduleToast — disabled silent-schedule preference', () => {
   it('suppresses silent toasts only when the per-scheduleId preference is false; non-silent always shows; default enabled', () => {
-    // Feature: one-stop-service-upgrade, Property 19: Disabled silent-schedule preference suppresses toast
+    // Disabled silent-schedule preference suppresses toast
     fc.assert(
       fc.property(eventArb, prefsArb, (event, prefs) => {
         const result = shouldShowScheduleToast(event, prefs);
@@ -72,11 +71,11 @@ describe('shouldShowScheduleToast — disabled silent-schedule preference', () =
         }
 
         if (entry === false) {
-          // Silent + explicitly disabled => suppressed for ALL statuses (R10.5).
+          // Silent + explicitly disabled => suppressed for ALL statuses.
           expect(result).toBe(false);
         } else {
           // Silent + (missing entry OR explicit `true`) => shown, the
-          // default-enabled behaviour (R10.6).
+          // default-enabled behaviour.
           expect(result).toBe(true);
         }
       }),
@@ -85,7 +84,7 @@ describe('shouldShowScheduleToast — disabled silent-schedule preference', () =
   });
 
   it('suppresses a disabled silent schedule across every possible status', () => {
-    // Feature: one-stop-service-upgrade, Property 19: Disabled silent-schedule preference suppresses toast
+    // Disabled silent-schedule preference suppresses toast
     const prefs: ScheduleToastPreferences = { silentScheduleToast: { 'sched-1': false } };
     fc.assert(
       fc.property(statusArb, (status) => {

@@ -3,9 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ToolManifest } from '../manifest-registry.js';
 
 /**
- * Unit tests for the tool-plugins dependency-install behaviour (M4-A.4, task 11).
+ * Unit tests for the tool-plugins dependency-install behaviour.
  *
- * Validates: Requirements 5.1, 5.2, 5.3, 10.4
  *
  * Strategy: mock the package-manager spawn (`execSync` from `node:child_process`)
  * plus the registry, manifest module, scanner cache, and the `withResync` wrapper
@@ -128,7 +127,7 @@ describe('installFromRegistry confirm-phase dependency install', () => {
     service = await import('../tool-plugins.js');
   });
 
-  it('runs `pnpm install` for a pnpm tool (Req 5.1)', async () => {
+  it('runs `pnpm install` for a pnpm tool', async () => {
     const result = await service.installFromRegistry('playwright', { confirm: true });
 
     expect(mockExecSync).toHaveBeenCalledTimes(1);
@@ -145,7 +144,7 @@ describe('installFromRegistry confirm-phase dependency install', () => {
     expect(result).toMatchObject({ resynced: true });
   });
 
-  it('runs `uv sync` for a uv tool (Req 5.2)', async () => {
+  it('runs `uv sync` for a uv tool', async () => {
     const result = await service.installFromRegistry('pytool', { confirm: true });
 
     expect(mockExecSync).toHaveBeenCalledTimes(1);
@@ -156,7 +155,7 @@ describe('installFromRegistry confirm-phase dependency install', () => {
     expect(result).not.toHaveProperty('depsError');
   });
 
-  it('skips the spawn entirely for a `none` package manager and still succeeds (Req 5.4)', async () => {
+  it('skips the spawn entirely for a `none` package manager and still succeeds', async () => {
     const result = await service.installFromRegistry('bintool', { confirm: true });
 
     expect(mockExecSync).not.toHaveBeenCalled();
@@ -164,7 +163,7 @@ describe('installFromRegistry confirm-phase dependency install', () => {
     expect(result).toMatchObject({ resynced: true });
   });
 
-  it('surfaces a spawn failure as depsError without rolling back the clone (Req 5.3)', async () => {
+  it('surfaces a spawn failure as depsError without rolling back the clone', async () => {
     const failure = Object.assign(new Error('command failed'), {
       stderr: Buffer.from('pnpm ERR! network ETIMEDOUT'),
     });
@@ -184,7 +183,7 @@ describe('installFromRegistry confirm-phase dependency install', () => {
     expect(mockRmSync).not.toHaveBeenCalled();
   });
 
-  it('falls back to the error message when stderr is empty (Req 10.4)', async () => {
+  it('falls back to the error message when stderr is empty', async () => {
     mockExecSync.mockImplementationOnce(() => {
       throw new Error('spawn pnpm ENOENT');
     });

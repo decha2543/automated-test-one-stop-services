@@ -3,8 +3,8 @@
 // Manifest-driven generator for a tool's `tsconfig.json` path aliases. Replaces
 // the hardcoded Playwright-only `generateTsConfig()` in `scripts/sync-projects.ts`.
 // Driven by `manifest.tsconfigGen` (null for tools that ship no generated
-// tsconfig, e.g. Robot Framework / k6). See design §3.1.1 (ToolTsconfigGenConfig)
-// and §4.2.1 (caller only invokes this when `tsconfigGen !== null`).
+// tsconfig, e.g. Robot Framework / k6). The caller only invokes this when
+// `tsconfigGen !== null`.
 //
 // Behaviour:
 //   - Reads the JSONC template named by `manifest.tsconfigGen.template`.
@@ -12,7 +12,7 @@
 //     substituting {type} and {project} into `aliasTarget`.
 //   - Writes the resolved JSON to `manifest.tsconfigGen.output`.
 //   - When the template is absent it logs a warning and returns WITHOUT throwing
-//     so a single broken tool never aborts the whole sync (Requirement 4.6).
+//     so a single broken tool never aborts the whole sync.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { listDirs } from './fs-helpers.js';

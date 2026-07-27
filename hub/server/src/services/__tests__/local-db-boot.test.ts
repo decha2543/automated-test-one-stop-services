@@ -7,17 +7,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openLocalDb } from '../local-db.js';
 
 /**
- * Local_DB boot + silent persistence unit tests (Area E).
+ * Local_DB boot + silent persistence unit tests.
  *
  * Covers two acceptance criteria at the persistence layer:
- *   - R12.1 boot-time synchronous load: openLocalDb on a FILE DB that already
+ *   boot-time synchronous load: openLocalDb on a FILE DB that already
  *     contains data returns a usable LocalDb whose first read immediately
  *     returns the persisted data synchronously (no await / no Promise).
- *   - R13.5 / R13.6 reopen after a silent run has no record: a silent run never
- *     writes (the runner gates the write — covered by task 5.3), so the
+ *   reopen after a silent run has no record: a silent run never
+ *     writes (the runner gates the write — covered by), so the
  *     persistence layer never holds a record referencing that run id, neither
- *     immediately (R13.5) nor after a reopen that simulates a Hub restart
- *     (R13.6). Non-silent records persist across the reopen.
+ *     immediately nor after a reopen that simulates a Hub restart
+ *. Non-silent records persist across the reopen.
  *
  * These exercise a real on-disk SQLite file (not ':memory:') so the
  * close/reopen round-trip genuinely re-reads persisted state.
@@ -58,8 +58,8 @@ describe('openLocalDb boot + silent persistence', () => {
     }
   });
 
-  // R12.1 — boot-time synchronous load.
-  it('reads persisted data synchronously on the first call after reopen (R12.1)', () => {
+  // boot-time synchronous load.
+  it('reads persisted data synchronously on the first call after reopen', () => {
     // Seed a file-backed DB with several datasets, then "shut down" (drop the ref).
     const schedules = [
       { id: 's1', cron: '0 * * * *', config: { tool: 'playwright' } },
@@ -78,7 +78,7 @@ describe('openLocalDb boot + silent persistence', () => {
 
     // The very FIRST read must return the persisted value directly, with no
     // await: the API is synchronous and the schema/data are ready before
-    // openLocalDb returns (R12.1).
+    // openLocalDb returns.
     const firstRead = booted.readCollection('schedules');
     expect(firstRead).not.toBeInstanceOf(Promise);
     expect((firstRead as { then?: unknown }).then).toBeUndefined();
@@ -92,31 +92,31 @@ describe('openLocalDb boot + silent persistence', () => {
     ]);
   });
 
-  it('returns an empty collection synchronously for an absent dataset on a fresh file DB (R12.1)', () => {
+  it('returns an empty collection synchronously for an absent dataset on a fresh file DB', () => {
     const booted = openLocalDb(dbPath);
     const result = booted.readCollection('schedules');
     expect(result).not.toBeInstanceOf(Promise);
     expect(result).toEqual([]);
   });
 
-  // R13.5 / R13.6 — a silent run leaves no record, even after reopen.
-  it('shows no record for a silent run id after reopen while non-silent records persist (R13.5/R13.6)', () => {
+  // a silent run leaves no record, even after reopen.
+  it('shows no record for a silent run id after reopen while non-silent records persist', () => {
     const silentRunId = 'run-silent';
     const nonSilentIds = ['run-normal-1', 'run-normal-2'];
 
     const seed = openLocalDb(dbPath);
     // The runner gates writes for silent runs: only NON-silent history is
-    // appended. The silent run's record is never written (mirrors task 5.3).
+    // appended. The silent run's record is never written (mirrors).
     seed.appendHistory(makeRecord(nonSilentIds[0] as string, 1));
     seed.appendHistory(makeRecord(nonSilentIds[1] as string, 2));
     // DO NOT append the silent run's record.
 
-    // R13.5: immediately (no restart) the silent id is absent on the same handle.
+    // immediately (no restart) the silent id is absent on the same handle.
     const beforeReopen = seed.readCollection<RunRecord>('history').map((r) => r.id);
     expect(beforeReopen).not.toContain(silentRunId);
     expect(beforeReopen).toEqual(expect.arrayContaining(nonSilentIds));
 
-    // R13.6: reopen (simulated Hub restart) — silent id still absent, others persist.
+    // reopen (simulated Hub restart) — silent id still absent, others persist.
     const booted = openLocalDb(dbPath);
     const persistedIds = booted.readCollection<RunRecord>('history').map((r) => r.id);
 
@@ -125,7 +125,7 @@ describe('openLocalDb boot + silent persistence', () => {
     expect(persistedIds).toHaveLength(nonSilentIds.length);
   });
 
-  it('keeps a silent run id absent from every dataset after reopen (R13.6)', () => {
+  it('keeps a silent run id absent from every dataset after reopen', () => {
     const silentRunId = 'run-silent-x';
 
     const seed = openLocalDb(dbPath);

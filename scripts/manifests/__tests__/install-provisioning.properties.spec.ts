@@ -1,10 +1,9 @@
 // scripts/manifests/__tests__/install-provisioning.properties.spec.ts
 //
-// Property-based tests for the install-and-provisioning-overhaul spec.
+// Property-based tests for install + provisioning.
 // One property per test; ≥100 iterations; fast-check under vitest, mirroring
 // the `scripts/manifests/__tests__/` convention (plain vitest + fc.assert).
 //
-// Validates: Requirements 6.2, 5.5, 6.1, 6.3, 6.4, 6.6, 6.5
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -55,14 +54,12 @@ function expectedIds(specs: readonly ToolFolderSpec[]): string[] {
 }
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 1
 // Tool discovery is folder-presence and deterministic.
 // For any `tools/` contents, discovery returns exactly the folders that contain
 // a `tool.manifest.json`, excluding `.`-prefixed and `*-template-example` names,
 // in a stable sorted order independent of filesystem iteration order.
-// **Validates: Requirements 6.2**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 1', () => {
+describe('Tool discovery is folder-presence and deterministic', () => {
   it('discovery is folder-presence + deterministic: exact set, sorted, manifest-gated, excludes hidden + template', () => {
     fc.assert(
       fc.property(arbToolFolderSet(), (specs) => {
@@ -91,7 +88,7 @@ describe('Feature: install-and-provisioning-overhaul, Property 1', () => {
 });
 
 // A random set of per-tool provisioning facts with unique ids — the pure input
-// space of `planToolSetup` (Property 3). Ids are deduped so the plan's
+// space of `planToolSetup`. Ids are deduped so the plan's
 // per-step mapping is unambiguous.
 const arbToolSetupFacts: fc.Arbitrary<ToolSetupFacts[]> = fc
   .array(
@@ -120,44 +117,42 @@ const arbToolSetupFacts: fc.Arbitrary<ToolSetupFacts[]> = fc
   });
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 3
 // Tool-setup delegation and no-op.
 // For any present tool, Setup_Task invokes the tool's `setup` task IFF the tool
 // defines one; a tool with no `setup` task has its dependencies installed and
 // the setup step skipped with no error; with an empty set of tool folders, Core
 // provisioning completes with no error.
-// **Validates: Requirements 5.5, 6.1, 6.3, 6.4, 6.6**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 3', () => {
+describe('Tool-setup delegation and no-op', () => {
   it('plans deps-always + setup-iff-defined, one step per tool, uv-sync iff any uv tool', () => {
     fc.assert(
       fc.property(arbToolSetupFacts, (facts) => {
         const plan = planToolSetup(facts);
 
-        // Exactly one plan step per tool, preserving discovery order (R6.4: the
+        // Exactly one plan step per tool, preserving discovery order (the
         // planner is data-driven, so any added/removed tool just changes facts).
         expect(plan.steps.map((s) => s.id)).toEqual(facts.map((f) => f.id));
 
         for (let i = 0; i < facts.length; i++) {
           // Deps are installed whenever a package.json is present — regardless of
-          // whether the tool defines a setup task (R6.3: no-setup ⇒ deps + skip).
+          // whether the tool defines a setup task (: no-setup ⇒ deps + skip).
           expect(plan.steps[i].installPnpm).toBe(facts[i].hasPackageJson);
-          // The tool's setup task is invoked IFF the tool defines one (R6.1, R6.3).
+          // The tool's setup task is invoked IFF the tool defines one.
           expect(plan.steps[i].runSetup).toBe(facts[i].hasSetupTask);
         }
 
         // A single root `uv sync` runs IFF any present tool is a uv tool — the
-        // central re-implementation is gone, provisioning is delegated (R5.5).
+        // central re-implementation is gone, provisioning is delegated.
         expect(plan.runUvSync).toBe(facts.some((f) => f.isUvTool));
 
-        // Empty tools/ set ⇒ empty plan ⇒ Core completes cleanly (R6.6).
+        // Empty tools/ set ⇒ empty plan ⇒ Core completes cleanly.
         expect(plan.isEmpty).toBe(facts.length === 0);
       }),
       { numRuns: 200 },
     );
   });
 
-  it('an empty tools/ set yields an empty, uv-sync-free plan (R6.6)', () => {
+  it('an empty tools/ set yields an empty, uv-sync-free plan', () => {
     const plan = planToolSetup([]);
     expect(plan.isEmpty).toBe(true);
     expect(plan.steps).toEqual([]);
@@ -166,7 +161,7 @@ describe('Feature: install-and-provisioning-overhaul, Property 3', () => {
 });
 
 // A random set of tool-setup outcomes with unique ids and a mix of success /
-// non-zero exit codes — the input space of `aggregateSetupFailures` (Property 4).
+// non-zero exit codes — the input space of `aggregateSetupFailures`.
 const arbSetupOutcomes: fc.Arbitrary<ToolSetupOutcome[]> = fc
   .array(
     fc.record({
@@ -187,13 +182,11 @@ const arbSetupOutcomes: fc.Arbitrary<ToolSetupOutcome[]> = fc
   });
 
 // =============================================================================
-// Feature: install-and-provisioning-overhaul, Property 4
 // Tool-setup failure is reported with tool id and a hint.
 // For any tool whose `setup` task exits non-zero, the aggregated Setup_Task
 // result names that tool's id and includes at least one remediation hint.
-// **Validates: Requirements 6.5**
 // =============================================================================
-describe('Feature: install-and-provisioning-overhaul, Property 4', () => {
+describe('Tool-setup failure is reported with tool id and a hint', () => {
   it('names every non-zero-exit tool id and always carries a remediation hint', () => {
     fc.assert(
       fc.property(arbSetupOutcomes, (outcomes) => {
@@ -214,7 +207,7 @@ describe('Feature: install-and-provisioning-overhaul, Property 4', () => {
         for (const id of expectedFailing) {
           expect(report.message).toContain(`- ${id}:`);
         }
-        // … and at least one remediation hint is always included (R6.5).
+        // … and at least one remediation hint is always included.
         expect(report.message).toContain(SETUP_FAILURE_HINT);
       }),
       { numRuns: 200 },

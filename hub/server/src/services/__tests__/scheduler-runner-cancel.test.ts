@@ -2,19 +2,19 @@ import type { RunRequest, WsServerEvent } from '@hub/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Unit / integration tests for Task 5.8 — schedule + runner cancel.
+ * Unit / integration tests for schedule + runner cancel.
  *
  * Covers acceptance criteria:
- *   R7.3  runner.cancel on an active run → status becomes 'cancelled' and the
+ *   runner.cancel on an active run → status becomes 'cancelled' and the
  *         run leaves getActive() within budget
- *   R8.5  a silent schedule trigger is treated as a Silent_Run → no history
+ *   a silent schedule trigger is treated as a Silent_Run → no history
  *         growth and no output buffer left behind
- *   R8.6  scheduler stamps `lastRunAt` (ISO 8601) + `lastStatus = 'pending'`
+ *   scheduler stamps `lastRunAt` (ISO 8601) + `lastStatus = 'pending'`
  *         when it triggers a run
- *   R8.7  scheduler updates `lastStatus` to the run's final status via the
+ *   scheduler updates `lastStatus` to the run's final status via the
  *         `run-finished` listener
  *
- * (R8.1 — ScheduleForm default silent=false — is covered by the client test
+ * (The ScheduleForm default silent=false is covered by the client test
  *  hub/client/src/components/schedule-form/ScheduleForm.silent.test.tsx.)
  *
  * Strategy: mock `node:child_process` so `runner` spawns a controllable
@@ -134,12 +134,12 @@ beforeEach(() => {
   cronReg.callbacks.length = 0;
 });
 
-describe('runner.cancel on an active run (R7.3)', () => {
+describe('runner.cancel on an active run', () => {
   it('marks the run cancelled and removes it from the active list', () => {
     const record = runner.start(makeConfig(), 'task pw:run-local PROJECT=demo');
     const id = record.id;
 
-    // R7.1: the run is in the active list right after start.
+    // the run is in the active list right after start.
     expect(runner.getActive().some((r) => r.id === id)).toBe(true);
 
     const child = latestRunChild();
@@ -154,14 +154,14 @@ describe('runner.cancel on an active run (R7.3)', () => {
     runner.on('event', onEvent);
 
     try {
-      // R7.3: cancel an active run → returns true (the route then 200s).
+      // cancel an active run → returns true (the route then 200s).
       expect(runner.cancel(id)).toBe(true);
 
       // Simulate the OS reporting the kill the way Windows `taskkill /F` does:
       // a non-zero exit code with no signal. The cancel intent must still win.
       child.emit('close', 1, null);
 
-      // R7.3: terminal status is 'cancelled' regardless of the raw exit code...
+      // terminal status is 'cancelled' regardless of the raw exit code...
       expect(finalStatus).toBe('cancelled');
       // ...and the run has left the active list.
       expect(runner.getActive().some((r) => r.id === id)).toBe(false);
@@ -171,7 +171,7 @@ describe('runner.cancel on an active run (R7.3)', () => {
   });
 });
 
-describe('scheduler trigger + silent run lifecycle (R8.5, R8.6, R8.7)', () => {
+describe('scheduler trigger + silent run lifecycle', () => {
   it('stamps lastRunAt/pending on trigger then the final status, with no trace for a silent run', async () => {
     const before = new Date().toISOString();
     const schedule = scheduler.create('nightly-silent', '0 8 * * *', makeConfig({ silent: true }));
@@ -187,7 +187,7 @@ describe('scheduler trigger + silent run lifecycle (R8.5, R8.6, R8.7)', () => {
     if (!tick) throw new Error('cron tick callback was not registered');
     await tick();
 
-    // R8.6: trigger stamps an ISO-8601 lastRunAt and lastStatus = 'pending'.
+    // trigger stamps an ISO-8601 lastRunAt and lastStatus = 'pending'.
     const triggered = scheduler.get(schedule.id);
     expect(triggered?.lastStatus).toBe('pending');
     expect(triggered?.lastRunAt).toMatch(ISO_8601);
@@ -196,17 +196,17 @@ describe('scheduler trigger + silent run lifecycle (R8.5, R8.6, R8.7)', () => {
     const runId = triggered?.lastRunId;
     expect(typeof runId).toBe('string');
 
-    // The triggered run is silent and currently active (R7.1).
+    // The triggered run is silent and currently active.
     expect(runner.getActive().some((r) => r.id === runId)).toBe(true);
 
     // Finish the run successfully (exit code 0).
     const child = latestRunChild();
     child.emit('close', 0, null);
 
-    // R8.7: lastStatus is updated to the final outcome via run-finished.
+    // lastStatus is updated to the final outcome via run-finished.
     expect(scheduler.get(schedule.id)?.lastStatus).toBe('passed');
 
-    // R8.5: a silent run leaves NO trace — history did not grow and the
+    // a silent run leaves NO trace — history did not grow and the
     // output buffer for the run id is gone.
     expect(runner.getHistory().length).toBe(historyBefore);
     expect(runner.getOutputBuffer(runId as string)).toBeNull();
@@ -214,7 +214,7 @@ describe('scheduler trigger + silent run lifecycle (R8.5, R8.6, R8.7)', () => {
     scheduler.delete(schedule.id);
   });
 
-  it('records a failed final status for a non-zero exit (R8.7)', async () => {
+  it('records a failed final status for a non-zero exit', async () => {
     const schedule = scheduler.create('nightly-loud', '0 9 * * *', makeConfig({ silent: false }));
     const tick = cronReg.callbacks[0];
     if (!tick) throw new Error('cron tick callback was not registered');
@@ -225,7 +225,7 @@ describe('scheduler trigger + silent run lifecycle (R8.5, R8.6, R8.7)', () => {
     const child = latestRunChild();
     child.emit('close', 2, null);
 
-    // R8.7: a non-zero exit maps to a 'failed' final status on the schedule.
+    // a non-zero exit maps to a 'failed' final status on the schedule.
     expect(scheduler.get(schedule.id)?.lastStatus).toBe('failed');
 
     scheduler.delete(schedule.id);

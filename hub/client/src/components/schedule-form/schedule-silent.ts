@@ -5,7 +5,7 @@ import type { RunRequest } from '@hub/shared';
  * persisted `RunRequest.config.silent` flag.
  *
  * These are extracted from the inline form logic so the form/config round-trip
- * can be exercised as a pure function (see Property 14). The component uses
+ * can be exercised as a pure function (see its property test). The component uses
  * these exact helpers so the test reflects real behaviour.
  */
 

@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * Property 16 — Non-schedule runs produce no toast (R9.5).
+ * Non-schedule runs produce no toast.
  *
  * A run that is NOT bound to a schedule never produces a `schedule-finished`
  * event, hence the client never raises a Corner_Toast for it. The scheduler
@@ -87,8 +87,8 @@ function makeUnboundRecord(runId: string, status: RunStatus): RunRecord {
   };
 }
 
-describe('scheduler: non-schedule runs produce no toast (Property 16)', () => {
-  // Feature: one-stop-service-upgrade, Property 16: Non-schedule runs produce no toast
+describe('scheduler: non-schedule runs produce no toast', () => {
+  // Non-schedule runs produce no toast
   it('never emits schedule-finished for a run-finished event with an unbound runId', () => {
     fc.assert(
       fc.property(runIdArb, statusArb, (runId, status) => {
@@ -100,7 +100,7 @@ describe('scheduler: non-schedule runs produce no toast (Property 16)', () => {
         runner.emit('event', { kind: 'run-finished', runId, record });
 
         // The scheduler drops unbound runs early, so no schedule-finished
-        // event (and therefore no Corner_Toast) is ever produced (R9.5).
+        // event (and therefore no Corner_Toast) is ever produced.
         expect(scheduleFinishedCount).toBe(before);
       }),
       { numRuns: 200 },
@@ -108,7 +108,7 @@ describe('scheduler: non-schedule runs produce no toast (Property 16)', () => {
   });
 
   // Concrete example: a typical user-initiated (non-schedule) passed run.
-  // Feature: one-stop-service-upgrade, Property 16: Non-schedule runs produce no toast
+  // Non-schedule runs produce no toast
   it('an ad-hoc passed run produces zero schedule-finished events (example)', () => {
     const before = scheduleFinishedCount;
     runner.emit('event', {

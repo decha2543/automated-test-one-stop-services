@@ -116,7 +116,7 @@ async function runManifestSync(workspaceRoot: string): Promise<string[]> {
   regeneratedFiles.push(PIPELINE_JSON_PATH);
   console.log(`✅ pipeline.json → ${PIPELINE_JSON_PATH}`);
 
-  // Surface broken manifests (do not throw — Requirement 2.7)
+  // Surface broken manifests (do not throw)
   for (const record of registry.all()) {
     if (record.status === 'invalid') {
       const codes = record.errors.map((e) => e.code).join(', ');

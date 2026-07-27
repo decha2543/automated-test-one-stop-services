@@ -1,14 +1,13 @@
 // scripts/manifests/__tests__/setup-step-parity.spec.ts
 //
-// Example tests for Task 3 of the install-and-provisioning-overhaul spec:
+// Example tests for setup-step parity across the two platform scripts:
 //  - Core_Tool_Set + STEP_ORDER parity across BOTH bootstrap scripts: identical
 //    step names and ordering, the same total, and only Core members treated as
-//    mandatory in the post-setup verify (R2.1, R2.5, R4.1, R4.5).
+//    mandatory in the post-setup verify.
 //  - A forced Core step failure marks the ledger `failed`, never resumes at
 //    start-hub, and both scripts stop with a remediation hint and no silent
-//    privilege escalation (R1.4, R2.3).
+//    privilege escalation.
 //
-// Validates: Requirements 1.4, 2.1, 2.3, 2.5, 4.1, 4.5
 
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -37,38 +36,38 @@ function verifyTargets(script: string): string[] {
   return [...script.matchAll(/(?:call :)?verify\s+([a-z0-9-]+)\s+"/g)].map((m) => m[1]);
 }
 
-describe('Core_Tool_Set + STEP_ORDER parity (R2.1, R2.5, R4.1, R4.5)', () => {
+describe('Core_Tool_Set + STEP_ORDER parity', () => {
   it('the ledger engine STEP_ORDER is Core + install-deps + start-hub, with k6 removed', () => {
     expect(STEP_ORDER).toEqual(EXPECTED_STEP_ORDER);
     expect(STEP_ORDER).not.toContain('k6');
   });
 
-  it('both scripts declare the same step names in the same order (R2.5)', () => {
+  it('both scripts declare the same step names in the same order', () => {
     expect(stepLabels(NIX)).toEqual(EXPECTED_STEP_ORDER);
     expect(stepLabels(WIN)).toEqual(EXPECTED_STEP_ORDER);
     expect(stepLabels(WIN)).toEqual(stepLabels(NIX));
   });
 
-  it('both scripts number every step out of the same total (R2.5)', () => {
+  it('both scripts number every step out of the same total', () => {
     const total = EXPECTED_STEP_ORDER.length;
     expect(new Set(stepTotals(NIX))).toEqual(new Set([total]));
     expect(new Set(stepTotals(WIN))).toEqual(new Set([total]));
   });
 
-  it('only Core_Tool_Set members are mandatory in the verify — k6 is not (R4.1, R4.5)', () => {
+  it('only Core_Tool_Set members are mandatory in the verify — k6 is not', () => {
     expect(verifyTargets(NIX)).toEqual(CORE_TOOL_SET);
     expect(verifyTargets(WIN)).toEqual(CORE_TOOL_SET);
     expect(NIX).not.toMatch(/verify\s+k6/);
     expect(WIN).not.toMatch(/verify\s+k6/);
   });
 
-  it('k6 is not a mandatory installer step on either platform (R4.5)', () => {
+  it('k6 is not a mandatory installer step on either platform', () => {
     expect(stepLabels(NIX)).not.toContain('k6');
     expect(stepLabels(WIN)).not.toContain('k6');
   });
 });
 
-describe('Core step failure: ledger failed, no start-hub, hint printed (R1.4, R2.3)', () => {
+describe('Core step failure: ledger failed, no start-hub, hint printed', () => {
   it('a failed Core step persists as "failed" and never resumes at start-hub', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'setup-fail-'));
     try {
@@ -95,7 +94,7 @@ describe('Core step failure: ledger failed, no start-hub, hint printed (R1.4, R2
     }
   });
 
-  it('both scripts stop with a remediation hint and start-hub is last (R1.4)', () => {
+  it('both scripts stop with a remediation hint and start-hub is last', () => {
     // Linux: fail_step records the failure, prints a [hint], and exits.
     expect(NIX).toMatch(/fail_step\(\)\s*\{/);
     expect(NIX).toMatch(/\[hint\]/);
@@ -112,7 +111,7 @@ describe('Core step failure: ledger failed, no start-hub, hint printed (R1.4, R2
     expect(stepLabels(WIN).at(-1)).toBe('start-hub');
   });
 
-  it('no Core step escalates privilege silently (R2.3)', () => {
+  it('no Core step escalates privilege silently', () => {
     // After k6 removal no Core step needs root; neither script auto-escalates.
     expect(NIX).not.toMatch(/^\s*sudo\s+/m);
     expect(WIN).not.toMatch(/runas|-Verb\s+RunAs/i);

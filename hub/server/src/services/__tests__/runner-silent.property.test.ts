@@ -6,7 +6,7 @@ import fc from 'fast-check';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Property 11 — Silent run leaves no trace, regardless of terminal status.
+ * Silent run leaves no trace, regardless of terminal status.
  *
  * The runner spawns real child processes via `node:child_process.spawn`, which
  * is impractical to property-test across 100 runs. We therefore mock `spawn`
@@ -118,7 +118,7 @@ function latestChild() {
 
 /** Emit some live output then drive the generated terminal outcome. */
 function driveTerminal(child: ReturnType<typeof latestChild>, outcome: Outcome): void {
-  // Output is emitted BEFORE the terminal event so the silent gate (R6.2) is
+  // Output is emitted BEFORE the terminal event so the silent gate is
   // genuinely exercised — a silent run must stream none of it.
   child.stdout.emit('data', Buffer.from('stdout chunk'));
   child.stderr.emit('data', Buffer.from('stderr chunk'));
@@ -147,9 +147,8 @@ afterAll(async () => {
   );
 });
 
-describe('runner silent run no-trace invariants (Property 11)', () => {
-  // Feature: one-stop-service-upgrade, Property 11: Silent run leaves no trace, regardless of terminal status
-  // Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 13.1, 13.2, 13.4
+describe('runner silent run no-trace invariants', () => {
+  // Silent run leaves no trace, regardless of terminal status
   it('a silent run leaves no trace for any terminal status', () => {
     fc.assert(
       fc.property(requestArb, outcomeArb, (req, outcome) => {
@@ -165,17 +164,17 @@ describe('runner silent run no-trace invariants (Property 11)', () => {
           const rec = runner.start({ ...req, silent: true }, 'task test:run');
           driveTerminal(latestChild(), outcome);
 
-          // R6.1 / R13.1 / R13.2: history count unchanged and no record for this run id.
+          // history count unchanged and no record for this run id.
           expect(runner.getHistory().length).toBe(historyBefore);
           expect(runner.getHistory().some((r) => r.id === rec.id)).toBe(false);
-          // R13.2 / R13.4: the Local_DB history dataset has no row referencing the run id.
+          // the Local_DB history dataset has no row referencing the run id.
           const dbHistory = getDb().readCollection<{ id: string }>('history');
           expect(dbHistory.some((r) => r.id === rec.id)).toBe(false);
 
-          // R6.3: last-status index for the run's key is identical to before.
+          // last-status index for the run's key is identical to before.
           expect(JSON.stringify(runner.getLastStatusByProject())).toBe(lastStatusBefore);
 
-          // R6.2: no stdout/stderr events were streamed for the silent run.
+          // no stdout/stderr events were streamed for the silent run.
           const streamed = events.filter(
             (e) =>
               (e.kind === 'run-stdout' || e.kind === 'run-stderr') &&
@@ -184,9 +183,9 @@ describe('runner silent run no-trace invariants (Property 11)', () => {
           );
           expect(streamed.length).toBe(0);
 
-          // R6.5: the output buffer is purged once the run finishes.
+          // the output buffer is purged once the run finishes.
           expect(runner.getOutputBuffer(rec.id)).toBeNull();
-          // R6.5 / R7.2: the run id is no longer in the active list.
+          // the run id is no longer in the active list.
           expect(runner.getActive().some((r) => r.id === rec.id)).toBe(false);
         } finally {
           runner.off('event', listener);
@@ -197,7 +196,7 @@ describe('runner silent run no-trace invariants (Property 11)', () => {
   });
 
   // Sanity baseline: an IDENTICAL non-silent run DOES leave a trace, proving the
-  // silent assertions above are not vacuously satisfied (R6.6 — silent parity).
+  // silent assertions above are not vacuously satisfied (silent parity).
   it('a non-silent run with the same outcomes does leave a trace (baseline)', () => {
     fc.assert(
       fc.property(requestArb, outcomeArb, (req, outcome) => {
@@ -233,7 +232,7 @@ describe('runner silent run no-trace invariants (Property 11)', () => {
     );
   });
 
-  // Concrete example covering R6.3's "previously HAD a value" branch: a silent
+  // Concrete example covering.3's "previously HAD a value" branch: a silent
   // run for a key that already has a recorded last-status must not change it.
   it('silent run preserves a pre-existing last-status across every terminal status (example)', () => {
     const base: RunRequest = { tool: 'playwright', type: 'web', project: 'seeded', mode: 'local' };

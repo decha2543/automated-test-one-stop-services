@@ -1,11 +1,9 @@
 // scripts/manifests/__tests__/runner-command.spec.ts
 //
-// Unit tests for the runner command builder (design §4.3.2).
+// Unit tests for the runner command builder.
 // Validates that `buildTaskCommand` produces the same command semantics as the
 // legacy `scripts/runner.ts` for every interactive flow: Playwright run+tags,
 // Robot Framework run+tags, k6 run (local/docker).
-//
-// Requirements: 4.8, 4.11–4.14
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -254,7 +252,7 @@ describe.skipIf(!TOOLS_PRESENT)('buildTaskCommand — Robot Framework', () => {
     );
   });
 
-  it('run (docker) — forced headless via dockerOverride (Requirement 4.12)', () => {
+  it('run (docker) — forced headless via dockerOverride', () => {
     const answers: RunnerAnswers = {
       executionType: 'run',
       environment: 'docker',

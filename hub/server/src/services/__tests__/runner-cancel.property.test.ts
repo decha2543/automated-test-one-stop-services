@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { runner } from '../runner.js';
 
 /**
- * Property 13 — Cancel of non-active run is a safe no-op (R7.4).
+ * Cancel of non-active run is a safe no-op.
  *
  * For any run id that is NOT present in the active list, `cancel(id)` returns
  * `false` (the "no active run found" indicator) and leaves the active list
@@ -44,8 +44,8 @@ const nanoidLikeArb: fc.Arbitrary<string> = fc.integer({ min: 1, max: 21 }).chai
 
 const runIdArb: fc.Arbitrary<string> = fc.oneof(fc.constant(''), fc.string(), nanoidLikeArb);
 
-describe('runner.cancel non-active run (Property 13)', () => {
-  // Feature: one-stop-service-upgrade, Property 13: Cancel of non-active run is a safe no-op
+describe('runner.cancel non-active run', () => {
+  // Cancel of non-active run is a safe no-op
   it('returns false and does not mutate the active list for any non-active run id', () => {
     fc.assert(
       fc.property(runIdArb, (id) => {

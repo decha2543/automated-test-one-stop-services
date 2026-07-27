@@ -1,11 +1,9 @@
 // scripts/manifests/__tests__/validate.spec.ts
 //
-// Unit tests for `scripts/manifests/validate.ts` (design §8.1).
+// Unit tests for `scripts/manifests/validate.ts`.
 // Covers every documented rejection path of `validateManifest()` and the
 // cross-manifest invariants of `validateRegistry()`. Each rejection asserts the
 // matching `ManifestError.code`.
-//
-// Validates: Requirements 1.15, 2.1, 2.2 (and exercises 1.2–1.14, 1.4/1.6/1.8, 2.4/2.5)
 import { describe, expect, it } from 'vitest';
 import type { ManifestError, ToolManifestRecord } from '../types.js';
 import { validateManifest, validateRegistry } from '../validate.js';
@@ -55,7 +53,7 @@ describe('validateManifest — accepts well-formed manifests', () => {
   });
 });
 
-describe('validateManifest — schema rejection paths (req 1.2–1.14)', () => {
+describe('validateManifest — schema rejection paths', () => {
   // Each case mutates a fresh valid manifest into a single invalid state and
   // asserts the structured failure carries the SCHEMA_FAIL code.
   const cases: { name: string; mutate: (m: Record<string, unknown>) => void }[] = [
@@ -156,7 +154,7 @@ describe('validateManifest — schema rejection paths (req 1.2–1.14)', () => {
   }
 });
 
-describe('validateManifest — never throws on arbitrary input (req 1.15, Property 6)', () => {
+describe('validateManifest — never throws on arbitrary input', () => {
   const weird: unknown[] = [
     null,
     undefined,
@@ -185,7 +183,7 @@ describe('validateManifest — never throws on arbitrary input (req 1.15, Proper
   }
 });
 
-describe('validateRegistry — folder-vs-id match (req 1.4)', () => {
+describe('validateRegistry — folder-vs-id match', () => {
   it('flags FOLDER_ID_MISMATCH when manifest.id !== containing folder', () => {
     const record = okRecord(baseManifest(), 'not-cypress');
     const [out] = validateRegistry([record]);
@@ -201,7 +199,7 @@ describe('validateRegistry — folder-vs-id match (req 1.4)', () => {
   });
 });
 
-describe('validateRegistry — alias uniqueness (req 1.6, 2.5)', () => {
+describe('validateRegistry — alias uniqueness', () => {
   it('marks BOTH enabled manifests sharing an alias with DUPLICATE_ALIAS', () => {
     const a = okRecord(readFixture('invalid-duplicate-alias-a.json') as Record<string, unknown>);
     const b = okRecord(readFixture('invalid-duplicate-alias-b.json') as Record<string, unknown>);
@@ -224,7 +222,7 @@ describe('validateRegistry — alias uniqueness (req 1.6, 2.5)', () => {
   });
 });
 
-describe('validateRegistry — namespace uniqueness (req 1.8, 2.5, Property 10)', () => {
+describe('validateRegistry — namespace uniqueness', () => {
   it('marks BOTH enabled manifests sharing a taskNamespace with DUPLICATE_NAMESPACE', () => {
     const a = okRecord(manifestWith('toola', 'ta', 'shared'));
     const b = okRecord(manifestWith('toolb', 'tb', 'shared'));

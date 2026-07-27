@@ -188,7 +188,7 @@ export function AppLayout() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const setPendingRunConfig = useNavigationStore((s) => s.setPendingRunConfig);
 
-  // App-level Corner_Toast listener for `schedule-finished` (Area D, task 7.3).
+  // App-level Corner_Toast listener for `schedule-finished`.
   // Surfaces schedule completion toasts on any page; ephemeral, never persisted.
   useScheduleToasts();
 
