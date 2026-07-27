@@ -100,7 +100,7 @@ export function FlakyTestsPage() {
               onClick={() => analyzeMutation.mutate()}
               loading={analyzeMutation.isPending}
             >
-              Analyze
+              {t('flaky.analyze')}
             </Button>
           </>
         }
@@ -147,61 +147,61 @@ export function FlakyTestsPage() {
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Test ID</Table.Th>
-                <Table.Th>Project</Table.Th>
-                <Table.Th>Tool</Table.Th>
-                <Table.Th>Flakiness</Table.Th>
-                <Table.Th>Pass/Fail</Table.Th>
-                <Table.Th>Recent</Table.Th>
-                <Table.Th>Last Seen</Table.Th>
+                <Table.Th>{t('flaky.testId')}</Table.Th>
+                <Table.Th>{t('run.project')}</Table.Th>
+                <Table.Th>{t('run.tool')}</Table.Th>
+                <Table.Th>{t('flaky.flakiness')}</Table.Th>
+                <Table.Th>{t('flaky.passFail')}</Table.Th>
+                <Table.Th>{t('flaky.recent')}</Table.Th>
+                <Table.Th>{t('flaky.lastSeen')}</Table.Th>
                 <Table.Th />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {tests.map((t) => {
-                const key = buildTestKey(t);
+              {tests.map((row) => {
+                const key = buildTestKey(row);
                 return (
                   <Table.Tr key={key}>
                     <Table.Td>
                       <Text size="xs" ff="monospace" lineClamp={1} maw={200}>
-                        {t.testId}
+                        {row.testId}
                       </Text>
                     </Table.Td>
                     <Table.Td>
                       <Badge size="xs" variant="light">
-                        {t.project}
+                        {row.project}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs">{t.tool}</Text>
+                      <Text size="xs">{row.tool}</Text>
                     </Table.Td>
                     <Table.Td w={120}>
                       <Group gap={4} wrap="nowrap">
                         <Progress
-                          value={t.flakinessScore}
+                          value={row.flakinessScore}
                           size="sm"
-                          color={t.flakinessScore > 50 ? 'red' : 'orange'}
+                          color={row.flakinessScore > 50 ? 'red' : 'orange'}
                           style={{ flex: 1 }}
                         />
                         <Text size="xs" fw={500} w={32} ta="right">
-                          {t.flakinessScore}%
+                          {row.flakinessScore}%
                         </Text>
                       </Group>
                     </Table.Td>
                     <Table.Td>
                       <Text size="xs">
                         <Text span c="green" fw={500}>
-                          {t.passes}
+                          {row.passes}
                         </Text>
                         {' / '}
                         <Text span c="red" fw={500}>
-                          {t.failures}
+                          {row.failures}
                         </Text>
                       </Text>
                     </Table.Td>
                     <Table.Td>
                       <Group gap={2}>
-                        {t.recentStatuses.map((s, i) => (
+                        {row.recentStatuses.map((s, i) => (
                           <Tooltip key={i as number} label={s}>
                             <div
                               style={{
@@ -217,17 +217,17 @@ export function FlakyTestsPage() {
                     </Table.Td>
                     <Table.Td>
                       <Text size="xs" c="dimmed">
-                        {dayjs(t.lastSeen).format('DD MMM HH:mm')}
+                        {dayjs(row.lastSeen).format('DD MMM HH:mm')}
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Tooltip label="Dismiss">
+                      <Tooltip label={t('flaky.dismiss')}>
                         <ActionIcon
                           variant="subtle"
                           color="gray"
                           size="sm"
                           onClick={() => dismissMutation.mutate(key)}
-                          aria-label="Dismiss flaky test"
+                          aria-label={t('flaky.dismissAria')}
                         >
                           <TbX size={14} />
                         </ActionIcon>

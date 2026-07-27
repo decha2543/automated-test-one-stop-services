@@ -19,21 +19,35 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
-import { useCallback, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { TbPlayerPlay, TbRocket } from 'react-icons/tb';
 import { qDoctor, qProjects, qRunsHistory } from '~/api/queries.js';
 import { DoctorPanel } from '~/components/DoctorPanel.js';
 import { NeedsAttentionWidget } from '~/components/NeedsAttentionWidget.js';
 import { PageHeader } from '~/components/PageHeader.js';
-import { RunHeatmap } from '~/components/RunHeatmap.js';
-import { TopProjectsBars } from '~/components/TopProjectsBars.js';
-import { TrendChart } from '~/components/TrendChart.js';
+
 import { useTools } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
 import { usePreferences } from '~/stores/hub.js';
 import { useNavigationStore } from '~/stores/navigation.js';
 import { getStatusColor } from '~/utils/run-status.js';
 import { toolLabel } from '~/utils/tool-label.js';
+
+/**
+ * The three charts pull in the charting library (~470 kB before gzip), which is
+ * more code than the rest of the dashboard combined. They live below the fold,
+ * so they load on their own instead of delaying the numbers and recent runs at
+ * the top of the page. `Skeleton` holds their space while that happens.
+ */
+const TrendChart = lazy(() =>
+  import('~/components/TrendChart.js').then((m) => ({ default: m.TrendChart })),
+);
+const TopProjectsBars = lazy(() =>
+  import('~/components/TopProjectsBars.js').then((m) => ({ default: m.TopProjectsBars })),
+);
+const RunHeatmap = lazy(() =>
+  import('~/components/RunHeatmap.js').then((m) => ({ default: m.RunHeatmap })),
+);
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -85,6 +99,11 @@ export function DashboardPage() {
 
   const hasProjects = (projects.data ?? []).length > 0;
   const envOk = doctor.data?.overallOk ?? false;
+  const hasRuns = (history.data ?? []).length > 0;
+  // The getting-started card retires itself once all three steps are genuinely
+  // done, so nobody has to know that the × in the corner is what hides it. The
+  // Settings switch still brings it back on demand.
+  const onboardingDone = envOk && hasProjects && hasRuns;
 
   return (
     <Stack gap="md">
@@ -127,7 +146,7 @@ export function DashboardPage() {
       {(projects.data || history.data || (!toolsQuery.isLoading && !projects.isLoading)) && (
         <>
           {/* Onboarding */}
-          {prefs.showOnboarding && (
+          {prefs.showOnboarding && !onboardingDone && (
             <Paper p="md" withBorder style={{ position: 'relative' }}>
               <CloseButton
                 size="sm"
@@ -140,7 +159,7 @@ export function DashboardPage() {
                 <Title order={5}>{t('dashboard.gettingStarted')}</Title>
               </Group>
               <Stepper
-                active={envOk ? (hasProjects ? 2 : 1) : 0}
+                active={envOk ? (hasProjects ? (hasRuns ? 3 : 2) : 1) : 0}
                 size="sm"
                 orientation="horizontal"
               >
@@ -204,6 +223,11 @@ export function DashboardPage() {
               {!history.isLoading && recentRuns.length === 0 && (
                 <Text size="sm" c="dimmed">
                   {t('dashboard.noRuns')}
+                </Text>
+              )}
+              {recentRuns.length > 0 && (
+                <Text size="xs" c="dimmed" mb={6}>
+                  {t('dashboard.recentRunHint')}
                 </Text>
               )}
               {recentRuns.length > 0 && (
@@ -304,7 +328,9 @@ export function DashboardPage() {
                 {t('dashboard.trendsDesc')}
               </Text>
             </Group>
-            <TrendChart />
+            <Suspense fallback={<Skeleton height={220} radius="sm" aria-hidden />}>
+              <TrendChart />
+            </Suspense>
           </Paper>
 
           {/* Top Projects + Run Activity — side by side */}
@@ -317,7 +343,9 @@ export function DashboardPage() {
                   {t('dashboard.topProjectsDesc')}
                 </Text>
               </Group>
-              <TopProjectsBars />
+              <Suspense fallback={<Skeleton height={160} radius="sm" aria-hidden />}>
+                <TopProjectsBars />
+              </Suspense>
             </Paper>
 
             {/* Run Activity Heatmap */}
@@ -328,7 +356,9 @@ export function DashboardPage() {
                   {t('dashboard.runActivityDesc')}
                 </Text>
               </Group>
-              <RunHeatmap />
+              <Suspense fallback={<Skeleton height={160} radius="sm" aria-hidden />}>
+                <RunHeatmap />
+              </Suspense>
             </Paper>
           </SimpleGrid>
         </>

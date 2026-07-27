@@ -35,7 +35,7 @@ const OUTPUT_BUFFER_LIMIT = 1024 * 1024; // 1 MiB
  * client's WebSocket `subscribe` lands; without this its buffer would already
  * be gone, so the live view shows no detail and only the *next* run appears to
  * work. Retaining the last N lets the subscribe-time replay backfill it.
- * ponytail: bounded by entry COUNT, not bytes — worst case N × OUTPUT_BUFFER_LIMIT.
+ * Known limit: bounded by entry COUNT, not bytes — worst case N × OUTPUT_BUFFER_LIMIT.
  * Upgrade path: switch to a byte-budgeted LRU if memory ever becomes a concern.
  */
 const RECENT_FINISHED_LIMIT = 20;
@@ -224,19 +224,6 @@ class RunnerService extends EventEmitter {
 
   getQueue(): QueuedRun[] {
     return [...this.queue];
-  }
-
-  reorderQueue(runIds: string[]): boolean {
-    if (runIds.length !== this.queue.length) return false;
-    const map = new Map(this.queue.map((q) => [q.record.id, q]));
-    const reordered: QueuedRun[] = [];
-    for (const id of runIds) {
-      const item = map.get(id);
-      if (!item) return false;
-      reordered.push(item);
-    }
-    this.queue = reordered;
-    return true;
   }
 
   promoteInQueue(id: string): boolean {

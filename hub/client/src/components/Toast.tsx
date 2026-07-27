@@ -42,8 +42,3 @@ export const toast = {
       autoClose: 4000,
     }),
 };
-
-/** Mantine renders notifications via <Notifications /> in main.tsx, so this is a no-op */
-export function ToastContainer() {
-  return null;
-}

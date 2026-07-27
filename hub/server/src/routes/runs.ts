@@ -1,9 +1,6 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import type { RunRequest } from '@hub/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { WORKSPACE_ROOT } from '../config.js';
 import { buildTaskCommand } from '../services/command-builder.js';
 import { getEnabledToolIds } from '../services/manifest-registry.js';
 import { severityByRun } from '../services/reports.js';
@@ -93,17 +90,6 @@ export async function runRoutes(app: FastifyInstance): Promise<void> {
     if (removed) return { success: true };
     reply.status(404);
     return { code: 'NOT_FOUND', message: 'Run not found or already finished' };
-  });
-
-  /** GET /api/runs/last-command — get the last-run command for rerun */
-  app.get('/api/runs/last-command', async (_req, reply) => {
-    const lastRunPath = path.join(WORKSPACE_ROOT, '.last-run');
-    if (!fs.existsSync(lastRunPath)) {
-      reply.status(404);
-      return { code: 'NO_LAST_RUN', message: 'No previous run found. Run a test first.' };
-    }
-    const command = fs.readFileSync(lastRunPath, 'utf8').trim();
-    return { command };
   });
 
   /** GET /api/runs/concurrency — get current concurrency settings */

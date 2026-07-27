@@ -1,4 +1,5 @@
 import type { WsServerEvent } from '@hub/shared';
+import { translate } from '~/i18n/index.js';
 
 /**
  * The `schedule-finished` variant of {@link WsServerEvent}. Extracted as a
@@ -66,7 +67,7 @@ export function buildScheduleToast(event: ScheduleFinishedEvent): ScheduleToastD
       id: scheduleToastId(event.runId),
       type: 'success',
       color: 'green',
-      title: 'Schedule completed',
+      title: translate('schedule.completed'),
       message: `${name} — ${event.status}`,
       autoClose: SUCCESS_AUTO_CLOSE_MS,
     };
@@ -79,7 +80,7 @@ export function buildScheduleToast(event: ScheduleFinishedEvent): ScheduleToastD
     id: scheduleToastId(event.runId),
     type: 'error',
     color: 'red',
-    title: 'Schedule failed',
+    title: translate('schedule.failed'),
     message,
     autoClose: FAILURE_AUTO_CLOSE_MS,
   };

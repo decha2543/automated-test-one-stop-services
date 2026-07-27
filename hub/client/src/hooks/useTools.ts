@@ -180,7 +180,12 @@ export function useInstallPython() {
   });
 }
 
-/** Manually trigger workspace re-sync (POST /api/workspace/resync). */
+/**
+ * Re-scan the workspace (POST /api/workspace/resync) and regenerate the derived
+ * config files. Needed after a project or tool is added outside the Hub — a
+ * `git clone` into `tools/`, a copied project folder — because the Hub's caches
+ * and the generated tsconfig/compose files do not know about it yet.
+ */
 export function useResyncWorkspace() {
   const qc = useQueryClient();
   return useMutation({

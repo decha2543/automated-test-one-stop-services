@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ToolId } from '@hub/shared';
 import type { FastifyInstance } from 'fastify';
-import { WORKSPACE_ROOT } from '../config.js';
+import { SERVER_PKG_DIR } from '../config.js';
 import { isUnderOutputs } from '../services/path-guard.js';
 import {
   invalidateReportsCache,
@@ -215,12 +215,16 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const child = spawn('pnpm', ['dlx', 'playwright', 'show-trace', tracePath], {
+    // `pnpm exec` (not `dlx`) runs the `playwright` version this package already
+    // declares — no registry download on first use, works offline, and the trace
+    // viewer matches the browser build the tool provisioned. Hence the cwd: the
+    // binary is resolved from @hub/server's own node_modules.
+    const child = spawn('pnpm', ['exec', 'playwright', 'show-trace', tracePath], {
       detached: false,
       stdio: 'ignore',
       shell: process.platform === 'win32',
       windowsHide: false,
-      cwd: WORKSPACE_ROOT,
+      cwd: SERVER_PKG_DIR,
     });
 
     if (!child.pid) {

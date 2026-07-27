@@ -15,7 +15,6 @@ export * from './domains/dashboard.js';
 export * from './domains/doctor.js';
 export * from './domains/env.js';
 export * from './domains/flaky.js';
-export * from './domains/health.js';
 export * from './domains/import-export.js';
 export * from './domains/projects.js';
 export * from './domains/reports.js';

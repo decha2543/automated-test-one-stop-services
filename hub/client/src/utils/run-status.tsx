@@ -1,4 +1,3 @@
-import type { RunStatus } from '@hub/shared';
 import type { ReactNode } from 'react';
 import { TbCircleCheck, TbCircleX, TbClock, TbHelp } from 'react-icons/tb';
 
@@ -43,9 +42,4 @@ export function getStatusIcon(status: string, size = 14): ReactNode {
     default:
       return <TbHelp size={size} />;
   }
-}
-
-/** Type guard for RunStatus when narrowing arbitrary strings. */
-export function isRunStatus(s: string): s is RunStatus {
-  return ['running', 'pending', 'passed', 'failed', 'cancelled', 'error'].includes(s);
 }

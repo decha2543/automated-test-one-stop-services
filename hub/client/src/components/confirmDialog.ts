@@ -1,5 +1,6 @@
 import { modals } from '@mantine/modals';
 import type { ReactNode } from 'react';
+import { translate } from '~/i18n/index.js';
 
 interface ConfirmOptions {
   title: string;
@@ -29,7 +30,10 @@ export function confirmDialog({
     modals.openConfirmModal({
       title,
       children: message,
-      labels: { confirm: confirmLabel ?? 'Confirm', cancel: cancelLabel ?? 'Cancel' },
+      labels: {
+        confirm: confirmLabel ?? translate('common.confirm'),
+        cancel: cancelLabel ?? translate('common.cancel'),
+      },
       confirmProps: { color: danger ? 'red' : 'blue' },
       cancelProps: isShowClose ? {} : { style: { display: 'none' } },
       closeButtonProps: isShowCancel ? {} : { style: { display: 'none' } },

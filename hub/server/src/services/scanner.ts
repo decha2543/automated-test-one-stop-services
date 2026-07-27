@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ProjectSummary, ToolId } from '@hub/shared';
 import { TOOLS_DIR } from '../config.js';
+import { mapPool } from '../lib/map-pool.js';
 import { parseEnvToRecord } from './env-parser.js';
 import { runChild } from './exec.js';
 import { getEnabledTools, getToolManifest } from './manifest-registry.js';
@@ -114,45 +115,6 @@ async function readGitRemote(projectDir: string): Promise<string | undefined> {
   return url || undefined;
 }
 
-/** Worker-pool: run `task` over `items` with a fixed parallelism cap. */
-async function mapPool<T, R>(
-  items: T[],
-  size: number,
-  task: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const idx = next++;
-      results[idx] = await task(items[idx] as T);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(size, items.length) }, () => worker()));
-  return results;
-}
-
-/**
- * Single-project summary including git remote. Async because we use
- * `runChild` instead of `execFileSync`; this keeps the Fastify event loop
- * free while a slow git probe runs.
- */
-export async function projectSummary(
-  tool: ToolId,
-  type: string,
-  name: string,
-): Promise<ProjectSummary> {
-  const manifest = await getToolManifest(tool);
-  const root = manifest?.projects.root ?? 'projects';
-  const base = projectSummaryBase(tool, type, name, root);
-  const { _isGit, ...rest } = base;
-  const gitRemoteUrl = _isGit ? await readGitRemote(rest.path) : undefined;
-  return {
-    ...rest,
-    ...(gitRemoteUrl ? { gitRemoteUrl } : {}),
-  };
-}
-
 /**
  * Cached `listAllProjects()`. The dashboard polls this often and the
  * git-remote probes per project are the slow part. Cache for ~30s; invalidate
@@ -234,7 +196,7 @@ export async function listSections(project: string): Promise<string[]> {
  * The section spec filename. A "section" is the directory that directly
  * contains this file — matching the Taskfile's `SPEC_FILE` and the manifest's
  * `pipeline.targetPaths` (`.../specs/{section}/e2e.spec.ts`).
- * ponytail: hardcoded here because the Hub's `ToolManifest` view doesn't expose
+ * Known limit: hardcoded here because the Hub's `ToolManifest` view doesn't expose
  * `pipeline.targetPaths`. Ceiling: if a tool ever uses a different spec
  * filename, source it from the manifest instead. Upgrade path: add the spec
  * basename to `ToolProjectsConfig` and read it here.

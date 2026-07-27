@@ -1,11 +1,11 @@
 import type { RunRecord, RunRequest, RunStatus } from '@hub/shared';
 import { Badge, Button, Code, Group, Modal, ScrollArea, Stack, Text } from '@mantine/core';
-import dayjs from 'dayjs';
 import { TbCopy, TbExternalLink, TbPlayerPlay, TbTerminal } from 'react-icons/tb';
 import { api } from '~/api/client.js';
 import { ArtifactMenu } from '~/components/reports/ArtifactMenu.js';
 import { toast } from '~/components/Toast.js';
-import { formatAbsolute } from '~/utils/datetime.js';
+import { translate, useT } from '~/i18n/index.js';
+import { formatAbsolute, formatDurationBetween } from '~/utils/datetime.js';
 
 function statusColor(s: RunStatus | string): string {
   if (s === 'passed') return 'green';
@@ -15,25 +15,12 @@ function statusColor(s: RunStatus | string): string {
   return 'gray';
 }
 
-function formatDuration(start: string, end?: string): string {
-  if (!end) return '-';
-  const ms = dayjs(end).diff(dayjs(start));
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return `${hours}h ${remainingMinutes}m`;
-}
-
 /** Open a run's HTML report in the OS default app (same path as the Reports page). */
 async function openReport(reportPath: string): Promise<void> {
   try {
     await api.post('/api/reports/open-file', { path: reportPath });
   } catch {
-    toast.error('Failed to open report');
+    toast.error(translate('runlog.openReportFailed'));
   }
 }
 
@@ -49,6 +36,7 @@ export interface RunLogModalProps {
  * Extracted from `pages/History.tsx` to keep that page focused on the table.
  */
 export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps) {
+  const t = useT();
   if (!run) return null;
   const { reportPath } = run;
 
@@ -75,7 +63,7 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
         <Group gap="xl" wrap="wrap">
           <Stack gap={2}>
             <Text size="xs" c="dimmed">
-              Tool
+              {t('run.tool')}
             </Text>
             <Text size="xs" fw={500}>
               {run.request.tool}
@@ -83,7 +71,7 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
           </Stack>
           <Stack gap={2}>
             <Text size="xs" c="dimmed">
-              Type
+              {t('table.type')}
             </Text>
             <Text size="xs" fw={500}>
               {run.request.type}
@@ -91,15 +79,15 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
           </Stack>
           <Stack gap={2}>
             <Text size="xs" c="dimmed">
-              Duration
+              {t('table.duration')}
             </Text>
             <Text size="xs" fw={500}>
-              {formatDuration(run.startedAt, run.endedAt)}
+              {formatDurationBetween(run.startedAt, run.endedAt)}
             </Text>
           </Stack>
           <Stack gap={2}>
             <Text size="xs" c="dimmed">
-              Exit Code
+              {t('runlog.exitCode')}
             </Text>
             <Text size="xs" fw={500} c={run.exitCode === 0 ? 'green' : 'red'}>
               {run.exitCode ?? 'N/A'}
@@ -107,7 +95,7 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
           </Stack>
           <Stack gap={2}>
             <Text size="xs" c="dimmed">
-              Started
+              {t('table.started')}
             </Text>
             <Text size="xs" fw={500}>
               {formatAbsolute(run.startedAt)}
@@ -116,7 +104,7 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
           {run.endedAt && (
             <Stack gap={2}>
               <Text size="xs" c="dimmed">
-                Ended
+                {t('runlog.ended')}
               </Text>
               <Text size="xs" fw={500}>
                 {formatAbsolute(run.endedAt)}
@@ -134,7 +122,7 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
               leftSection={<TbExternalLink size={12} />}
               onClick={() => openReport(reportPath)}
             >
-              Open Report
+              {t('runlog.openReport')}
             </Button>
             {run.request.tool === 'playwright' && <ArtifactMenu reportPath={reportPath} />}
           </Group>
@@ -143,7 +131,7 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
         <Stack gap={4}>
           <Group justify="space-between">
             <Text size="xs" c="dimmed">
-              Command
+              {t('runlog.command')}
             </Text>
             <Group gap={4}>
               <Button
@@ -156,7 +144,7 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
                   onClose();
                 }}
               >
-                Rerun
+                {t('runlog.rerun')}
               </Button>
               <Button
                 size="compact-xs"
@@ -166,13 +154,13 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(run.command);
-                    toast.success('Command copied');
+                    toast.success(t('runlog.commandCopied'));
                   } catch {
-                    toast.error('Copy failed');
+                    toast.error(t('common.copyFailed'));
                   }
                 }}
               >
-                Copy
+                {t('common.copy')}
               </Button>
             </Group>
           </Group>
@@ -184,7 +172,7 @@ export function RunLogModal({ run, opened, onClose, onRerun }: RunLogModalProps)
         {run.request.tag && (
           <Stack gap={4}>
             <Text size="xs" c="dimmed">
-              Tags
+              {t('runlog.tags')}
             </Text>
             <Code style={{ fontSize: 11 }}>{run.request.tag}</Code>
           </Stack>

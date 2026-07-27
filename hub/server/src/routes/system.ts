@@ -4,6 +4,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { WORKSPACE_ROOT } from '../config.js';
+import { mapPool } from '../lib/map-pool.js';
 import { runChild } from '../services/exec.js';
 import { isUnderOutputs, isUnderWorkspace } from '../services/path-guard.js';
 import { loadJson, saveJson } from '../services/persistence.js';
@@ -93,24 +94,6 @@ function appendCleanupHistory(record: CleanupRecord): void {
   history.unshift(record);
   if (history.length > MAX_CLEANUP_HISTORY) history.length = MAX_CLEANUP_HISTORY;
   saveJson(CLEANUP_HISTORY_FILE, history);
-}
-
-/** Worker-pool helper — runs `task` over `items` with limited concurrency. */
-async function mapPool<T, R>(
-  items: T[],
-  size: number,
-  task: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const idx = next++;
-      results[idx] = await task(items[idx] as T);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(size, items.length) }, () => worker()));
-  return results;
 }
 
 async function runCleanup(

@@ -12,10 +12,17 @@ export const OUTPUTS_DIR = path.join(WORKSPACE_ROOT, 'outputs');
 export const SCRIPTS_DIR = path.join(WORKSPACE_ROOT, 'scripts');
 
 /**
+ * Root of the `@hub/server` package (parent of `src/` in dev, of `dist/` in a
+ * build). Commands that must resolve this package's own dependencies — e.g.
+ * `pnpm exec playwright` for the trace viewer — spawn with this as their cwd.
+ */
+export const SERVER_PKG_DIR = path.join(here, '..');
+
+/**
  * Directory holding Hub runtime data: the Local_DB file plus the legacy
  * JSON/NDJSON sources that DB_Migration imports. Resolves to `hub/server/data`.
  */
-export const DATA_DIR = path.join(here, '..', 'data');
+export const DATA_DIR = path.join(SERVER_PKG_DIR, 'data');
 
 /**
  * Path to the embedded Local_DB (node:sqlite). Defaults to
@@ -57,7 +64,6 @@ export const ALLOWED_ORIGINS = process.env.HUB_ALLOWED_ORIGINS
 export const BASH_PATH = (() => {
   const candidates = [
     'C:\\Program Files\\Git\\bin\\bash.exe',
-    // biome-ignore lint/security/noSecrets: Windows Git Bash install path, not a credential
     'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
   ];
   for (const p of candidates) {

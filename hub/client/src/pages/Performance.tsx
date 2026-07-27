@@ -125,7 +125,7 @@ export function PerformancePage() {
             <SimpleGrid cols={{ base: 2, sm: 3, md: 5 }} spacing="xs">
               <Card withBorder p="sm">
                 <Text size="xs" c="dimmed">
-                  Avg Response
+                  {t('perf.avgResponse')}
                 </Text>
                 <Text size="lg" fw={700}>
                   {latest.avg.toFixed(0)} ms
@@ -157,7 +157,7 @@ export function PerformancePage() {
               </Card>
               <Card withBorder p="sm">
                 <Text size="xs" c="dimmed">
-                  Error Rate
+                  {t('perf.errorRate')}
                 </Text>
                 <Text size="lg" fw={700} c={latest.errorRate > 1 ? 'red' : 'green'}>
                   {latest.errorRate.toFixed(2)}%
@@ -169,17 +169,17 @@ export function PerformancePage() {
           {/* Run history */}
           <Paper withBorder p="md">
             <Text size="sm" fw={600} mb="sm">
-              Run History ({runs.length} runs)
+              {t('perf.runHistory')} ({runs.length})
             </Text>
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Run</Table.Th>
-                  <Table.Th>Avg (ms)</Table.Th>
+                  <Table.Th>{t('perf.run')}</Table.Th>
+                  <Table.Th>{t('perf.avgMs')}</Table.Th>
                   <Table.Th>P95 (ms)</Table.Th>
                   <Table.Th>P99 (ms)</Table.Th>
                   <Table.Th>RPS</Table.Th>
-                  <Table.Th>Error %</Table.Th>
+                  <Table.Th>{t('perf.errorPct')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -220,13 +220,13 @@ export function PerformancePage() {
           {latestThresholds.length > 0 && (
             <Paper withBorder p="md">
               <Text size="sm" fw={600} mb="sm">
-                Thresholds (latest run)
+                {t('perf.thresholds')}
               </Text>
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Metric</Table.Th>
-                    <Table.Th>Status</Table.Th>
+                    <Table.Th>{t('perf.metric')}</Table.Th>
+                    <Table.Th>{t('table.status')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>

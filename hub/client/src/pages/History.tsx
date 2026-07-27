@@ -38,6 +38,7 @@ import { api } from '~/api/client.js';
 import { qRunsHistory } from '~/api/queries.js';
 import { confirmDialog } from '~/components/confirmDialog';
 import { EmptyState } from '~/components/EmptyState.js';
+import { ErrorState } from '~/components/ErrorState.js';
 import { RunLogModal } from '~/components/history/RunLogModal.js';
 import { PageHeader } from '~/components/PageHeader.js';
 import { PassScoreCell } from '~/components/PassScoreCell.js';
@@ -47,7 +48,7 @@ import { useTableSort } from '~/hooks/useTableSort.js';
 import { useTools } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
 import { useNavigationStore } from '~/stores/navigation.js';
-import { formatAbsolute, formatRelative } from '~/utils/datetime.js';
+import { formatAbsolute, formatDurationBetween, formatRelative } from '~/utils/datetime.js';
 import { getStatusColor, getStatusIcon } from '~/utils/run-status.js';
 import { toolLabel } from '~/utils/tool-label.js';
 
@@ -59,18 +60,6 @@ function triggerColor(trigger?: string): string {
   if (trigger === 'schedule') return 'blue';
   if (trigger === 'webhook') return 'violet';
   return 'gray';
-}
-
-function formatDuration(start: string, end?: string): string {
-  if (!end) return '-';
-  const ms = dayjs(end).diff(dayjs(start));
-  const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  const remSec = sec % 60;
-  if (min < 60) return `${min}m ${remSec}s`;
-  const hr = Math.floor(min / 60);
-  return `${hr}h ${min % 60}m`;
 }
 
 export function HistoryPage() {
@@ -177,7 +166,7 @@ export function HistoryPage() {
       failed: r.summary?.failed ?? '',
       startedAt: r.startedAt,
       endedAt: r.endedAt ?? '',
-      duration: formatDuration(r.startedAt, r.endedAt),
+      duration: formatDurationBetween(r.startedAt, r.endedAt),
       exitCode: r.exitCode ?? '',
       command: r.command,
     }));
@@ -494,7 +483,8 @@ export function HistoryPage() {
       )}
 
       {/* Empty state */}
-      {!history.isLoading && sorted.length === 0 && (
+      {history.isError && <ErrorState onRetry={() => history.refetch()} />}
+      {!history.isLoading && !history.isError && sorted.length === 0 && (
         <EmptyState
           icon={<TbHistory size={48} color="var(--mantine-color-dimmed)" />}
           description={activeFilterCount > 0 ? t('history.noMatchFilter') : t('history.noRuns')}
@@ -672,7 +662,7 @@ export function HistoryPage() {
                     </Table.Td>
                     <Table.Td>
                       <Text size="xs" ff="monospace">
-                        {formatDuration(r.startedAt, r.endedAt)}
+                        {formatDurationBetween(r.startedAt, r.endedAt)}
                       </Text>
                     </Table.Td>
                     <Table.Td>

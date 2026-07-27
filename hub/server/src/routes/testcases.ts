@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TestCaseStatusSyncResult } from '@hub/shared';
+import type { TestCaseEditRequest, TestCaseStatusSyncResult } from '@hub/shared';
 import type { FastifyInstance } from 'fastify';
 import { TOOLS_DIR } from '../config.js';
 import { SAFE_ID } from '../lib/safe-id.js';
@@ -121,35 +121,32 @@ export async function testCaseRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** POST /api/testcases/edit — set one cell + auto-stamp Updated At (writes .edited.json). */
-  app.post<{ Body: { path?: string; sheet?: number; row?: number; col?: number; value?: string } }>(
-    '/api/testcases/edit',
-    async (req, reply) => {
-      const { path: p, sheet, row, col, value } = req.body ?? {};
-      const lower = p?.toLowerCase() ?? '';
-      if (!p || !isUnder(TOOLS_DIR, p) || !(lower.endsWith('.csv') || lower.endsWith('.xlsx'))) {
-        reply.status(400);
-        return { code: 'INVALID_PATH', message: 'path must be a .csv/.xlsx under tools/' };
-      }
-      if (
-        typeof sheet !== 'number' ||
-        typeof row !== 'number' ||
-        typeof col !== 'number' ||
-        typeof value !== 'string'
-      ) {
-        reply.status(400);
-        return {
-          code: 'BAD_REQUEST',
-          message: 'sheet, row, col (numbers) + value (string) required',
-        };
-      }
-      const grid = await editTestCaseCell(p, sheet, row, col, value);
-      if (!grid) {
-        reply.status(400);
-        return { code: 'EDIT_FAILED', message: 'invalid target cell' };
-      }
-      return grid;
-    },
-  );
+  app.post<{ Body: Partial<TestCaseEditRequest> }>('/api/testcases/edit', async (req, reply) => {
+    const { path: p, sheet, row, col, value } = req.body ?? {};
+    const lower = p?.toLowerCase() ?? '';
+    if (!p || !isUnder(TOOLS_DIR, p) || !(lower.endsWith('.csv') || lower.endsWith('.xlsx'))) {
+      reply.status(400);
+      return { code: 'INVALID_PATH', message: 'path must be a .csv/.xlsx under tools/' };
+    }
+    if (
+      typeof sheet !== 'number' ||
+      typeof row !== 'number' ||
+      typeof col !== 'number' ||
+      typeof value !== 'string'
+    ) {
+      reply.status(400);
+      return {
+        code: 'BAD_REQUEST',
+        message: 'sheet, row, col (numbers) + value (string) required',
+      };
+    }
+    const grid = await editTestCaseCell(p, sheet, row, col, value);
+    if (!grid) {
+      reply.status(400);
+      return { code: 'EDIT_FAILED', message: 'invalid target cell' };
+    }
+    return grid;
+  });
 
   /** POST /api/testcases/add-row — append a blank row (writes .edited.json). */
   app.post<{ Body: { path?: string; sheet?: number } }>(

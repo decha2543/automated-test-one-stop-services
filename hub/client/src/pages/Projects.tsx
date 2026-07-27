@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { TbDownload, TbPlus, TbPuzzle } from 'react-icons/tb';
 import { api } from '~/api/client.js';
+import { ErrorState } from '~/components/ErrorState.js';
 import { PageHeader } from '~/components/PageHeader.js';
 import { AddToolsModal } from '~/components/projects/AddToolsModal.js';
 import { CloneModal } from '~/components/projects/CloneModal.js';
@@ -418,7 +419,9 @@ export function ProjectsPage() {
         </Stack>
       )}
 
-      {!projects.isLoading && (
+      {projects.isError && <ErrorState onRetry={() => projects.refetch()} />}
+
+      {!projects.isLoading && !projects.isError && (
         <>
           <ToolSection
             label="scripts/.env"

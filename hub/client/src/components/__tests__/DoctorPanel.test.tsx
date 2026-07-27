@@ -10,7 +10,12 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { en } from '~/i18n/en';
 import { DoctorPanel } from '../DoctorPanel';
+
+/** Match the button by its translation source, so a copy change cannot break
+ *  a test whose subject is behaviour (mutation fired), not wording. */
+const PROVISION_LABEL = new RegExp(en['doctor.provision'], 'i');
 
 /**
  * Unit tests for DoctorPanel rendering (one-stop-service-upgrade, task 2.10;
@@ -242,7 +247,7 @@ describe('DoctorPanel provisioning + guidance', () => {
     const user = userEvent.setup();
     renderPanel(<DoctorPanel doctor={reportBrowsersMissing} isLoading={false} />);
 
-    const provisionBtn = screen.getByRole('button', { name: /provision/i });
+    const provisionBtn = screen.getByRole('button', { name: PROVISION_LABEL });
     expect(provisionBtn).toBeInTheDocument();
 
     await user.click(provisionBtn);
@@ -257,7 +262,7 @@ describe('DoctorPanel provisioning + guidance', () => {
     ]);
     renderPanel(<DoctorPanel doctor={generic} isLoading={false} />);
 
-    expect(screen.queryByRole('button', { name: /provision/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: PROVISION_LABEL })).not.toBeInTheDocument();
   });
 
   it('shows a spinner on the active card while provisioning', () => {
@@ -269,7 +274,7 @@ describe('DoctorPanel provisioning + guidance', () => {
     };
     renderPanel(<DoctorPanel doctor={reportBrowsersMissing} isLoading={false} />);
 
-    const provisionBtn = screen.getByRole('button', { name: /provision/i });
+    const provisionBtn = screen.getByRole('button', { name: PROVISION_LABEL });
     expect(provisionBtn).toHaveAttribute('data-loading', 'true');
   });
 
@@ -294,7 +299,7 @@ describe('DoctorPanel provisioning + guidance', () => {
 
     // Guidance is collapsed (hidden) until "How to fix" is clicked. Mantine 9.4
     // keeps Collapse children mounted, so assert it is not VISIBLE, not absent.
-    expect(screen.getByText(/if your organisation ever provides/i)).not.toBeVisible();
+    expect(screen.getByText(/if your organisation provides/i)).not.toBeVisible();
 
     await user.click(screen.getByRole('button', { name: /how to fix/i }));
 
@@ -306,7 +311,8 @@ describe('DoctorPanel provisioning + guidance', () => {
     // The mirror is presented as conditional ("if your org ever provides one"),
     // never as an existing resource, and only as the LAST step.
     expect(body).toContain('PLAYWRIGHT_DOWNLOAD_HOST');
-    expect(body).toMatch(/if your organisation ever provides/i);
+    // Conditional phrasing ("if ... provides"), never "we have a mirror".
+    expect(body).toMatch(/if your organisation provides/i);
     // No CDN URL is hardcoded into the guidance.
     expect(body).not.toMatch(/https?:\/\//);
   });

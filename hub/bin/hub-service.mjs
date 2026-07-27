@@ -55,6 +55,8 @@ const DIST_INDEX = path.join(SERVER_DIR, 'dist', 'index.js');
 const RUN_DIR = path.join(HUB_DIR, '.run');
 const PID_FILE = path.join(RUN_DIR, 'hub.pid');
 const LOG_FILE = path.join(RUN_DIR, 'hub.log');
+/** Rotate `hub.log` once it passes this size. `0` disables rotation. */
+const LOG_MAX_BYTES = Number.parseInt(process.env.HUB_LOG_MAX_BYTES || '5242880', 10);
 
 const IS_WIN = process.platform === 'win32';
 const IS_LINUX = process.platform === 'linux';
@@ -92,6 +94,26 @@ function daemonlessEnv() {
     HUB_HOST: HOST,
     HUB_PORT: String(PORT),
   };
+}
+
+/**
+ * Keep one generation of the log instead of appending forever. The child writes
+ * stdout+stderr straight into this file, so without a cap it grows for the life
+ * of the machine (megabytes per week of ordinary request logging).
+ *
+ * Called only on `start`, when no Hub process holds the handle. Every failure is
+ * ignored on purpose — a log that cannot be rotated must never block a start.
+ */
+function rotateLogIfLarge() {
+  if (!Number.isFinite(LOG_MAX_BYTES) || LOG_MAX_BYTES <= 0) return;
+  try {
+    if (fs.statSync(LOG_FILE).size < LOG_MAX_BYTES) return;
+    const previous = `${LOG_FILE}.1`;
+    fs.rmSync(previous, { force: true });
+    fs.renameSync(LOG_FILE, previous);
+  } catch {
+    /* no log yet, or the file is locked — start anyway */
+  }
 }
 
 function readPid() {
@@ -141,6 +163,7 @@ async function daemonlessStart() {
   // moment, so a fresh bind may transiently hit EADDRINUSE. We wait for the port
   // to clear between attempts.
   for (let attempt = 1; attempt <= 3; attempt++) {
+    rotateLogIfLarge();
     const logFd = fs.openSync(LOG_FILE, 'a');
     const child = spawn(process.execPath, [DIST_INDEX], {
       cwd: SERVER_DIR,

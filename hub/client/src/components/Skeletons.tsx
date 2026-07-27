@@ -47,13 +47,26 @@ export function StatCardsSkeleton({ count = 5 }: { count?: number }) {
   );
 }
 
-/** Tile grid — matches gallery/file views (Artifacts grid). */
-export function GridSkeleton({ count = 8 }: { count?: number }) {
+/**
+ * Tile grid — matches gallery/file views (Artifacts grid) and card grids
+ * (Docker services). `cols`/`height` default to the Artifacts shape; pass them
+ * to mirror a different grid so the placeholder occupies the same space as the
+ * real content and nothing shifts when data lands.
+ */
+export function GridSkeleton({
+  count = 8,
+  cols = { base: 2, sm: 3, md: 4, lg: 6 },
+  height = 104,
+}: {
+  count?: number;
+  cols?: { base?: number; sm?: number; md?: number; lg?: number };
+  height?: number;
+}) {
   return (
-    <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 6 }} spacing="sm" aria-hidden>
+    <SimpleGrid cols={cols} spacing="sm" aria-hidden>
       {Array.from({ length: count }, (_, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length static placeholder
-        <Skeleton key={i} height={104} radius="md" />
+        <Skeleton key={i} height={height} radius="md" />
       ))}
     </SimpleGrid>
   );

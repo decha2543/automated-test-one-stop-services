@@ -35,6 +35,7 @@ import {
 import { api } from '~/api/client.js';
 import { confirmDialog } from '~/components/confirmDialog.js';
 import { EmptyState } from '~/components/EmptyState.js';
+import { ErrorState } from '~/components/ErrorState.js';
 import { PageHeader } from '~/components/PageHeader.js';
 import { PassScoreCell } from '~/components/PassScoreCell.js';
 import { ArtifactMenu } from '~/components/reports/ArtifactMenu.js';
@@ -44,7 +45,7 @@ import { PAGE_SIZE_OPTIONS, SortableHeader } from '~/components/table/SortableHe
 import { useTableSort } from '~/hooks/useTableSort.js';
 import { useTools } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
-import { formatAbsolute, formatRelative } from '~/utils/datetime.js';
+import { formatAbsolute, formatDurationMs, formatRelative } from '~/utils/datetime.js';
 import { getStatusColor, getStatusIcon } from '~/utils/run-status.js';
 
 const ALL_STATUSES = ['success', 'error'];
@@ -87,14 +88,6 @@ function CaseCountCell({ summary }: { summary?: RunSummary }) {
       </Group>
     </Tooltip>
   );
-}
-
-function formatMs(ms: number): string {
-  const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ${sec % 60}s`;
-  return `${Math.floor(min / 60)}h ${min % 60}m`;
 }
 
 export function ReportsPage() {
@@ -502,7 +495,8 @@ export function ReportsPage() {
       )}
 
       {/* Empty state */}
-      {!reports.isLoading && sorted.length === 0 && (
+      {reports.isError && <ErrorState onRetry={() => reports.refetch()} />}
+      {!reports.isLoading && !reports.isError && sorted.length === 0 && (
         <EmptyState
           icon={<TbReportAnalytics size={48} color="var(--mantine-color-dimmed)" />}
           description={activeFilterCount > 0 ? t('reports.noMatchFilter') : t('reports.noReports')}
@@ -667,7 +661,7 @@ export function ReportsPage() {
                     <Table.Td>
                       {r.durationMs !== undefined ? (
                         <Text size="xs" ff="monospace">
-                          {formatMs(r.durationMs)}
+                          {formatDurationMs(r.durationMs)}
                         </Text>
                       ) : (
                         <Text size="xs" c="dimmed">

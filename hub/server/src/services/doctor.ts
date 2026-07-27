@@ -155,7 +155,7 @@ async function checkDockerDaemon(): Promise<DoctorCheck> {
 // false, never auto-expands the dashboard panel, and never prevents another
 // component from independently declaring that tool required.
 //
-// ponytail: reuses the existing `optional-install` category instead of adding a
+// Design note: reuses the existing `optional-install` category instead of adding a
 // `not-required` DoctorCategory. `overallOk` (and the client summary badge)
 // consider only `required-install`, so `optional-install` yields identical
 // overall semantics while avoiding edits to the client's exhaustive

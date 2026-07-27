@@ -9,11 +9,6 @@
  */
 export const SAFE_ID = /^[a-z][a-z0-9-]+$/;
 
-/** Convenience predicate around {@link SAFE_ID}. */
-export function isSafeId(value: string): boolean {
-  return SAFE_ID.test(value);
-}
-
 /**
  * Safe git ref (branch / tag / SHA) pattern for values that reach a `git`
  * shell command. Allows letters, digits, `.`, `_`, `/`, `-`. Forbids a leading
@@ -23,14 +18,8 @@ export function isSafeId(value: string): boolean {
  * `(`, `)`, `*`, `?`, `~`, newline), a matching value cannot break out of a
  * double-quoted shell argument.
  *
- * ponytail: stricter than the full `git check-ref-format` spec (which permits a
- * few more bytes). Upgrade path — if a legitimate ref is ever rejected, move the
- * `git` calls in `tool-plugins.ts` to argv-form `runChild` (no shell) and drop
- * this guard; see scanner/perf finding "execSync → runChild migration".
+ * Deliberately stricter than the full `git check-ref-format` spec (which permits
+ * a few more bytes). If a legitimate ref is ever rejected, move the `git` calls
+ * in `tool-plugins.ts` to argv-form `runChild` (no shell) and drop this guard.
  */
 export const SAFE_GIT_REF = /^(?!-)(?!.*\.\.)[A-Za-z0-9._/-]+$/;
-
-/** Convenience predicate around {@link SAFE_GIT_REF}. */
-export function isSafeGitRef(value: string): boolean {
-  return SAFE_GIT_REF.test(value);
-}

@@ -26,3 +26,30 @@ export function formatRelative(iso: string | undefined | null): string {
   const d = dayjs(iso);
   return d.isValid() ? d.fromNow() : '-';
 }
+
+/**
+ * Compact duration from a millisecond span, e.g. `45s`, `3m 12s`, `2h 5m`.
+ *
+ * One implementation for every duration cell in the UI (History table, run-log
+ * modal, Reports table) so the same span never renders two different ways.
+ */
+export function formatDurationMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '-';
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ${sec % 60}s`;
+  return `${Math.floor(min / 60)}h ${min % 60}m`;
+}
+
+/**
+ * Compact duration between two ISO-8601 timestamps. A still-running entry has
+ * no end timestamp, which renders as `-` rather than a bogus `0s`.
+ */
+export function formatDurationBetween(start: string, end?: string): string {
+  if (!end) return '-';
+  const from = dayjs(start);
+  const to = dayjs(end);
+  if (!from.isValid() || !to.isValid()) return '-';
+  return formatDurationMs(to.diff(from));
+}

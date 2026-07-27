@@ -1,6 +1,6 @@
 import { ActionIcon, Menu, Tooltip } from '@mantine/core';
 import { TbCheck, TbLanguage } from 'react-icons/tb';
-import { type Locale, useI18nStore } from '~/i18n';
+import { type Locale, translate, useI18nStore } from '~/i18n';
 
 const LOCALE_OPTIONS: { value: Locale; label: string }[] = [
   { value: 'en', label: 'English' },
@@ -19,7 +19,7 @@ export function LanguageToggle() {
     <Menu position="bottom-end" withArrow shadow="md">
       <Menu.Target>
         <Tooltip label="Language / ภาษา">
-          <ActionIcon variant="default" size="lg" aria-label="Change language">
+          <ActionIcon variant="default" size="lg" aria-label={translate('settings.changeLanguage')}>
             <TbLanguage size={18} />
           </ActionIcon>
         </Tooltip>

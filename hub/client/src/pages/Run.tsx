@@ -361,7 +361,7 @@ export function RunPage() {
                         e.stopPropagation();
                         closeSession(s.id);
                       }}
-                      aria-label="Close session"
+                      aria-label={t('run.closeSessionTip')}
                     >
                       <TbX size={14} />
                     </ActionIcon>
@@ -376,7 +376,7 @@ export function RunPage() {
               color="gray"
               size="lg"
               onClick={() => addSession()}
-              aria-label="New session"
+              aria-label={t('run.newSessionTip')}
             >
               <TbPlus size={18} />
             </ActionIcon>

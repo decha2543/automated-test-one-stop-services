@@ -239,9 +239,14 @@ export function BookmarkPanel({ getConfig, onLoad, disabled }: BookmarkPanelProp
         {bookmarks.isLoading && <Loader size="sm" />}
 
         {!bookmarks.isLoading && list.length === 0 && (
-          <Text size="xs" c="dimmed" py="xs">
-            {t('bookmark.empty')}
-          </Text>
+          <Stack gap={2} py="xs">
+            <Text size="xs" c="dimmed">
+              {t('bookmark.empty')}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {t('bookmark.hint')}
+            </Text>
+          </Stack>
         )}
 
         {!bookmarks.isLoading && list.length > 0 && groups.length === 0 && (

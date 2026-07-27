@@ -32,7 +32,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 // Page routes — code-split via lazyRouteComponent
 // ---------------------------------------------------------------------------
 
-export const dashboardRoute = createRoute({
+const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   // Prefetch the three dashboard queries in parallel at navigation time so the
@@ -46,7 +46,7 @@ export const dashboardRoute = createRoute({
   component: lazyRouteComponent(() => import('./pages/Dashboard.js'), 'DashboardPage'),
 });
 
-export const runRoute = createRoute({
+const runRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/run',
   // Run page gates on whether any projects exist and reconnects to active runs.
@@ -58,62 +58,62 @@ export const runRoute = createRoute({
   component: lazyRouteComponent(() => import('./pages/Run.js'), 'RunPage'),
 });
 
-export const historyRoute = createRoute({
+const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/history',
   loader: ({ context }) => context.queryClient.ensureQueryData(qRunsHistory()),
   component: lazyRouteComponent(() => import('./pages/History.js'), 'HistoryPage'),
 });
 
-export const schedulesRoute = createRoute({
+const schedulesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/schedules',
   component: lazyRouteComponent(() => import('./pages/Schedules.js'), 'SchedulesPage'),
 });
 
-export const projectsRoute = createRoute({
+const projectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/projects',
   component: lazyRouteComponent(() => import('./pages/Projects.js'), 'ProjectsPage'),
 });
 
-export const envProfilesRoute = createRoute({
+const envProfilesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/env-profiles',
   component: lazyRouteComponent(() => import('./pages/EnvProfiles.js'), 'EnvProfilesPage'),
 });
 
-export const reportsRoute = createRoute({
+const reportsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/reports',
   component: lazyRouteComponent(() => import('./pages/Reports.js'), 'ReportsPage'),
 });
 
-export const artifactsRoute = createRoute({
+const artifactsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/artifacts',
   component: lazyRouteComponent(() => import('./pages/Artifacts.js'), 'ArtifactsPage'),
 });
 
-export const insightsRoute = createRoute({
+const insightsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/insights',
   component: lazyRouteComponent(() => import('./pages/Insights.js'), 'InsightsPage'),
 });
 
-export const dockerRoute = createRoute({
+const dockerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/docker',
   component: lazyRouteComponent(() => import('./pages/DockerServices.js'), 'DockerServicesPage'),
 });
 
-export const webhooksRoute = createRoute({
+const webhooksRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/webhooks',
   component: lazyRouteComponent(() => import('./pages/Webhooks.js'), 'WebhooksPage'),
 });
 
-export const settingsRoute = createRoute({
+const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: lazyRouteComponent(() => import('./pages/Settings.js'), 'SettingsPage'),
@@ -131,7 +131,7 @@ export const compareRoute = createRoute({
   component: lazyRouteComponent(() => import('./pages/Compare.js'), 'ComparePage'),
 });
 
-export const testcasesRoute = createRoute({
+const testcasesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/testcases',
   component: lazyRouteComponent(() => import('./pages/Testcases.js'), 'TestCasesPage'),

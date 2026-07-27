@@ -3,9 +3,8 @@ import {
   Button,
   Card,
   Group,
-  Loader,
-  Paper,
   SimpleGrid,
+  Skeleton,
   Stack,
   Text,
   Tooltip,
@@ -21,9 +20,19 @@ import {
   TbServer,
 } from 'react-icons/tb';
 import { api } from '~/api/client';
+import { ErrorState } from '~/components/ErrorState.js';
 import { PageHeader } from '~/components/PageHeader.js';
+import { GridSkeleton } from '~/components/Skeletons.js';
 import { toast } from '~/components/Toast';
 import { useT } from '~/i18n/index.js';
+
+/**
+ * Poll interval for the Docker/Appium probes. Each poll shells out to the
+ * `docker` CLI on the server, so this is the page's real cost — 10s still feels
+ * live for start/stop actions (which invalidate the query immediately) at half
+ * the process churn of the previous 5s.
+ */
+const STATUS_POLL_MS = 10_000;
 
 interface DockerStatus {
   dockerRunning: boolean;
@@ -49,7 +58,7 @@ export function DockerServicesPage() {
   const status = useQuery<DockerStatus>({
     queryKey: ['docker-status'],
     queryFn: () => api.get('/api/docker/status'),
-    refetchInterval: 5000,
+    refetchInterval: STATUS_POLL_MS,
   });
 
   const dockerRunning = status.data?.dockerRunning ?? false;
@@ -119,12 +128,12 @@ export function DockerServicesPage() {
   const appium = useQuery<AppiumStatus>({
     queryKey: ['appium-status'],
     queryFn: () => api.get('/api/appium/status'),
-    refetchInterval: 5000,
+    refetchInterval: STATUS_POLL_MS,
   });
   const appiumStart = useMutation({
     mutationFn: () => api.post('/api/appium/start'),
     onSuccess: () => {
-      toast.success('Appium starting');
+      toast.success(t('docker.appiumStarting'));
       queryClient.invalidateQueries({ queryKey: ['appium-status'] });
       queryClient.invalidateQueries({ queryKey: ['doctor-nav'] });
     },
@@ -133,7 +142,7 @@ export function DockerServicesPage() {
   const appiumStop = useMutation({
     mutationFn: () => api.post('/api/appium/stop'),
     onSuccess: () => {
-      toast.success('Appium stopped');
+      toast.success(t('docker.appiumStopped'));
       queryClient.invalidateQueries({ queryKey: ['appium-status'] });
       queryClient.invalidateQueries({ queryKey: ['doctor-nav'] });
     },
@@ -142,7 +151,7 @@ export function DockerServicesPage() {
   const appiumInstall = useMutation({
     mutationFn: () => api.post('/api/appium/install'),
     onSuccess: () => {
-      toast.success('Appium installed');
+      toast.success(t('docker.appiumInstalled'));
       queryClient.invalidateQueries({ queryKey: ['appium-status'] });
       queryClient.invalidateQueries({ queryKey: ['doctor-nav'] });
     },
@@ -158,15 +167,22 @@ export function DockerServicesPage() {
     <Stack gap="md">
       <PageHeader title={t('docker.title')} description={t('nav.docker.desc')} />
 
+      {/* Probing Docker can take a few seconds. Mirror the real layout (status
+          card → bulk actions → service cards) so the page never looks stuck and
+          nothing jumps when the data lands. */}
+      {status.isError && <ErrorState onRetry={() => status.refetch()} />}
       {status.isLoading && (
-        <Paper p="xl" withBorder ta="center">
-          <Stack align="center" gap="sm">
-            <Loader size="md" />
-            <Text c="dimmed" size="sm">
-              Checking Docker status...
-            </Text>
-          </Stack>
-        </Paper>
+        <Stack gap="md">
+          <Text c="dimmed" size="sm">
+            {t('docker.checking')}
+          </Text>
+          <Skeleton height={86} radius="md" aria-hidden />
+          <Group gap="xs" aria-hidden>
+            <Skeleton height={26} width={104} radius="sm" />
+            <Skeleton height={26} width={104} radius="sm" />
+          </Group>
+          <GridSkeleton count={3} cols={{ base: 1, sm: 2, md: 3 }} height={188} />
+        </Stack>
       )}
 
       {!status.isLoading && (
@@ -181,7 +197,7 @@ export function DockerServicesPage() {
                     Docker Desktop
                   </Text>
                   <Badge size="sm" variant="light" color={dockerRunning ? 'green' : 'red'}>
-                    {dockerRunning ? 'Running' : 'Stopped'}
+                    {dockerRunning ? t('common.running') : t('common.stopped')}
                   </Badge>
                 </Stack>
               </Group>
@@ -192,7 +208,7 @@ export function DockerServicesPage() {
                   onClick={() => startDesktop.mutate()}
                   loading={startDesktop.isPending}
                 >
-                  Start Docker Desktop
+                  {t('docker.startDesktop')}
                 </Button>
               )}
             </Group>
@@ -209,7 +225,7 @@ export function DockerServicesPage() {
               loading={startAll.isPending}
               disabled={!dockerRunning}
             >
-              Start All
+              {t('docker.startAll')}
             </Button>
             <Button
               size="xs"
@@ -220,7 +236,7 @@ export function DockerServicesPage() {
               loading={stopAll.isPending}
               disabled={!dockerRunning}
             >
-              Stop All
+              {t('docker.stopAll')}
             </Button>
           </Group>
 
@@ -241,7 +257,7 @@ export function DockerServicesPage() {
                         </Text>
                       </Group>
                       <Badge size="sm" variant="light" color={isRunning ? 'green' : 'red'}>
-                        {svcStatus}
+                        {isRunning ? t('common.running') : t('common.stopped')}
                       </Badge>
                     </Group>
 
@@ -266,7 +282,7 @@ export function DockerServicesPage() {
                             disabled={!dockerRunning}
                             loading={startService.isPending && startService.variables === name}
                           >
-                            Start
+                            {t('common.start')}
                           </Button>
                         </Tooltip>
                       )}
@@ -281,7 +297,7 @@ export function DockerServicesPage() {
                             disabled={!dockerRunning}
                             loading={stopService.isPending && stopService.variables === name}
                           >
-                            Stop
+                            {t('common.stop')}
                           </Button>
                         </Tooltip>
                       )}
@@ -295,7 +311,7 @@ export function DockerServicesPage() {
                           disabled={!dockerRunning || !isRunning}
                           loading={restartService.isPending && restartService.variables === name}
                         >
-                          Restart
+                          {t('common.restart')}
                         </Button>
                       </Tooltip>
                     </Group>
@@ -312,7 +328,7 @@ export function DockerServicesPage() {
           Android emulator on Windows. */}
       <div>
         <Text size="sm" fw={700} c="dimmed" tt="uppercase" mb="xs">
-          Local services
+          {t('docker.localServices')}
         </Text>
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
           <Card withBorder p="md">
@@ -321,17 +337,17 @@ export function DockerServicesPage() {
                 <Group gap="xs">
                   <TbDeviceMobile size={16} />
                   <Text size="sm" fw={500}>
-                    Appium (local)
+                    {t('docker.appiumLocal')}
                   </Text>
                 </Group>
                 <Badge size="sm" variant="light" color={appium.data?.running ? 'green' : 'red'}>
-                  {appium.data?.running ? 'running' : 'stopped'}
+                  {appium.data?.running ? t('common.running') : t('common.stopped')}
                 </Badge>
               </Group>
 
               <Stack gap={2}>
                 <Text size="xs" c="dimmed">
-                  Host Appium server for mobile testing
+                  {t('docker.appiumDesc')}
                 </Text>
                 <Text size="xs" c="dimmed" ff="monospace">
                   :{appium.data?.port ?? 4723}
@@ -339,7 +355,7 @@ export function DockerServicesPage() {
               </Stack>
 
               {appium.data && !appium.data.installed ? (
-                <Tooltip label="Install Appium + uiautomator2 driver on this machine">
+                <Tooltip label={t('docker.installAppiumTip')}>
                   <Button
                     size="xs"
                     variant="light"
@@ -348,7 +364,7 @@ export function DockerServicesPage() {
                     onClick={() => appiumInstall.mutate()}
                     loading={appiumInstall.isPending}
                   >
-                    Install
+                    {t('common.install')}
                   </Button>
                 </Tooltip>
               ) : (
@@ -362,7 +378,7 @@ export function DockerServicesPage() {
                       onClick={() => appiumStart.mutate()}
                       loading={appiumStart.isPending}
                     >
-                      Start
+                      {t('common.start')}
                     </Button>
                   )}
                   {appium.data?.running && (
@@ -374,7 +390,7 @@ export function DockerServicesPage() {
                       onClick={() => appiumStop.mutate()}
                       loading={appiumStop.isPending}
                     >
-                      Stop
+                      {t('common.stop')}
                     </Button>
                   )}
                 </Group>

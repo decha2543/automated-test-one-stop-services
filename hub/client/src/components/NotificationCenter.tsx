@@ -12,6 +12,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import dayjs from 'dayjs';
 import { TbBell, TbCheck, TbCircleCheck, TbCircleX, TbInfoCircle, TbTrash } from 'react-icons/tb';
+import { useT } from '~/i18n/index.js';
 import { type HubNotification, useNotifications } from '~/stores/hub.js';
 
 function NotificationIcon({ type }: { type: HubNotification['type'] }) {
@@ -28,6 +29,7 @@ function NotificationIcon({ type }: { type: HubNotification['type'] }) {
 }
 
 export function NotificationCenter() {
+  const t = useT();
   const [_, { toggle, close }] = useDisclosure(false);
   const { notifications, unreadCount, markAllRead, markRead, clear } = useNotifications();
 
@@ -42,14 +44,14 @@ export function NotificationCenter() {
       closeOnEscape
     >
       <Popover.Target>
-        <Tooltip label="Notifications">
+        <Tooltip label={t('notif.title')}>
           <Indicator
             color="red"
             size={16}
             label={unreadCount > 0 ? unreadCount : undefined}
             disabled={unreadCount === 0}
           >
-            <ActionIcon variant="subtle" onClick={toggle} aria-label="Notifications">
+            <ActionIcon variant="subtle" onClick={toggle} aria-label={t('notif.title')}>
               <TbBell size={18} />
             </ActionIcon>
           </Indicator>
@@ -64,7 +66,7 @@ export function NotificationCenter() {
           style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
         >
           <Text size="sm" fw={600}>
-            Notifications
+            {t('notif.title')}
           </Text>
           <Group gap={4}>
             {unreadCount > 0 && (
@@ -74,7 +76,7 @@ export function NotificationCenter() {
                 leftSection={<TbCheck size={12} />}
                 onClick={markAllRead}
               >
-                Mark all read
+                {t('notif.markAllRead')}
               </Button>
             )}
             {notifications.length > 0 && (
@@ -85,7 +87,7 @@ export function NotificationCenter() {
                 leftSection={<TbTrash size={12} />}
                 onClick={clear}
               >
-                Clear
+                {t('notif.clear')}
               </Button>
             )}
           </Group>
@@ -94,7 +96,7 @@ export function NotificationCenter() {
         <ScrollArea.Autosize mah="45vh">
           {notifications.length === 0 ? (
             <Text size="sm" c="dimmed" ta="center" py="xl">
-              No notifications yet
+              {t('notif.empty')}
             </Text>
           ) : (
             <Stack gap={0}>

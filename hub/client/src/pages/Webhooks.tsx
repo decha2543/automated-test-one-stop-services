@@ -420,14 +420,14 @@ function WebhookFormModal({
             label={t('webhook.token')}
             value={token}
             onChange={(e) => setToken(e.currentTarget.value)}
-            placeholder="Long-lived token from LINE Developers Console"
+            placeholder={t('webhooks.lineTokenPlaceholder')}
             description={t('webhook.tokenDesc')}
           />
           <TextInput
             label={t('webhook.recipient')}
             value={recipientId}
             onChange={(e) => setRecipientId(e.currentTarget.value)}
-            placeholder="User ID or Group ID (e.g. U1234...)"
+            placeholder={t('webhooks.lineTargetPlaceholder')}
             description={t('webhook.recipientDesc')}
           />
         </>

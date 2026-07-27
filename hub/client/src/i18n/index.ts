@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { en, type TranslationKey } from './en';
@@ -45,7 +46,24 @@ export const useI18nStore = create<I18nStore>()(
  */
 export function useT(): (key: TranslationKey) => string {
   const locale = useI18nStore((s) => s.locale);
-  return (key: TranslationKey) => locales[locale][key] ?? en[key] ?? key;
+  // Memoised on `locale` so `t` keeps a stable identity between renders: it is a
+  // dependency of `useMemo`/`useCallback` blocks in the pages, and a fresh
+  // closure every render would silently defeat them.
+  return useCallback((key: TranslationKey) => resolve(locale, key), [locale]);
+}
+
+/** English is the fallback whenever a locale is missing a key. */
+function resolve(locale: Locale, key: TranslationKey): string {
+  return locales[locale][key] ?? en[key] ?? key;
+}
+
+/**
+ * Translation for code that runs outside a React component (imperative helpers
+ * such as `confirmDialog` or a toast fired from a mutation callback), where a
+ * hook is not available. Reads the same store, so it follows the user's locale.
+ */
+export function translate(key: TranslationKey): string {
+  return resolve(useI18nStore.getState().locale, key);
 }
 
 export type { TranslationKey };

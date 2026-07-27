@@ -12,6 +12,7 @@ import {
   ScrollArea,
   Select,
   SimpleGrid,
+  Skeleton,
   Stack,
   Switch,
   Table,
@@ -35,7 +36,7 @@ import {
   useDesktopNotification,
 } from '~/hooks/useDesktopNotification.js';
 import { useNotificationSound } from '~/hooks/useNotificationSound.js';
-import { useToolOptions } from '~/hooks/useTools.js';
+import { useResyncWorkspace, useToolOptions } from '~/hooks/useTools.js';
 import { type Locale, useI18nStore, useT } from '~/i18n';
 import { usePreferences } from '~/stores/hub.js';
 
@@ -110,6 +111,7 @@ export function SettingsPage() {
   const setDefaultHeadless = usePreferences((s) => s.setDefaultHeadless);
   const toggleOnboarding = usePreferences((s) => s.toggleOnboarding);
   const queryClient = useQueryClient();
+  const resync = useResyncWorkspace();
   const toolOptions = useToolOptions();
   const [qrOpened, { open: openQr, close: closeQr }] = useDisclosure(false);
 
@@ -415,29 +417,35 @@ export function SettingsPage() {
                   )}
                 </Text>
               </Stack>
-              <Group gap="xs">
-                <NumberInput
-                  size="xs"
-                  w={80}
-                  min={1}
-                  max={10}
-                  value={concurrencyInput}
-                  onChange={(v) => setConcurrencyInput(typeof v === 'number' ? v : '')}
-                />
-                <Button
-                  size="xs"
-                  onClick={() => {
-                    if (typeof concurrencyInput === 'number')
-                      concurrencyMutation.mutate(concurrencyInput);
-                  }}
-                  loading={concurrencyMutation.isPending}
-                  disabled={
-                    !concurrencyInput || concurrencyInput === concurrencyQ.data?.maxConcurrency
-                  }
-                >
-                  {t('common.save')}
-                </Button>
-              </Group>
+              {/* Reserve the control's space while the saved value loads —
+                  otherwise the input renders empty and then snaps to a number. */}
+              {concurrencyQ.isLoading ? (
+                <Skeleton height={30} width={132} radius="sm" aria-hidden />
+              ) : (
+                <Group gap="xs">
+                  <NumberInput
+                    size="xs"
+                    w={80}
+                    min={1}
+                    max={10}
+                    value={concurrencyInput}
+                    onChange={(v) => setConcurrencyInput(typeof v === 'number' ? v : '')}
+                  />
+                  <Button
+                    size="xs"
+                    onClick={() => {
+                      if (typeof concurrencyInput === 'number')
+                        concurrencyMutation.mutate(concurrencyInput);
+                    }}
+                    loading={concurrencyMutation.isPending}
+                    disabled={
+                      !concurrencyInput || concurrencyInput === concurrencyQ.data?.maxConcurrency
+                    }
+                  >
+                    {t('common.save')}
+                  </Button>
+                </Group>
+              )}
             </Group>
           </Stack>
         </Paper>
@@ -522,15 +530,19 @@ export function SettingsPage() {
                   {t('settings.retentionPeriodDesc')}
                 </Text>
               </Stack>
-              <NumberInput
-                size="xs"
-                w={100}
-                min={1}
-                max={365}
-                value={cleanupDays}
-                onChange={(v) => setCleanupDays(typeof v === 'number' ? v : '')}
-                suffix={t('settings.daysSuffix')}
-              />
+              {retentionQ.isLoading ? (
+                <Skeleton height={30} width={100} radius="sm" aria-hidden />
+              ) : (
+                <NumberInput
+                  size="xs"
+                  w={100}
+                  min={1}
+                  max={365}
+                  value={cleanupDays}
+                  onChange={(v) => setCleanupDays(typeof v === 'number' ? v : '')}
+                  suffix={t('settings.daysSuffix')}
+                />
+              )}
             </Group>
 
             <Group justify="space-between">
@@ -658,6 +670,33 @@ export function SettingsPage() {
                 </Text>
               </Stack>
               <Switch checked={showOnboarding} onChange={() => toggleOnboarding()} size="md" />
+            </Group>
+
+            <Divider />
+
+            {/* Projects/tools added outside the Hub (git clone, file copy) are
+                invisible until the workspace is re-scanned. Exposing it here
+                saves a terminal trip. */}
+            <Group justify="space-between">
+              <Stack gap={2}>
+                <Text size="sm">{t('settings.resync')}</Text>
+                <Text size="xs" c="dimmed">
+                  {t('settings.resyncDesc')}
+                </Text>
+              </Stack>
+              <Button
+                size="xs"
+                variant="light"
+                leftSection={<TbRefresh size={14} />}
+                loading={resync.isPending}
+                onClick={() =>
+                  resync.mutate(undefined, {
+                    onSuccess: () => toast.success(t('settings.resyncDone')),
+                  })
+                }
+              >
+                {t('settings.resyncAction')}
+              </Button>
             </Group>
 
             <Divider />

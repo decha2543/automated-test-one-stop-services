@@ -1,35 +1,37 @@
 import type { DoctorCategory, DoctorCheck, DoctorReport } from '@hub/shared';
 import { missingPrerequisites } from '@hub/shared';
 import {
-  Badge,
-  Button,
-  Card,
-  Collapse,
-  Group,
-  Loader,
-  Paper,
-  SimpleGrid,
-  Stack,
-  Text,
-  UnstyledButton,
+    Badge,
+    Button,
+    Card,
+    Collapse,
+    Group,
+    Loader,
+    Paper,
+    SimpleGrid,
+    Stack,
+    Text,
+    UnstyledButton,
 } from '@mantine/core';
 import { useState } from 'react';
 import {
-  TbAlertTriangle,
-  TbChevronRight,
-  TbCircleCheck,
-  TbCircleX,
-  TbDownload,
-  TbRefresh,
+    TbAlertTriangle,
+    TbChevronRight,
+    TbCircleCheck,
+    TbCircleX,
+    TbDownload,
+    TbRefresh,
 } from 'react-icons/tb';
 import { useInstallPython, useProvisionTool } from '~/hooks/useTools.js';
+import type { TranslationKey } from '~/i18n/en';
+import { useT } from '~/i18n/index.js';
 import {
-  groupByCategory,
-  provisionGuidance,
-  provisionTargetFor,
-  shouldAutoExpand,
-  shouldShowGroup,
-  summaryBadge,
+    groupByCategory,
+    provisionGuidance,
+    provisionTargetFor,
+    shouldAutoExpand,
+    shouldShowGroup,
+    summaryBadge,
 } from './doctor-panel-helpers';
 
 interface DoctorPanelProps {
@@ -71,7 +73,7 @@ interface InstallState {
 
 interface CategoryConfig {
   key: DoctorCategory;
-  title: string;
+  titleKey: TranslationKey;
   okBorder: string;
   failBorder: string;
   okBg: string;
@@ -82,7 +84,7 @@ interface CategoryConfig {
 const CATEGORIES: CategoryConfig[] = [
   {
     key: 'required-install',
-    title: 'Required',
+    titleKey: 'doctor.catRequired',
     okBorder: 'var(--mantine-color-green-7)',
     failBorder: 'var(--mantine-color-red-7)',
     okBg: 'var(--mantine-color-green-light)',
@@ -91,7 +93,7 @@ const CATEGORIES: CategoryConfig[] = [
   },
   {
     key: 'optional-install',
-    title: 'Optional — Install',
+    titleKey: 'doctor.catOptionalInstall',
     okBorder: 'var(--mantine-color-green-7)',
     failBorder: 'var(--mantine-color-yellow-7)',
     okBg: 'var(--mantine-color-green-light)',
@@ -100,7 +102,7 @@ const CATEGORIES: CategoryConfig[] = [
   },
   {
     key: 'optional-process',
-    title: 'Optional — Services',
+    titleKey: 'doctor.catOptionalServices',
     okBorder: 'var(--mantine-color-green-7)',
     failBorder: 'var(--mantine-color-gray-5)',
     okBg: 'var(--mantine-color-green-light)',
@@ -118,6 +120,7 @@ const CATEGORIES: CategoryConfig[] = [
  * cannot miss the problem.
  */
 export function DoctorPanel({ doctor, isLoading }: DoctorPanelProps) {
+  const t = useT();
   const hasIssues = !!doctor && shouldAutoExpand(doctor);
   const [expanded, setExpanded] = useState(false);
   const isExpanded = hasIssues || expanded;
@@ -147,7 +150,7 @@ export function DoctorPanel({ doctor, isLoading }: DoctorPanelProps) {
         <Group gap="xs">
           {isLoading && <Loader size="xs" />}
           <Text c="dimmed" size="sm">
-            Checking environment...
+            {t('doctor.checking')}
           </Text>
         </Group>
       </Paper>
@@ -163,7 +166,7 @@ export function DoctorPanel({ doctor, isLoading }: DoctorPanelProps) {
         w="100%"
         aria-expanded={isExpanded}
         aria-disabled={hasIssues || undefined}
-        aria-label="Toggle environment status details"
+        aria-label={t('doctor.toggleDetails')}
         style={{ cursor: hasIssues ? 'default' : 'pointer' }}
         onClick={() => {
           if (!hasIssues) setExpanded((v) => !v);
@@ -181,7 +184,7 @@ export function DoctorPanel({ doctor, isLoading }: DoctorPanelProps) {
               />
             )}
             <Text fw={600} size="sm">
-              Environment Status
+              {t('doctor.envStatus')}
             </Text>
             {badge.ok ? (
               <Badge
@@ -236,10 +239,11 @@ function CategorySection({
   provision: ProvisionState;
   install: InstallState;
 }) {
+  const t = useT();
   return (
     <div>
       <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb={6}>
-        {cat.title}
+        {t(cat.titleKey)}
       </Text>
       <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
         {checks.map((check) => (
@@ -278,6 +282,7 @@ function CheckCard({
 
   // A failing tool check (e.g. playwright-browsers, k6) can be re-provisioned by
   // re-running the tool's `setup` task. Generic checks have no provision target.
+  const t = useT();
   const provisionTarget = check.ok ? undefined : provisionTargetFor(check.name);
   const isProvisioning = provisionTarget !== undefined && provision.pendingId === provisionTarget;
   const provisionFailed = provisionTarget !== undefined && provision.failedId === provisionTarget;
@@ -333,7 +338,7 @@ function CheckCard({
               disabled={prereqBlocked}
               onClick={() => provision.onProvision(provisionTarget)}
             >
-              Provision
+              {t('doctor.provision')}
             </Button>
             <Button
               size="compact-xs"
@@ -341,7 +346,7 @@ function CheckCard({
               color="gray"
               onClick={() => setShowFix((v) => !v)}
             >
-              How to fix
+              {t('doctor.howToFix')}
             </Button>
           </Group>
           {prereqBlocked && (
@@ -378,7 +383,7 @@ function CheckCard({
             disabled={prereqBlocked}
             onClick={install.onInstall}
           >
-            Install Python
+            {t('doctor.installPython')}
           </Button>
           {prereqBlocked && (
             <Text size="xs" c="red">

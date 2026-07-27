@@ -15,6 +15,7 @@ import {
 import dayjs from 'dayjs';
 import { TbExternalLink, TbWindow } from 'react-icons/tb';
 import { useTools } from '~/hooks/useTools.js';
+import { useT } from '~/i18n/index.js';
 import { toolLabel } from '~/utils/tool-label.js';
 
 interface FloatingRunsWindowProps {
@@ -30,6 +31,7 @@ export function FloatingRunsWindow({
   onClose,
   onJumpToRuns,
 }: FloatingRunsWindowProps) {
+  const t = useT();
   const tools = useTools();
 
   if (!visible || runs.length === 0) return null;
@@ -48,22 +50,22 @@ export function FloatingRunsWindow({
           <Group gap={6}>
             <Loader size={12} color="blue" type="dots" />
             <Text size="sm" fw={600}>
-              Active Runs ({runs.length})
+              {t('runs.activeTitle')} ({runs.length})
             </Text>
           </Group>
           <Group gap={2}>
-            <Tooltip label="Jump to Run page" withArrow>
+            <Tooltip label={t('runs.jumpToRun')} withArrow>
               <ActionIcon
                 size="sm"
                 variant="subtle"
                 color="blue"
                 onClick={onJumpToRuns}
-                aria-label="Jump to Run page"
+                aria-label={t('runs.jumpToRun')}
               >
                 <TbExternalLink size={14} />
               </ActionIcon>
             </Tooltip>
-            <CloseButton size="sm" onClick={onClose} aria-label="Close" />
+            <CloseButton size="sm" onClick={onClose} aria-label={t('common.close')} />
           </Group>
         </Group>
         <ScrollArea.Autosize mah="28vh">
@@ -101,7 +103,7 @@ export function FloatingRunsWindow({
           leftSection={<TbWindow size={12} />}
           onClick={onJumpToRuns}
         >
-          Open Run Tests
+          {t('runs.openRunTests')}
         </Button>
       </Stack>
     </FloatingWindow>

@@ -16,7 +16,12 @@ export const useNotificationSound = create<NotificationSoundStore>()(
   ),
 );
 
-const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+// Safari (and older WebKit) only expose the prefixed constructor. Typing it as an
+// optional window property keeps the fallback free of an `any` cast.
+type AudioContextCtor = typeof window.AudioContext;
+const AudioContext: AudioContextCtor =
+  window.AudioContext ??
+  (window as Window & { webkitAudioContext?: AudioContextCtor }).webkitAudioContext;
 let audioCtx: InstanceType<typeof window.AudioContext> | null = null;
 
 function getAudioCtx(): InstanceType<typeof window.AudioContext> {

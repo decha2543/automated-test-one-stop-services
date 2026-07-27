@@ -1,3 +1,4 @@
+import type { ApiError } from '@hub/shared';
 import axios, { type AxiosError, type AxiosRequestConfig } from 'axios';
 
 const instance = axios.create({
@@ -9,7 +10,7 @@ const instance = axios.create({
 /** Throw a uniform Error with backend's `message` when available */
 instance.interceptors.response.use(
   (res) => res,
-  (err: AxiosError<{ message?: string; code?: string; stage?: string }>) => {
+  (err: AxiosError<Partial<ApiError>>) => {
     const data = err.response?.data;
     const msg = data?.message ?? err.message ?? 'Request failed';
     const error = new Error(msg) as Error & { code?: string; stage?: string };

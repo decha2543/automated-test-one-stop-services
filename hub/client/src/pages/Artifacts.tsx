@@ -21,6 +21,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   TbArrowLeft,
@@ -33,11 +34,14 @@ import {
   TbGridDots,
   TbList,
   TbMovie,
+  TbPlayerPlay,
   TbRoute,
   TbTrash,
 } from 'react-icons/tb';
 import { api } from '~/api/client';
 import { confirmDialog } from '~/components/confirmDialog';
+import { EmptyState } from '~/components/EmptyState.js';
+import { ErrorState } from '~/components/ErrorState.js';
 import { PageHeader } from '~/components/PageHeader.js';
 import { GridSkeleton } from '~/components/Skeletons.js';
 import { toast } from '~/components/Toast';
@@ -139,17 +143,26 @@ function handleActivateKey(action: () => void) {
 
 // ─── Components ──────────────────────────────────────────────────────────────
 
-function EmptyState() {
+/** First-run state: explains what lands here and offers the one action that fills it. */
+function ArtifactsEmpty() {
+  const t = useT();
+  const navigate = useNavigate();
   return (
-    <Stack align="center" justify="center" py={80}>
-      <TbFolder size={56} color="var(--mantine-color-dimmed)" />
-      <Text c="dimmed" size="lg" fw={500}>
-        No artifacts yet
-      </Text>
-      <Text c="dimmed" size="sm" maw={360} ta="center">
-        Run your tests to generate outputs. Screenshots, videos, traces, and logs will appear here.
-      </Text>
-    </Stack>
+    <EmptyState
+      icon={<TbFolder size={48} color="var(--mantine-color-dimmed)" />}
+      title={t('artifacts.noArtifacts')}
+      description={t('artifacts.noArtifactsDesc')}
+      action={
+        <Button
+          size="xs"
+          color="green"
+          leftSection={<TbPlayerPlay size={14} />}
+          onClick={() => navigate({ to: '/run' })}
+        >
+          {t('history.startRun')}
+        </Button>
+      }
+    />
   );
 }
 
@@ -166,6 +179,7 @@ function FolderCard({
   selected?: boolean;
   onToggleSelect?: () => void;
 }) {
+  const t = useT();
   return (
     <Card
       withBorder
@@ -211,7 +225,7 @@ function FolderCard({
           )}
         </Group>
         <Group gap="xs">
-          <Tooltip label="Download as ZIP">
+          <Tooltip label={t('artifacts.downloadZip')}>
             <ActionIcon
               variant="light"
               size="sm"
@@ -224,7 +238,7 @@ function FolderCard({
             </ActionIcon>
           </Tooltip>
           {onDelete && (
-            <Tooltip label="Delete folder">
+            <Tooltip label={t('artifacts.deleteFolder')}>
               <ActionIcon
                 variant="light"
                 color="red"
@@ -245,6 +259,7 @@ function FolderCard({
 }
 
 function FileCard({ node, onClick }: { node: ArtifactFile; onClick: () => void }) {
+  const t = useT();
   return (
     <Card
       withBorder
@@ -267,12 +282,12 @@ function FileCard({ node, onClick }: { node: ArtifactFile; onClick: () => void }
           </Badge>
         </Group>
         <Group gap="xs">
-          <Tooltip label="Preview">
+          <Tooltip label={t('artifacts.preview')}>
             <ActionIcon variant="light" size="sm" onClick={onClick}>
               <TbEye size={14} />
             </ActionIcon>
           </Tooltip>
-          <Tooltip label="Download">
+          <Tooltip label={t('artifacts.download')}>
             <ActionIcon
               variant="light"
               size="sm"
@@ -303,6 +318,7 @@ function FileRow({
   selected?: boolean;
   onToggleSelect?: () => void;
 }) {
+  const t = useT();
   return (
     <Group
       justify="space-between"
@@ -310,7 +326,7 @@ function FileRow({
       py="xs"
       role="button"
       tabIndex={0}
-      aria-label={`Preview ${node.name}`}
+      aria-label={`${t('artifacts.preview')} ${node.name}`}
       style={{
         borderBottom: '1px solid var(--mantine-color-default-border)',
         cursor: 'pointer',
@@ -338,7 +354,7 @@ function FileRow({
         <Text size="xs" c="dimmed">
           {formatSize(node.size)}
         </Text>
-        <Tooltip label="Download">
+        <Tooltip label={t('artifacts.download')}>
           <ActionIcon
             variant="subtle"
             size="sm"
@@ -351,7 +367,7 @@ function FileRow({
           </ActionIcon>
         </Tooltip>
         {onDelete && (
-          <Tooltip label="Delete file">
+          <Tooltip label={t('artifacts.deleteFile')}>
             <ActionIcon
               variant="subtle"
               color="red"
@@ -383,6 +399,7 @@ function FolderRow({
   selected?: boolean;
   onToggleSelect?: () => void;
 }) {
+  const t = useT();
   return (
     <Group
       justify="space-between"
@@ -425,7 +442,7 @@ function FolderRow({
           </Text>
         )}
         {onDelete && (
-          <Tooltip label="Delete folder">
+          <Tooltip label={t('artifacts.deleteFolder')}>
             <ActionIcon
               variant="subtle"
               color="red"
@@ -453,6 +470,7 @@ function PreviewModal({
   opened: boolean;
   onClose: () => void;
 }) {
+  const t = useT();
   const isImage = file?.type === 'screenshot';
   const isVideo = file?.type === 'video';
   const isText = !isImage && !isVideo;
@@ -497,7 +515,7 @@ function PreviewModal({
               href={serveUrl(file.path)}
               target="_blank"
             >
-              Download
+              {t('artifacts.download')}
             </Button>
           </Group>
 
@@ -518,7 +536,7 @@ function PreviewModal({
             <Group gap="xs" justify="center" py="xl">
               <Loader size="sm" />
               <Text size="sm" c="dimmed">
-                Loading content...
+                {t('artifacts.loadingContent')}
               </Text>
             </Group>
           )}
@@ -565,14 +583,16 @@ export function ArtifactsPage() {
   const handleDelete = useCallback(
     async (name: string, artifactPath: string, isFolder: boolean) => {
       const ok = await confirmDialog({
-        title: `Delete ${isFolder ? 'Folder' : 'File'}`,
-        message: `Are you sure you want to delete "${name}"?${isFolder ? ' This will remove all files inside.' : ''} This action cannot be undone.`,
-        confirmLabel: 'Delete',
+        title: t(isFolder ? 'artifacts.deleteFolderTitle' : 'artifacts.deleteFileTitle'),
+        message: `"${name}" — ${t(
+          isFolder ? 'artifacts.deleteConfirmFolder' : 'artifacts.deleteConfirmFile',
+        )}`,
+        confirmLabel: t('common.delete'),
         danger: true,
       });
       if (ok) deleteMutation.mutate(artifactPath);
     },
-    [deleteMutation],
+    [deleteMutation, t],
   );
 
   // Multiselect state
@@ -670,7 +690,7 @@ export function ArtifactsPage() {
   const breadcrumbItems = useMemo(() => {
     const items = [
       <Anchor key="root" size="sm" onClick={() => navigateTo(0)} style={{ cursor: 'pointer' }}>
-        Artifacts
+        {t('nav.artifacts')}
       </Anchor>,
     ];
     for (let i = 0; i < currentPath.length; i++) {
@@ -682,7 +702,7 @@ export function ArtifactsPage() {
       );
     }
     return items;
-  }, [currentPath, navigateTo]);
+  }, [currentPath, navigateTo, t]);
 
   // Filter buttons
   const filterTypes: { value: FileType; label: string; icon: React.ReactNode }[] = [
@@ -692,6 +712,9 @@ export function ArtifactsPage() {
     { value: 'log', label: 'Logs', icon: <TbFileText size={14} /> },
   ];
 
+  if (tree.isError) {
+    return <ErrorState onRetry={() => tree.refetch()} />;
+  }
   if (tree.isLoading) {
     return <GridSkeleton count={12} />;
   }
@@ -737,7 +760,7 @@ export function ArtifactsPage() {
           color="gray"
           onClick={() => setTypeFilter(null)}
         >
-          All
+          {t('common.all')}
         </Button>
         {filterTypes.map((ft) => (
           <Button
@@ -777,14 +800,14 @@ export function ArtifactsPage() {
             }}
             label={
               <Text size="xs" c="dimmed">
-                Select all
+                {t('common.selectAll')}
               </Text>
             }
           />
           {selectedPaths.size > 0 && (
             <>
               <Badge size="sm" variant="light">
-                {selectedPaths.size} selected
+                {selectedPaths.size} {t('artifacts.selectedCount')}
               </Badge>
               <Button
                 size="compact-xs"
@@ -794,7 +817,7 @@ export function ArtifactsPage() {
                 onClick={handleBulkDelete}
                 loading={bulkDeleteMutation.isPending}
               >
-                Delete selected
+                {t('artifacts.deleteSelected')}
               </Button>
               <Button
                 size="compact-xs"
@@ -802,7 +825,7 @@ export function ArtifactsPage() {
                 color="gray"
                 onClick={() => setSelectedPaths(new Set())}
               >
-                Clear
+                {t('common.clear')}
               </Button>
             </>
           )}
@@ -811,7 +834,7 @@ export function ArtifactsPage() {
 
       {/* Content */}
       {!currentFolder || (folders.length === 0 && files.length === 0) ? (
-        <EmptyState />
+        <ArtifactsEmpty />
       ) : viewMode === 'grid' ? (
         <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="md">
           {folders.map((folder) => (

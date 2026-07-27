@@ -152,7 +152,7 @@ export function EnvProfilesPage() {
       <Paper p="md" withBorder>
         <Group gap="sm" wrap="wrap">
           <Select
-            label="Tool"
+            label={t('run.tool')}
             size="xs"
             w={160}
             value={tool}
@@ -166,7 +166,7 @@ export function EnvProfilesPage() {
             allowDeselect={false}
           />
           <Select
-            label="Type"
+            label={t('table.type')}
             size="xs"
             w={160}
             value={type || null}
@@ -181,7 +181,7 @@ export function EnvProfilesPage() {
             searchable
           />
           <Select
-            label="Project"
+            label={t('run.project')}
             size="xs"
             w={200}
             value={project || null}
@@ -235,7 +235,7 @@ export function EnvProfilesPage() {
                             color="green"
                             leftSection={<TbCheck size={10} />}
                           >
-                            Active
+                            {t('common.active')}
                           </Badge>
                         )}
                       </Group>

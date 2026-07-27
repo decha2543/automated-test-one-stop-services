@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { WORKSPACE_ROOT } from '../config.js';
+import { mapPool } from '../lib/map-pool.js';
 import { runChild } from '../services/exec.js';
 import { listAllProjects } from '../services/scanner.js';
 
@@ -26,24 +27,6 @@ interface GitStatusItem {
 
 /** Concurrency cap for fanned-out git operations across many projects. */
 const GIT_OP_CONCURRENCY = 4;
-
-/** Worker pool — runs `task` over `items` with bounded parallelism. */
-async function mapPool<T, R>(
-  items: T[],
-  size: number,
-  task: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const idx = next++;
-      results[idx] = await task(items[idx] as T);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(size, items.length) }, () => worker()));
-  return results;
-}
 
 /** Run a `git ...` invocation in argv form — no shell, no injection. */
 function git(cwd: string, args: string[]) {

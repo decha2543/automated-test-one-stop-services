@@ -1,4 +1,5 @@
 import type { DoctorCategory, DoctorCheck, DoctorReport } from '@hub/shared';
+import { translate } from '~/i18n/index.js';
 
 /**
  * Pure, framework-free helpers backing {@link DoctorPanel}.
@@ -124,27 +125,23 @@ export interface ProvisionGuidanceStep {
  */
 export function provisionGuidance(toolId: string): readonly ProvisionGuidanceStep[] {
   const retry: ProvisionGuidanceStep = {
-    title: 'Retry',
-    detail:
-      'Run Provision again — transient network or CDN errors usually clear on a second attempt.',
+    title: translate('common.retry'),
+    detail: translate('doctor.retryDetail'),
   };
   if (toolId !== 'playwright') return [retry];
   return [
     retry,
     {
-      title: 'Install the browser archive manually',
-      detail:
-        'Download the browser archive and extract it into the folder named by PLAYWRIGHT_BROWSERS_PATH (see tools/playwright/.env.template).',
+      title: translate('doctor.manualBrowserInstall'),
+      detail: translate('doctor.manualBrowserDetail'),
     },
     {
-      title: 'Behind a proxy',
-      detail:
-        'Set HTTPS_PROXY, and trust your proxy CA via NODE_EXTRA_CA_CERTS. Never disable TLS verification.',
+      title: translate('doctor.behindProxy'),
+      detail: translate('doctor.behindProxyDetail'),
     },
     {
-      title: 'Optional: internal mirror',
-      detail:
-        'If your organisation ever provides a Playwright download mirror, point PLAYWRIGHT_DOWNLOAD_HOST at it.',
+      title: translate('doctor.internalMirror'),
+      detail: translate('doctor.internalMirrorDetail'),
     },
   ];
 }

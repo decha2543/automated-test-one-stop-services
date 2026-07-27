@@ -1,6 +1,7 @@
 import { Alert, Button, Code, Group, Stack } from '@mantine/core';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { TbAlertTriangle, TbRefresh } from 'react-icons/tb';
+import { translate } from '~/i18n/index.js';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -44,14 +45,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       <Alert
         icon={<TbAlertTriangle size={20} />}
         color="red"
-        title="Something went wrong"
+        title={translate('error.boundaryTitle')}
         variant="light"
       >
         <Stack gap="sm">
           <Code block>{error.message || 'Unknown error'}</Code>
           <Group gap="xs">
             <Button size="xs" variant="light" onClick={this.reset}>
-              Try again
+              {translate('common.retry')}
             </Button>
             <Button
               size="xs"
@@ -60,7 +61,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               leftSection={<TbRefresh size={14} />}
               onClick={this.reload}
             >
-              Reload page
+              {translate('error.reloadPage')}
             </Button>
           </Group>
         </Stack>

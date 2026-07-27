@@ -14,7 +14,6 @@ export const th: Record<TranslationKey, string> = {
   'nav.history': 'ประวัติ',
   'nav.schedules': 'ตั้งเวลา',
   'nav.projects': 'โปรเจค',
-  'nav.tools': 'เครื่องมือ',
   'nav.envProfiles': 'โปรไฟล์ Env',
   'nav.reports': 'รายงาน',
   'nav.artifacts': 'ไฟล์ผลลัพธ์',
@@ -29,7 +28,6 @@ export const th: Record<TranslationKey, string> = {
   'nav.history.desc': 'ดู กรอง และรันซ้ำเทสที่เคยทำมาก่อน',
   'nav.schedules.desc': 'ตั้งให้เทสรันอัตโนมัติตามเวลา (cron)',
   'nav.projects.desc': 'สร้าง โคลน และจัดการโปรเจคเทส รวมถึงไฟล์ .env',
-  'nav.tools.desc': 'จัดการ tool plugin ที่ติดตั้ง — เปิด/ปิดใช้งาน และ re-sync workspace',
   'nav.envProfiles.desc': 'บันทึกและสลับโปรไฟล์ environment variable ในแต่ละโปรเจค',
   'nav.reports.desc': 'ดูรายงาน HTML ของเครื่องมือที่ทดสอบ',
   'nav.artifacts.desc': 'ดูภาพหน้าจอ วิดีโอ trace และ log จากการรันเทส',
@@ -48,15 +46,11 @@ export const th: Record<TranslationKey, string> = {
   'dashboard.needsAttention': 'ต้องดูแล',
   'dashboard.allGood': 'ทุกอย่างปกติ',
   'dashboard.allGoodDesc': 'ไม่มีปัญหาที่ต้องดูแลตอนนี้',
-  'dashboard.quickActions': 'ทางลัด',
-  'dashboard.envStatus': 'สถานะ Environment',
-  'dashboard.quickLaunch': 'เปิดด่วน',
   'dashboard.recentRuns': 'รันล่าสุด',
   'dashboard.projectsOverview': 'ภาพรวมโปรเจค',
   'dashboard.testTrends': 'แนวโน้มเทส (14 วัน)',
   'dashboard.topProjects': 'โปรเจคยอดนิยม',
   'dashboard.runActivity': 'กิจกรรมการรัน',
-  'dashboard.customize': 'ปรับแต่ง',
   'dashboard.viewAll': 'ดูทั้งหมด',
   'dashboard.noRuns': 'ยังไม่มีการรัน ไปที่ รันเทส เพื่อเริ่มต้น',
 
@@ -65,29 +59,22 @@ export const th: Record<TranslationKey, string> = {
   'common.save': 'บันทึก',
   'common.cancel': 'ยกเลิก',
   'common.delete': 'ลบ',
-  'common.edit': 'แก้ไข',
   'common.create': 'สร้าง',
   'common.search': 'ค้นหา',
   'common.noResults': 'ไม่พบรายการ',
-  'common.filter': 'กรอง',
   'common.all': 'ทั้งหมด',
   'common.enabled': 'เปิดใช้งาน',
   'common.disabled': 'ปิดใช้งาน',
   'common.running': 'กำลังทำงาน',
   'common.stopped': 'หยุดแล้ว',
   'common.active': 'ใช้งานอยู่',
-  'common.apply': 'ใช้งาน',
   'common.export': 'ส่งออก',
   'common.import': 'นำเข้า',
-  'common.reset': 'รีเซ็ต',
   'common.refresh': 'รีเฟรช',
   'common.expand': 'ขยาย',
   'common.collapse': 'ย่อ',
-  'common.download': 'ดาวน์โหลด',
   'common.close': 'ปิด',
   'common.confirm': 'ยืนยัน',
-  'common.yes': 'ใช่',
-  'common.no': 'ไม่',
   'common.select': 'เลือก...',
   'common.loadFailed': 'โหลดไม่สำเร็จ',
   'common.retry': 'ลองใหม่',
@@ -107,17 +94,29 @@ export const th: Record<TranslationKey, string> = {
   'settings.webhooksDesc': 'ตั้งค่าการแจ้งเตือน Slack/Discord/Teams/LINE สำหรับการรันเทส',
   'settings.manageWebhooks': 'จัดการ Webhooks',
   'settings.importExport': 'นำเข้า / ส่งออก',
+  'settings.exportDesc': 'บันทึกการตั้งค่าของ Hub เป็นไฟล์ JSON เก็บไว้ หรือย้ายไปเครื่องอื่นได้',
+  'settings.exportInclude': 'เลือกสิ่งที่จะบันทึก',
+  'settings.importDesc': 'โหลดไฟล์ที่ส่งออกไว้ก่อนหน้า เพื่อกู้การตั้งค่ากลับมา',
+  'settings.importSelectFile': 'เลือกไฟล์ .json',
+  'settings.importPreview': 'ในไฟล์นี้มี',
+  'settings.importMergeMode': 'เก็บของเดิมไว้ แล้วเพิ่มจากไฟล์',
+  'settings.importReplaceMode': 'แทนที่ของเดิมทั้งหมดด้วยไฟล์นี้',
+  'settings.importReplaceWarn': 'การแทนที่จะลบบุ๊กมาร์ก ตารางเวลา webhook และโปรไฟล์ที่มีอยู่ทิ้ง',
+  'settings.importMergeBtn': 'เพิ่มเข้าการตั้งค่า',
+  'settings.importReplaceBtn': 'แทนที่การตั้งค่า',
+  'settings.importComplete': 'นำเข้าเสร็จแล้ว',
+  'settings.imported': 'รายการ',
+  'settings.resync': 'สแกนเวิร์กสเปซใหม่',
+  'settings.resyncDesc': 'ใช้เมื่อเพิ่มโปรเจกต์หรือเครื่องมือจากนอก Hub — ระบบจะหาให้เจอและสร้างไฟล์ที่ต้องใช้ให้ใหม่',
+  'settings.resyncAction': 'สแกนใหม่',
+  'settings.resyncDone': 'สแกนเวิร์กสเปซใหม่แล้ว',
   'settings.language': 'ภาษา',
   'settings.about': 'เกี่ยวกับ',
 
   // Reports
   'reports.title': 'รายงาน',
   'reports.filters': 'ตัวกรอง',
-  'reports.savedFilters': 'ตัวกรองที่บันทึก',
-  'reports.saveCurrentFilter': 'บันทึกตัวกรองปัจจุบัน',
   'reports.noReports': 'ยังไม่มีรายงาน รันเทสเพื่อสร้างรายงาน',
-  'reports.annotations': 'บันทึกย่อ',
-  'reports.addNote': 'เพิ่มบันทึก',
 
   // Docker
   'docker.title': 'Docker & Services',
@@ -209,6 +208,19 @@ export const th: Record<TranslationKey, string> = {
   'run.cancelTestConfirm': 'เทสที่กำลังรันจะหยุดทันที',
   'run.cancelTestConfirmLabel': 'ยกเลิกเทส',
   'run.keepRunning': 'รันต่อ',
+
+  // Load failures
+  'error.loadFailed': 'โหลดข้อมูลไม่สำเร็จ',
+  'error.loadFailedDesc': 'เซิร์ฟเวอร์ Hub อาจหยุดทำงาน ลองเช็กว่ายังรันอยู่แล้วลองใหม่อีกครั้ง',
+
+  // Run queue
+  'queue.title': 'กำลังรัน & รอคิว',
+  'queue.hint': 'รันพร้อมกันได้จำกัด ที่เหลือจะรอในคิวนี้แล้วเริ่มเองเมื่อมีที่ว่าง',
+  'queue.waiting': 'รออยู่',
+  'queue.promote': 'ให้รันตัวนี้ต่อไป',
+  'queue.promoted': 'ย้ายไปเป็นคิวแรกแล้ว',
+  'queue.remove': 'เอาออกจากคิว',
+  'queue.removed': 'เอาออกจากคิวแล้ว',
 
   // Additional page titles
   'projects.title': 'โปรเจกต์',
@@ -344,23 +356,15 @@ export const th: Record<TranslationKey, string> = {
   'bookmark.delete': 'ลบบุ๊กมาร์ก',
   'bookmark.namePlaceholder': 'ชื่อ (จำเป็น)...',
   'bookmark.hint': 'บันทึกค่ารันปัจจุบัน แล้วคลิกบุ๊กมาร์กเพื่อโหลดกลับมาใช้',
-  'bookmark.manage': 'จัดการ',
-  'bookmark.manageTip': 'ค้นหา กรอง แก้ไข และจัดระเบียบบุ๊กมาร์ก',
-  'bookmark.manageTitle': 'จัดการบุ๊กมาร์ก',
   'bookmark.apply': 'โหลดเข้าฟอร์มรัน',
   'bookmark.edit': 'แก้ไขบุ๊กมาร์ก',
-  'bookmark.editTitle': 'แก้ไขบุ๊กมาร์ก',
-  'bookmark.name': 'ชื่อ',
   'bookmark.updated': 'อัปเดตบุ๊กมาร์กแล้ว',
   'bookmark.searchPlaceholder': 'ค้นหาตามชื่อ...',
   'bookmark.empty': 'ยังไม่มีบุ๊กมาร์ก ตั้งค่าการรันแล้วบันทึกไว้ใช้ภายหลัง',
   'bookmark.noMatch': 'ไม่มีบุ๊กมาร์กตรงกับตัวกรอง',
-  'bookmark.count': 'บุ๊กมาร์ก',
   'bookmark.syncFromForm': 'แทนที่ด้วยค่าฟอร์มรันปัจจุบัน',
-  'bookmark.syncFromFormHint': 'เขียนทับค่าที่บันทึกไว้ด้วยค่าฟอร์มรันปัจจุบันของเซสชันที่ใช้งานอยู่',
   'bookmark.synced': 'ดึงค่าฟอร์มรันปัจจุบันแล้ว',
   'bookmark.noFormConfig': 'เลือกโปรเจกต์ในฟอร์มรันก่อน',
-  'bookmark.savedOn': 'บันทึกเมื่อ',
 
   // Webhooks (list rows + form)
   'webhook.scopedTooltip': 'webhook นี้จำกัดเฉพาะเป้าหมายการรันนี้',
@@ -405,7 +409,6 @@ export const th: Record<TranslationKey, string> = {
   'filter.groupByTool': 'จัดกลุ่มตามเครื่องมือ',
   'filter.groupByProject': 'จัดกลุ่มตามโปรเจกต์',
   'filter.selectProject': 'เลือกโปรเจกต์',
-  'filter.selectAvd': 'เลือก AVD',
   'filter.showing': 'แสดง',
   'filter.of': 'จาก',
 
@@ -441,10 +444,8 @@ export const th: Record<TranslationKey, string> = {
   'testcases.title': 'เทสเคส',
   'testcases.selectProject': 'เลือกเครื่องมือ ประเภท และโปรเจกต์เพื่อดูเอกสารเทสเคส',
   'testcases.none': 'ไม่พบเอกสารเทสเคสของโปรเจกต์นี้',
-  'testcases.preview': 'ดูตัวอย่าง',
   'testcases.open': 'เปิด',
   'testcases.download': 'ดาวน์โหลด',
-  'testcases.truncated': 'แสดงตัวอย่างเฉพาะ 1000 แถวแรก',
   'testcases.editedBadge': 'แก้ไขแล้ว (เฉพาะเครื่อง)',
   'testcases.addRow': 'เพิ่มเทสเคส',
   'testcases.runSelected': 'รันที่เลือก',
@@ -737,7 +738,6 @@ export const th: Record<TranslationKey, string> = {
   'reports.scoreNoSeverity': 'ไม่มีแท็ก severity — ใช้อัตราผ่านปกติ',
   'reports.scoreSeverityRow': '{level}: {passed}✓ {failed}✗',
   'reports.allTests': 'ทุกเคส',
-  'reports.tagFilter': 'กรองแท็ก',
   'reports.open': 'เปิด',
   'reports.openFailed': 'เปิดไฟล์รายงานไม่สำเร็จ',
   'reports.selectRow': 'เลือก',
@@ -762,4 +762,107 @@ export const th: Record<TranslationKey, string> = {
   'settings.cleanupDeletedPrefix': 'ลบแล้ว',
   'settings.cleanupOlderThan': 'รายงานที่เก่ากว่า',
   'common.later': 'ภายหลัง',
+
+  // Shared verbs / nouns reused across pages
+  'common.copy': 'คัดลอก',
+  'common.copied': 'คัดลอกแล้ว',
+  'common.copyFailed': 'คัดลอกไม่ได้',
+  'common.start': 'เริ่ม',
+  'common.stop': 'หยุด',
+  'common.restart': 'เริ่มใหม่',
+  'common.install': 'ติดตั้ง',
+  'common.selectAll': 'เลือกทั้งหมด',
+  'common.clear': 'ล้าง',
+
+  // Run log
+  'runlog.exitCode': 'รหัสจบการทำงาน',
+  'runlog.ended': 'จบเมื่อ',
+  'runlog.openReport': 'เปิดรายงาน',
+  'runlog.openReportFailed': 'เปิดรายงานไม่ได้',
+  'runlog.command': 'คำสั่งที่ใช้รัน',
+  'runlog.commandCopied': 'คัดลอกคำสั่งแล้ว',
+  'runlog.rerun': 'รันอีกครั้ง',
+  'runlog.tags': 'แท็ก',
+
+  // Performance
+  'perf.avgResponse': 'เวลาตอบสนองเฉลี่ย',
+  'perf.runHistory': 'ประวัติการรัน',
+  'perf.errorRate': 'อัตราข้อผิดพลาด',
+  'perf.thresholds': 'เกณฑ์ที่ตั้งไว้ (รันล่าสุด)',
+  'perf.run': 'รอบรัน',
+  'perf.metric': 'ตัวชี้วัด',
+  'perf.avgMs': 'เฉลี่ย (ms)',
+  'perf.errorPct': 'ข้อผิดพลาด %',
+
+  // Flaky tests
+  'flaky.testId': 'รหัสเทส',
+  'flaky.flakiness': 'ความไม่เสถียร',
+  'flaky.passFail': 'ผ่าน / ไม่ผ่าน',
+  'flaky.recent': 'ล่าสุด',
+  'flaky.lastSeen': 'เห็นครั้งล่าสุด',
+  'flaky.analyze': 'วิเคราะห์',
+
+  // Docker services
+  'docker.localServices': 'บริการในเครื่อง',
+  'docker.installAppiumTip': 'ติดตั้ง Appium และไดรเวอร์ uiautomator2 บนเครื่องนี้',
+  'docker.appiumLocal': 'Appium (ในเครื่อง)',
+  'docker.appiumDesc': 'รันเซิร์ฟเวอร์ Appium บนเครื่องนี้เพื่อเทสบนมือถือ',
+  'docker.appiumStarting': 'กำลังเริ่ม Appium',
+  'docker.appiumStopped': 'หยุด Appium แล้ว',
+  'docker.appiumInstalled': 'ติดตั้ง Appium แล้ว',
+
+  // Artifacts
+  'artifacts.loadingContent': 'กำลังโหลดเนื้อหา...',
+  'artifacts.deleteSelected': 'ลบที่เลือก',
+  'artifacts.selectedCount': 'ที่เลือก',
+  'artifacts.deleteFolderTitle': 'ลบโฟลเดอร์นี้?',
+  'artifacts.deleteFileTitle': 'ลบไฟล์นี้?',
+  'artifacts.deleteConfirmFolder': 'ไฟล์ข้างในจะถูกลบไปด้วย และกู้คืนไม่ได้',
+  'artifacts.deleteConfirmFile': 'ลบแล้วกู้คืนไม่ได้',
+
+  // Environment panel
+  'doctor.provision': 'ติดตั้งให้',
+  'doctor.toggleDetails': 'ดูหรือซ่อนรายละเอียดสภาพแวดล้อม',
+  'doctor.howToFix': 'วิธีแก้',
+  'doctor.installPython': 'ติดตั้ง Python',
+  'doctor.retryDetail': 'กด "ติดตั้งให้" อีกครั้ง — เน็ตหรือ CDN สะดุดชั่วคราวมักหายไปในรอบสอง',
+  'doctor.manualBrowserInstall': 'ติดตั้งไฟล์เบราว์เซอร์เอง',
+  'doctor.manualBrowserDetail':
+    'ดาวน์โหลดไฟล์เบราว์เซอร์แล้วแตกไฟล์ลงโฟลเดอร์ที่ระบุใน PLAYWRIGHT_BROWSERS_PATH (ดู tools/playwright/.env.template)',
+  'doctor.behindProxy': 'อยู่หลัง proxy',
+  'doctor.behindProxyDetail':
+    'ตั้งค่า HTTPS_PROXY และเพิ่ม CA ของ proxy ผ่าน NODE_EXTRA_CA_CERTS — อย่าปิดการตรวจ TLS',
+  'doctor.internalMirror': 'ไม่บังคับ: ใช้ mirror ภายใน',
+  'doctor.internalMirrorDetail':
+    'ถ้าองค์กรมี mirror สำหรับดาวน์โหลด Playwright ให้ชี้ PLAYWRIGHT_DOWNLOAD_HOST ไปที่นั่น',
+
+  // Crash fallback
+  'error.boundaryTitle': 'มีบางอย่างผิดพลาด',
+  'error.reloadPage': 'โหลดหน้าใหม่',
+
+  // Active runs window
+  'runs.activeTitle': 'กำลังรันอยู่',
+  'runs.jumpToRun': 'ไปหน้ารันเทส',
+  'runs.openRunTests': 'เปิดหน้ารันเทส',
+
+  // Report artifacts menu
+  'artifactMenu.view': 'ดูไฟล์ผลลัพธ์ (trace / วิดีโอ)',
+  'artifactMenu.reveal': 'เปิดโฟลเดอร์ในเครื่อง',
+  'artifactMenu.traceFailed': 'เปิด trace viewer ไม่ได้',
+  'artifactMenu.pathCopied': 'คัดลอกที่อยู่โฟลเดอร์แล้ว',
+  'artifactMenu.videoTitle': 'วิดีโอการเทส',
+
+  // Schedule notifications
+  'schedule.completed': 'ตารางเวลารันเสร็จแล้ว',
+  'schedule.failed': 'ตารางเวลารันไม่สำเร็จ',
+
+  // Settings extras
+  'settings.exportDownloaded': 'ดาวน์โหลดไฟล์ส่งออกแล้ว',
+  'settings.replaceConfirmTitle': 'แทนที่ข้อมูลเดิมทั้งหมด?',
+  'settings.replaceConfirmLabel': 'แทนที่',
+  'settings.changeLanguage': 'เปลี่ยนภาษา',
+
+  // Webhooks
+  'webhooks.lineTokenPlaceholder': 'token แบบอายุยาวจาก LINE Developers Console',
+  'webhooks.lineTargetPlaceholder': 'User ID หรือ Group ID (เช่น U1234...)',
 };

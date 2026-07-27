@@ -20,6 +20,8 @@ import { TbAlertTriangle, TbCircleCheck, TbDownload, TbFileImport, TbUpload } fr
 import { api } from '~/api/client';
 import { confirmDialog } from '~/components/confirmDialog';
 import { toast } from '~/components/Toast';
+import type { TranslationKey } from '~/i18n/en';
+import { useT } from '~/i18n/index.js';
 
 interface ImportResult {
   bookmarks?: number;
@@ -38,11 +40,17 @@ interface ParsedPayload {
 }
 
 const EXPORT_ITEMS = [
-  { key: 'bookmarks', label: 'Bookmarks' },
-  { key: 'schedules', label: 'Schedules' },
-  { key: 'webhooks', label: 'Webhooks' },
-  { key: 'envProfiles', label: 'Environment Profiles' },
-] as const;
+  { key: 'bookmarks', labelKey: 'bookmark.title' },
+  { key: 'schedules', labelKey: 'nav.schedules' },
+  { key: 'webhooks', labelKey: 'webhooks.title' },
+  { key: 'envProfiles', labelKey: 'nav.envProfiles' },
+] as const satisfies readonly { key: string; labelKey: TranslationKey }[];
+
+/** Localised label for one export/import bucket. */
+function itemLabel(t: (key: TranslationKey) => string, key: string): string {
+  const item = EXPORT_ITEMS.find((i) => i.key === key);
+  return item ? t(item.labelKey) : key;
+}
 
 type ExportKey = (typeof EXPORT_ITEMS)[number]['key'];
 const ALL_KEYS: ExportKey[] = EXPORT_ITEMS.map((i) => i.key);
@@ -72,6 +80,7 @@ async function parseImportFile(file: File): Promise<ParsedPayload | null> {
 }
 
 export function ImportExportPanel() {
+  const t = useT();
   // Export state
   const [exportIncludes, setExportIncludes] = useState<ExportKey[]>([...ALL_KEYS]);
 
@@ -122,7 +131,7 @@ export function ImportExportPanel() {
       a.download = `hub-export-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Export downloaded');
+      toast.success(t('settings.exportDownloaded'));
     },
     onError: (err) => toast.error((err as Error).message),
   });
@@ -134,7 +143,7 @@ export function ImportExportPanel() {
       setImportResult(data);
       setImportFile(null);
       setImportPreview(null);
-      toast.success('Import completed');
+      toast.success(t('settings.importComplete'));
     },
     onError: (err) => toast.error((err as Error).message),
   });
@@ -143,10 +152,10 @@ export function ImportExportPanel() {
     if (!importPreview) return;
     if (!mergeMode) {
       const ok = await confirmDialog({
-        title: 'Replace existing data?',
+        title: t('settings.replaceConfirmTitle'),
         message:
           'Replace mode will overwrite all current bookmarks, schedules, webhooks, and environment profiles with the contents of this file. This cannot be undone.',
-        confirmLabel: 'Replace',
+        confirmLabel: t('settings.replaceConfirmLabel'),
         danger: true,
       });
       if (!ok) return;
@@ -157,7 +166,7 @@ export function ImportExportPanel() {
   return (
     <Paper p="md" withBorder>
       <Stack gap="md">
-        <Title order={5}>Import / Export</Title>
+        <Title order={5}>{t('settings.importExport')}</Title>
 
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           {/* Export card */}
@@ -166,23 +175,23 @@ export function ImportExportPanel() {
               <Group gap="xs" align="center">
                 <TbDownload size={16} />
                 <Text size="sm" fw={600}>
-                  Export
+                  {t('common.export')}
                 </Text>
               </Group>
               <Text size="xs" c="dimmed">
-                Download hub configuration as a JSON file.
+                {t('settings.exportDesc')}
               </Text>
 
               <Group justify="space-between" align="center">
                 <Text size="xs" fw={500}>
-                  Include
+                  {t('settings.exportInclude')}
                 </Text>
                 <Button
                   size="compact-xs"
                   variant="subtle"
                   onClick={() => setExportIncludes(allExportSelected ? [] : [...ALL_KEYS])}
                 >
-                  {allExportSelected ? 'Clear all' : 'Select all'}
+                  {allExportSelected ? t('common.clearAll') : t('common.selectAll')}
                 </Button>
               </Group>
 
@@ -190,7 +199,7 @@ export function ImportExportPanel() {
                 {EXPORT_ITEMS.map((item) => (
                   <Checkbox
                     key={item.key}
-                    label={item.label}
+                    label={t(item.labelKey)}
                     size="xs"
                     checked={exportIncludes.includes(item.key)}
                     onChange={() => toggleExportItem(item.key)}
@@ -206,7 +215,7 @@ export function ImportExportPanel() {
                 disabled={exportIncludes.length === 0}
                 mt="auto"
               >
-                Export
+                {t('common.export')}
               </Button>
             </Stack>
           </Card>
@@ -217,16 +226,16 @@ export function ImportExportPanel() {
               <Group gap="xs" align="center">
                 <TbUpload size={16} />
                 <Text size="sm" fw={600}>
-                  Import
+                  {t('common.import')}
                 </Text>
               </Group>
               <Text size="xs" c="dimmed">
-                Upload a previously exported JSON file to restore configuration.
+                {t('settings.importDesc')}
               </Text>
 
               <FileInput
                 size="xs"
-                placeholder="Select .json file"
+                placeholder={t('settings.importSelectFile')}
                 accept=".json,application/json"
                 value={importFile}
                 onChange={setImportFile}
@@ -241,7 +250,7 @@ export function ImportExportPanel() {
                     <Group gap={6} align="center">
                       <TbCircleCheck size={14} color="var(--mantine-color-green-6)" />
                       <Text size="xs" fw={500}>
-                        Preview
+                        {t('settings.importPreview')}
                       </Text>
                       {importPreview.version && (
                         <Badge size="xs" variant="light">
@@ -257,7 +266,7 @@ export function ImportExportPanel() {
                         return (
                           <List.Item key={k}>
                             <Text size="xs">
-                              {EXPORT_ITEMS.find((i) => i.key === k)?.label}:{' '}
+                              {itemLabel(t, k)}:{' '}
                               <Text span fw={600}>
                                 {count}
                               </Text>
@@ -271,7 +280,7 @@ export function ImportExportPanel() {
               )}
 
               <Switch
-                label={mergeMode ? 'Merge with existing' : 'Replace existing'}
+                label={mergeMode ? t('settings.importMergeMode') : t('settings.importReplaceMode')}
                 checked={mergeMode}
                 onChange={(e) => setMergeMode(e.currentTarget.checked)}
                 size="sm"
@@ -281,7 +290,7 @@ export function ImportExportPanel() {
                 <Group gap={6} align="center" wrap="nowrap">
                   <TbAlertTriangle size={14} color="var(--mantine-color-red-6)" />
                   <Text size="xs" c="red">
-                    Replace mode overwrites existing data.
+                    {t('settings.importReplaceWarn')}
                   </Text>
                 </Group>
               )}
@@ -295,24 +304,21 @@ export function ImportExportPanel() {
                 disabled={!importPreview}
                 mt="auto"
               >
-                {mergeMode ? 'Import (Merge)' : 'Import (Replace)'}
+                {mergeMode ? t('settings.importMergeBtn') : t('settings.importReplaceBtn')}
               </Button>
 
               {importResult && (
-                <Alert color="green" variant="light" title="Import Complete" p="xs">
+                <Alert color="green" variant="light" title={t('settings.importComplete')} p="xs">
                   <Stack gap={2}>
-                    {importResult.bookmarks != null && (
-                      <Text size="xs">Bookmarks: {importResult.bookmarks} imported</Text>
-                    )}
-                    {importResult.schedules != null && (
-                      <Text size="xs">Schedules: {importResult.schedules} imported</Text>
-                    )}
-                    {importResult.webhooks != null && (
-                      <Text size="xs">Webhooks: {importResult.webhooks} imported</Text>
-                    )}
-                    {importResult.envProfiles != null && (
-                      <Text size="xs">Env Profiles: {importResult.envProfiles} imported</Text>
-                    )}
+                    {ALL_KEYS.map((k) => {
+                      const count = importResult[k];
+                      if (count == null) return null;
+                      return (
+                        <Text key={k} size="xs">
+                          {itemLabel(t, k)}: {count} {t('settings.imported')}
+                        </Text>
+                      );
+                    })}
                   </Stack>
                 </Alert>
               )}

@@ -358,9 +358,9 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
     if (!lastCommand) return;
     try {
       await navigator.clipboard.writeText(lastCommand);
-      toast.success('Command copied');
+      toast.success(t('runlog.commandCopied'));
     } catch {
-      toast.error('Copy failed');
+      toast.error(t('common.copyFailed'));
     }
   }
 

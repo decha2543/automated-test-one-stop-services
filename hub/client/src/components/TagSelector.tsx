@@ -207,7 +207,6 @@ export function TagSelector({
                   <TbChevronDown
                     size={14}
                     style={{
-                      // biome-ignore lint/security/noSecrets: CSS transform value, not a secret
                       transform: showMatchedTests ? 'rotate(180deg)' : 'rotate(0deg)',
                       transition: 'transform 150ms',
                     }}

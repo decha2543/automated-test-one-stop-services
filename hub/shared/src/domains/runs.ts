@@ -78,34 +78,17 @@ export interface Bookmark {
   createdAt: string;
 }
 
-export interface QueueEntry {
-  id: string;
-  position: number;
-  record: RunRecord;
-}
-
-// Matrix / Parallel Runs ------------------------------------------------------
-
-export interface MatrixAxis {
-  name: string;
-  values: string[];
-}
-
-export interface MatrixRunRequest {
-  baseConfig: RunRequest;
-  axes: MatrixAxis[];
-  maxParallel?: number;
-}
-
-export interface MatrixRunGroup {
-  id: string;
-  name: string;
-  request: MatrixRunRequest;
-  runIds: string[];
-  status: 'pending' | 'running' | 'completed';
-  startedAt: string;
-  endedAt?: string;
-  summary?: { passed: number; failed: number; total: number };
+/**
+ * Snapshot of the run queue (`GET /api/queue`): what is executing now and what
+ * is waiting. `queued` is in queue order, so the array index is the position.
+ */
+export interface QueueStatus {
+  active: RunRecord[];
+  queued: RunRecord[];
+  activeCount: number;
+  queueLength: number;
+  /** Parallel-run cap currently configured in Settings. */
+  maxConcurrency: number;
 }
 
 // WebSocket events -----------------------------------------------------------

@@ -119,6 +119,16 @@ export function saveCredentials(tool: string, content: string): SaveCredentialsR
   }
 
   const target = path.join(dir, CREDENTIALS_FILENAME);
-  fs.writeFileSync(target, content, 'utf8');
+  // Service-account keys are secrets: create owner-only (0600) instead of
+  // inheriting the umask (commonly 0644, world-readable on a shared machine).
+  // `mode` only applies on creation, so chmod an existing file too. Windows
+  // ignores POSIX modes — the call is a harmless no-op there.
+  fs.writeFileSync(target, content, { encoding: 'utf8', mode: 0o600 });
+  try {
+    fs.chmodSync(target, 0o600);
+  } catch {
+    // Filesystems without POSIX permissions (e.g. some Windows mounts) — the
+    // file is still written; permission hardening is best-effort.
+  }
   return { ok: true, path: path.relative(SCRIPTS_DIR, target) };
 }

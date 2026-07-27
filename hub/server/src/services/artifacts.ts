@@ -155,7 +155,7 @@ class ArtifactService {
     // (synchronous fs walk blocks the event loop). Cache the tree for a short
     // window; `invalidateBrowseAll()` drops it on artifact deletion for
     // immediate consistency. Fresh run output appears within the TTL.
-    // ponytail: the walk is still synchronous on a cache miss — staleness ceiling
+    // Known limit: the walk is still synchronous on a cache miss — staleness ceiling
     // is BROWSE_CACHE_TTL_MS. Upgrade path if misses ever stall the loop: move
     // `buildTree` to `fs.promises` (async) and lower the depth-14 default.
     const now = Date.now();

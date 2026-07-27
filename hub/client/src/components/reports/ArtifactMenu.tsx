@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TbCopy, TbDots, TbFolder, TbPlayerPlay, TbRoute } from 'react-icons/tb';
 import { api } from '~/api/client.js';
 import { toast } from '~/components/Toast.js';
+import { useT } from '~/i18n/index.js';
 
 export interface ArtifactGroup {
   name: string;
@@ -38,6 +39,7 @@ export interface ArtifactMenuProps {
  * file focused on the report table itself.
  */
 export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
+  const t = useT();
   const [artifactOpen, { open: openArtifacts, close: closeArtifacts }] = useDisclosure(false);
   const [videoOpen, { open: openVideo, close: closeVideo }] = useDisclosure(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
@@ -123,7 +125,7 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
         next.delete(tracePath);
         return next;
       });
-      toast.error('Failed to open trace viewer');
+      toast.error(t('artifactMenu.traceFailed'));
     }
   }
 
@@ -163,7 +165,7 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
 
   function handleCopyDir() {
     navigator.clipboard.writeText(artifactDir);
-    toast.success('Artifact directory copied');
+    toast.success(t('artifactMenu.pathCopied'));
   }
 
   async function handleRevealDir() {
@@ -181,8 +183,8 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
 
   return (
     <>
-      <Tooltip label="View artifacts (trace/video)">
-        <ActionIcon variant="subtle" size="sm" onClick={handleOpen} aria-label="Artifacts">
+      <Tooltip label={t('artifactMenu.view')}>
+        <ActionIcon variant="subtle" size="sm" onClick={handleOpen} aria-label={t('nav.artifacts')}>
           <TbDots size={14} />
         </ActionIcon>
       </Tooltip>
@@ -203,7 +205,7 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
                 Copy directory
               </Button>
             </Tooltip>
-            <Tooltip label="Reveal in file explorer" withArrow>
+            <Tooltip label={t('artifactMenu.reveal')} withArrow>
               <Button
                 size="compact-xs"
                 variant="light"
@@ -311,7 +313,13 @@ export function ArtifactMenu({ reportPath }: ArtifactMenuProps) {
         )}
       </Modal>
 
-      <Modal opened={videoOpen} onClose={closeVideo} title="Test Video" size="lg" centered>
+      <Modal
+        opened={videoOpen}
+        onClose={closeVideo}
+        title={t('artifactMenu.videoTitle')}
+        size="lg"
+        centered
+      >
         {selectedVideo && (
           <video
             src={selectedVideo}

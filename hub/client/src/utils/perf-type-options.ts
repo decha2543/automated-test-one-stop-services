@@ -24,7 +24,7 @@ const STRESS_PEAK_FACTOR = 2;
  * `tools/k6/resources/src/configs/test-options.ts` (`PROFILES` + the
  * `*_PEAK_FACTOR` constants) — the multipliers and the TEST_PROTOCOL target are
  * mirrored here for display only.
- * ponytail: the two packages share no module (one runs in the k6 runtime, the
+ * Known limit: the two packages share no module (one runs in the k6 runtime, the
  * other in the browser), so this is a documented copy of ~5 stable numbers
  * rather than cross-package plumbing. Ceiling: if the engine formulas change,
  * update both. Upgrade path: surface a profile descriptor from a shared source
