@@ -15,6 +15,7 @@ import type {
   RunRecord,
   RunRequest,
   RunStatus,
+  RunSummary,
   ToolId,
 } from '@hub/shared';
 import { missingChecksForTool } from '@hub/shared';
@@ -65,6 +66,7 @@ import { useT } from '~/i18n/index.js';
 import { usePreferences } from '~/stores/hub.js';
 import { buildPerfTypeData } from '~/utils/perf-type-options.js';
 import { getStatusColor } from '~/utils/run-status.js';
+import { runVerdict } from '~/utils/run-verdict.js';
 import { buildTagExpr, parseTagExpr } from '~/utils/tag-selection.js';
 import { toolSelectData } from '~/utils/tool-label.js';
 
@@ -120,17 +122,20 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   const [lastCommand, setLastCommand] = useState('');
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState('');
-  const [runSummary, setRunSummary] = useState<{
-    passed: number;
-    failed: number;
-    skipped?: number;
-  } | null>(null);
+  const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
   const fullOutputRef = useRef('');
   const activeRunIdRef = useRef<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const isRunning = runStatus === 'running' || runStatus === 'pending';
+  const isFinished = runStatus !== 'idle' && !isRunning;
+  const advancedMode = prefs.advancedMode;
+  // Raw CLI flags reach the runner unvalidated, so they are an advanced-only
+  // field AND an advanced-only value: in simple view the field is hidden and its
+  // (still-kept) text is not sent, so a value typed earlier cannot leak into the
+  // next run.
+  const effectiveExtraArgs = advancedMode ? extraArgs || undefined : undefined;
 
   // Terminal (xterm) and the per-session WebSocket live in dedicated hooks so
   // this component orchestrates state while the imperative plumbing stays in
@@ -160,7 +165,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
       mode,
       tag: buildTagExpr(selectedTags),
       headless: !sectionAxis ? headless : undefined,
-      extraArgs: extraArgs || undefined,
+      extraArgs: effectiveExtraArgs,
       noTrack,
       silent,
       section: sectionAxis ? section : undefined,
@@ -329,7 +334,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
       mode,
       tag: tagExpr,
       headless: !sectionAxis ? headless : undefined,
-      extraArgs: extraArgs || undefined,
+      extraArgs: effectiveExtraArgs,
       noTrack: effectiveNoTrack,
       silent,
       section: sectionAxis ? section : undefined,
@@ -529,7 +534,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
             )}
 
             {!sectionAxis && (
-              <SimpleGrid cols={2} spacing="xs">
+              <SimpleGrid cols={advancedMode ? 2 : 1} spacing="xs">
                 <Select
                   label={t('run.display')}
                   size="xs"
@@ -542,14 +547,16 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
                   ]}
                   allowDeselect={false}
                 />
-                <TextInput
-                  label={t('run.extraArgs')}
-                  size="xs"
-                  disabled={isRunning}
-                  value={extraArgs}
-                  onChange={(e) => setExtraArgs(e.currentTarget.value)}
-                  placeholder="--workers=4"
-                />
+                {advancedMode && (
+                  <TextInput
+                    label={t('run.extraArgs')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={extraArgs}
+                    onChange={(e) => setExtraArgs(e.currentTarget.value)}
+                    placeholder="--workers=4"
+                  />
+                )}
               </SimpleGrid>
             )}
 
@@ -713,11 +720,16 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
           >
             <Group gap="xs">
               <Text size="xs" c="dimmed">
-                {t('run.liveOutput')}
+                {advancedMode ? t('run.liveOutput') : t('run.technicalOutput')}
               </Text>
               {isRunning && elapsed && (
                 <Text size="xs" c="blue" ff="monospace">
                   {elapsed}
+                </Text>
+              )}
+              {isFinished && (
+                <Text size="xs" fw={600} c={getStatusColor(runStatus)}>
+                  {runVerdict(runSummary, t)}
                 </Text>
               )}
               {!isRunning && runSummary && (
@@ -741,13 +753,15 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
               )}
             </Group>
             <Group gap="xs">
-              <Badge
-                size="sm"
-                color={getStatusColor(runStatus)}
-                variant={runStatus === 'running' ? 'dot' : 'filled'}
-              >
-                {runStatus}
-              </Badge>
+              {advancedMode && (
+                <Badge
+                  size="sm"
+                  color={getStatusColor(runStatus)}
+                  variant={runStatus === 'running' ? 'dot' : 'filled'}
+                >
+                  {runStatus}
+                </Badge>
+              )}
               <Button
                 size="compact-xs"
                 variant="subtle"
@@ -813,12 +827,16 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
           <div ref={termRef} style={{ flex: 1, minHeight: 0 }} />
         </Paper>
 
-        {lastCommand && (
+        {/* Simple view keeps only Rerun + duration here, so during a run the bar
+            has nothing to show and is dropped instead of rendering empty. */}
+        {lastCommand && (advancedMode || !isRunning) && (
           <Paper p="xs" withBorder style={{ flexShrink: 0 }}>
-            <Group justify="space-between" mb={4}>
-              <Text size="xs" c="dimmed">
-                {t('run.command')}
-              </Text>
+            <Group justify={advancedMode ? 'space-between' : 'flex-end'} mb={4}>
+              {advancedMode && (
+                <Text size="xs" c="dimmed">
+                  {t('run.command')}
+                </Text>
+              )}
               <Group gap="xs">
                 {!isRunning && (
                   <Button
@@ -830,20 +848,24 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
                     {t('run.rerun')}
                   </Button>
                 )}
-                <Button
-                  size="compact-xs"
-                  variant="subtle"
-                  color="gray"
-                  onClick={handleCopyCommand}
-                  leftSection={<TbCopy size={12} />}
-                >
-                  {t('run.copy')}
-                </Button>
+                {advancedMode && (
+                  <Button
+                    size="compact-xs"
+                    variant="subtle"
+                    color="gray"
+                    onClick={handleCopyCommand}
+                    leftSection={<TbCopy size={12} />}
+                  >
+                    {t('run.copy')}
+                  </Button>
+                )}
               </Group>
             </Group>
-            <Code block style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {lastCommand}
-            </Code>
+            {advancedMode && (
+              <Code block style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {lastCommand}
+              </Code>
+            )}
             {!isRunning && elapsed && (
               <Text size="xs" c="dimmed" mt={4}>
                 {t('run.duration')}: {elapsed}

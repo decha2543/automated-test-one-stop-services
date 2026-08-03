@@ -30,6 +30,15 @@ interface Preferences {
    * persisted notifications store.
    */
   silentScheduleToast: Record<string, boolean>;
+  /**
+   * Simple view (default) vs advanced view. Off hides engineering detail that a
+   * business user cannot act on — raw CLI args, exit codes, tag regexes, the
+   * shell command, the live terminal — and narrows the wide tables so they fit
+   * a laptop screen without a horizontal scroll. Nothing is dropped from the
+   * data or the API: turning it on restores every column and field, which is
+   * why it is a persisted preference and not a per-page toggle.
+   */
+  advancedMode: boolean;
 }
 
 interface PreferencesActions {
@@ -42,6 +51,7 @@ interface PreferencesActions {
   toggleOnboarding: () => void;
   /** Enable/disable the silent-schedule completion toast for one scheduleId. */
   setSilentScheduleToast: (scheduleId: string, enabled: boolean) => void;
+  setAdvancedMode: (on: boolean) => void;
 }
 
 type PreferencesStore = Simplify<Preferences & PreferencesActions>;
@@ -55,6 +65,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   showOnboarding: true,
   sidebarCollapsed: false,
   silentScheduleToast: {},
+  advancedMode: false,
 };
 
 export const usePreferences = create<PreferencesStore>()(
@@ -73,6 +84,7 @@ export const usePreferences = create<PreferencesStore>()(
         set((s) => ({
           silentScheduleToast: { ...s.silentScheduleToast, [scheduleId]: enabled },
         })),
+      setAdvancedMode: (on) => set({ advancedMode: on }),
     }),
     {
       name: 'hub-preferences',

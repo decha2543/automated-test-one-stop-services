@@ -47,6 +47,7 @@ import { PAGE_SIZE_OPTIONS, SortableHeader } from '~/components/table/SortableHe
 import { useTableSort } from '~/hooks/useTableSort.js';
 import { useTools } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
+import { usePreferences } from '~/stores/hub.js';
 import { useNavigationStore } from '~/stores/navigation.js';
 import { formatAbsolute, formatDurationBetween, formatRelative } from '~/utils/datetime.js';
 import { getStatusColor, getStatusIcon } from '~/utils/run-status.js';
@@ -93,6 +94,9 @@ export function HistoryPage() {
   const [selectedRun, setSelectedRun] = useState<RunRecord | null>(null);
   // Up to two runs picked for the compare view (A vs B).
   const [compareSel, setCompareSel] = useState<Set<string>>(new Set());
+  // The raw exit code is engineering metadata: shown only in advanced mode. Sort
+  // state is untouched when a hidden column is the active sort field.
+  const advancedMode = usePreferences((s) => s.advancedMode);
 
   const history = useQuery(qRunsHistory());
 
@@ -258,73 +262,80 @@ export function HistoryPage() {
   }
 
   return (
-    <Stack gap="md" h="100%">
-      <PageHeader
-        title={t('history.title')}
-        description={t('nav.history.desc')}
-        actions={
-          <>
-            {compareSel.size === 2 && (
-              <Button
-                size="xs"
-                color="grape"
-                leftSection={<TbGitCompare size={14} />}
-                onClick={handleCompare}
-              >
-                {t('compare.button')} (2)
-              </Button>
-            )}
-            {sorted.length > 0 && (
+    // The root is bounded and clips: the table's ScrollArea below is the only
+    // scroll container on the page, so mounting the pagination bar can never
+    // hand a scrollbar to the surrounding content region.
+    <Stack gap="md" h="100%" style={{ minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0 }}>
+        <PageHeader
+          title={t('history.title')}
+          description={t('nav.history.desc')}
+          actions={
+            <>
+              {compareSel.size === 2 && (
+                <Button
+                  size="xs"
+                  color="grape"
+                  leftSection={<TbGitCompare size={14} />}
+                  onClick={handleCompare}
+                >
+                  {t('compare.button')} (2)
+                </Button>
+              )}
+              {sorted.length > 0 && (
+                <Button
+                  variant="default"
+                  size="xs"
+                  leftSection={<TbDownload size={14} />}
+                  onClick={exportCsv}
+                >
+                  {t('history.exportCsv')}
+                </Button>
+              )}
+              {sorted.length > 0 && (
+                <Button
+                  variant="light"
+                  color="red"
+                  size="xs"
+                  leftSection={<TbTrash size={14} />}
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: t('history.clearTitle'),
+                      message: t('history.clearConfirm'),
+                      confirmLabel: t('history.clearAll'),
+                      danger: true,
+                    });
+                    if (ok) clearHistoryMutation.mutate();
+                  }}
+                  loading={clearHistoryMutation.isPending}
+                >
+                  {t('history.clearHistory')}
+                </Button>
+              )}
               <Button
                 variant="default"
                 size="xs"
-                leftSection={<TbDownload size={14} />}
-                onClick={exportCsv}
+                leftSection={<TbFilter size={14} />}
+                rightSection={
+                  activeFilterCount > 0 ? (
+                    <Badge size="xs" color="blue" circle>
+                      {activeFilterCount}
+                    </Badge>
+                  ) : null
+                }
+                onClick={() => setShowFilters(!showFilters)}
               >
-                {t('history.exportCsv')}
+                {t('reports.filters')}
               </Button>
-            )}
-            {sorted.length > 0 && (
-              <Button
-                variant="light"
-                color="red"
-                size="xs"
-                leftSection={<TbTrash size={14} />}
-                onClick={async () => {
-                  const ok = await confirmDialog({
-                    title: t('history.clearTitle'),
-                    message: t('history.clearConfirm'),
-                    confirmLabel: t('history.clearAll'),
-                    danger: true,
-                  });
-                  if (ok) clearHistoryMutation.mutate();
-                }}
-                loading={clearHistoryMutation.isPending}
-              >
-                {t('history.clearHistory')}
-              </Button>
-            )}
-            <Button
-              variant="default"
-              size="xs"
-              leftSection={<TbFilter size={14} />}
-              rightSection={
-                activeFilterCount > 0 ? (
-                  <Badge size="xs" color="blue" circle>
-                    {activeFilterCount}
-                  </Badge>
-                ) : null
-              }
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              {t('reports.filters')}
-            </Button>
-          </>
-        }
-      />
+            </>
+          }
+        />
+      </div>
 
       {showFilters && (
-        <Paper p="md" withBorder>
+        // Bounded so a tall filter panel scrolls itself instead of squeezing
+        // the table out of the clipped root.
+        <Paper p="md" withBorder mah="40vh" style={{ flexShrink: 0, overflowY: 'auto' }}>
           <Stack gap="sm">
             <Group justify="space-between">
               <Text size="xs" fw={600} c="dimmed" tt="uppercase">
@@ -439,7 +450,7 @@ export function HistoryPage() {
       )}
 
       {history.data && (
-        <Group justify="space-between">
+        <Group justify="space-between" style={{ flexShrink: 0 }}>
           <Text size="xs" c="dimmed">
             {t('filter.showing')} {paginatedData.length} {t('filter.of')} {sorted.length}{' '}
             {t('history.runsWord')}
@@ -467,7 +478,7 @@ export function HistoryPage() {
 
       {/* Loading skeleton */}
       {history.isLoading && (
-        <Paper withBorder p="md">
+        <Paper withBorder p="md" style={{ flexShrink: 0 }}>
           <Stack gap="xs">
             {Array.from({ length: 8 }).map((_, i) => (
               <Group key={i as number} gap="md" wrap="nowrap">
@@ -483,30 +494,36 @@ export function HistoryPage() {
       )}
 
       {/* Empty state */}
-      {history.isError && <ErrorState onRetry={() => history.refetch()} />}
+      {history.isError && (
+        <div style={{ flexShrink: 0 }}>
+          <ErrorState onRetry={() => history.refetch()} />
+        </div>
+      )}
       {!history.isLoading && !history.isError && sorted.length === 0 && (
-        <EmptyState
-          icon={<TbHistory size={48} color="var(--mantine-color-dimmed)" />}
-          description={activeFilterCount > 0 ? t('history.noMatchFilter') : t('history.noRuns')}
-          action={
-            activeFilterCount > 0 ? (
-              <Button size="xs" variant="subtle" onClick={clearFilters}>
-                {t('common.clearFilters')}
-              </Button>
-            ) : (
-              <Button
-                size="xs"
-                color="green"
-                leftSection={<TbPlayerPlay size={14} />}
-                onClick={() => {
-                  navigate({ to: '/run' });
-                }}
-              >
-                {t('history.startRun')}
-              </Button>
-            )
-          }
-        />
+        <div style={{ flexShrink: 0 }}>
+          <EmptyState
+            icon={<TbHistory size={48} color="var(--mantine-color-dimmed)" />}
+            description={activeFilterCount > 0 ? t('history.noMatchFilter') : t('history.noRuns')}
+            action={
+              activeFilterCount > 0 ? (
+                <Button size="xs" variant="subtle" onClick={clearFilters}>
+                  {t('common.clearFilters')}
+                </Button>
+              ) : (
+                <Button
+                  size="xs"
+                  color="green"
+                  leftSection={<TbPlayerPlay size={14} />}
+                  onClick={() => {
+                    navigate({ to: '/run' });
+                  }}
+                >
+                  {t('history.startRun')}
+                </Button>
+              )
+            }
+          />
+        </div>
       )}
 
       {paginatedData.length > 0 && (
@@ -523,7 +540,13 @@ export function HistoryPage() {
           {/* Bounded ScrollArea → table scrolls inside the card (sticky header)
               instead of growing the page; pagination below stays visible. */}
           <ScrollArea type="auto" style={{ flex: 1, minHeight: 0 }}>
-            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={1200}>
+            <Table
+              striped
+              highlightOnHover
+              verticalSpacing="xs"
+              stickyHeader
+              miw={advancedMode ? 1200 : 1060}
+            >
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th w={40} />
@@ -570,7 +593,7 @@ export function HistoryPage() {
                       onSort={handleSort}
                     />
                   </Table.Th>
-                  <Table.Th>{t('table.exit')}</Table.Th>
+                  {advancedMode && <Table.Th>{t('table.exit')}</Table.Th>}
                   <Table.Th>{t('table.actions')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
@@ -672,11 +695,13 @@ export function HistoryPage() {
                         </Text>
                       </Tooltip>
                     </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" ff="monospace" c={r.exitCode === 0 ? 'green' : 'red'}>
-                        {r.exitCode ?? '-'}
-                      </Text>
-                    </Table.Td>
+                    {advancedMode && (
+                      <Table.Td>
+                        <Text size="xs" ff="monospace" c={r.exitCode === 0 ? 'green' : 'red'}>
+                          {r.exitCode ?? '-'}
+                        </Text>
+                      </Table.Td>
+                    )}
                     <Table.Td>
                       <Group gap={4} wrap="nowrap">
                         <Tooltip label={t('history.rerun')}>
@@ -720,7 +745,7 @@ export function HistoryPage() {
       )}
 
       {totalPages > 1 && (
-        <Group justify="center">
+        <Group justify="center" style={{ flexShrink: 0 }}>
           <Pagination
             value={safePage}
             onChange={setCurrentPage}

@@ -31,6 +31,7 @@ import {
 } from '~/hooks/useProjectQueries.js';
 import { useTools } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
+import { usePreferences } from '~/stores/hub.js';
 import { buildPerfTypeData } from '~/utils/perf-type-options.js';
 import { buildTagExpr, parseTagExpr } from '~/utils/tag-selection.js';
 import { toolSelectData } from '~/utils/tool-label.js';
@@ -116,6 +117,7 @@ export function ScheduleForm({
   const isEdit = mode === 'edit';
   const isOpen = isEdit ? !!schedule : opened;
   const t = useT();
+  const advancedMode = usePreferences((s) => s.advancedMode);
   const cronPresets = [
     { label: t('schedule.cronHourly'), value: '0 * * * *' },
     { label: t('schedule.cron6h'), value: '0 */6 * * *' },
@@ -235,6 +237,12 @@ export function ScheduleForm({
   const tags = useProjectTags(sectionAxis ? '' : tool, effectiveType, project);
 
   const tagExpr = buildTagExpr(selectedTags);
+  // Human reading of the current cron plus its next fire time. Shown as the raw
+  // input's description in advanced view, and standalone under the presets in
+  // simple view, where the raw input is hidden.
+  const cronDescription = cronExpr
+    ? `${humanizeCron(cronExpr)} · ${t('schedule.nextRun')} ${describeNextRun(cronExpr)}`
+    : undefined;
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -245,6 +253,8 @@ export function ScheduleForm({
         mode: runMode,
         tag: tagExpr,
         headless: !sectionAxis ? headless : undefined,
+        // Sent even while the field is hidden: a saved schedule's flags must
+        // survive an edit made from the simple view.
         extraArgs: extraArgs || undefined,
         noTrack: noTrack || undefined,
         silent: toConfigSilent(silent),
@@ -282,18 +292,16 @@ export function ScheduleForm({
         />
 
         <Stack gap={4}>
-          <TextInput
-            label={t('schedule.cronExpr')}
-            value={cronExpr}
-            onChange={(e) => setCronExpr(e.currentTarget.value)}
-            placeholder="0 8 * * *"
-            styles={{ input: { fontFamily: 'monospace' } }}
-            description={
-              cronExpr
-                ? `${humanizeCron(cronExpr)} · ${t('schedule.nextRun')} ${describeNextRun(cronExpr)}`
-                : undefined
-            }
-          />
+          {advancedMode && (
+            <TextInput
+              label={t('schedule.cronExpr')}
+              value={cronExpr}
+              onChange={(e) => setCronExpr(e.currentTarget.value)}
+              placeholder="0 8 * * *"
+              styles={{ input: { fontFamily: 'monospace' } }}
+              description={cronDescription}
+            />
+          )}
           <Group gap={4} wrap="wrap">
             {cronPresets.map((p) => (
               <Badge
@@ -317,6 +325,11 @@ export function ScheduleForm({
               </Badge>
             ))}
           </Group>
+          {!advancedMode && cronDescription && (
+            <Text size="xs" c="dimmed">
+              {cronDescription}
+            </Text>
+          )}
         </Stack>
 
         <Paper withBorder p="sm" mt="xs">
@@ -409,7 +422,7 @@ export function ScheduleForm({
             )}
 
             {!sectionAxis && (
-              <SimpleGrid cols={2} spacing="xs">
+              <SimpleGrid cols={advancedMode ? 2 : 1} spacing="xs">
                 <Select
                   label={t('run.display')}
                   size="xs"
@@ -418,13 +431,15 @@ export function ScheduleForm({
                   data={headlessOptions}
                   allowDeselect={false}
                 />
-                <TextInput
-                  label={t('run.extraArgs')}
-                  size="xs"
-                  value={extraArgs}
-                  onChange={(e) => setExtraArgs(e.currentTarget.value)}
-                  placeholder="--workers=4"
-                />
+                {advancedMode && (
+                  <TextInput
+                    label={t('run.extraArgs')}
+                    size="xs"
+                    value={extraArgs}
+                    onChange={(e) => setExtraArgs(e.currentTarget.value)}
+                    placeholder="--workers=4"
+                  />
+                )}
               </SimpleGrid>
             )}
 
@@ -444,7 +459,7 @@ export function ScheduleForm({
           </Stack>
         </Paper>
 
-        {selectedTags.length > 0 && (
+        {advancedMode && selectedTags.length > 0 && (
           <Text size="xs" c="dimmed">
             {t('schedule.tagExpr')} <code>{tagExpr}</code>
           </Text>

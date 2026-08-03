@@ -7,6 +7,7 @@ import {
   Kbd,
   NavLink,
   ScrollArea,
+  Switch,
   Text,
   Title,
   Tooltip,
@@ -46,6 +47,7 @@ import { useRunFinishedNotifier } from '~/hooks/useRunFinishedNotifier.js';
 import { useScheduleToasts } from '~/hooks/useScheduleToasts.js';
 import type { TranslationKey } from '~/i18n/en';
 import { useT } from '~/i18n/index.js';
+import { usePreferences } from '~/stores/hub.js';
 import { useNavigationStore } from '~/stores/navigation.js';
 
 // ---------------------------------------------------------------------------
@@ -131,12 +133,6 @@ const NAV_CATEGORIES: NavCategory[] = [
         icon: <TbChecklist size={18} />,
       },
       {
-        path: '/env-profiles',
-        labelKey: 'nav.envProfiles',
-        descKey: 'nav.envProfiles.desc',
-        icon: <TbKey size={18} />,
-      },
-      {
         path: '/artifacts',
         labelKey: 'nav.artifacts',
         descKey: 'nav.artifacts.desc',
@@ -156,9 +152,17 @@ const NAV_CATEGORIES: NavCategory[] = [
     ],
   },
   {
+    // Operator-only surfaces: a raw `.env` key/value editor and the container
+    // services. Both need engineering context, so they share one gated group.
     labelKey: 'nav.infrastructure',
     advanced: true,
     items: [
+      {
+        path: '/env-profiles',
+        labelKey: 'nav.envProfiles',
+        descKey: 'nav.envProfiles.desc',
+        icon: <TbKey size={18} />,
+      },
       {
         path: '/docker',
         labelKey: 'nav.docker',
@@ -185,7 +189,13 @@ export function AppLayout() {
 
   const [opened, { toggle, close }] = useDisclosure();
   const [floatingOpen, setFloatingOpen] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const advancedMode = usePreferences((s) => s.advancedMode);
+  const setAdvancedMode = usePreferences((s) => s.setAdvancedMode);
+  // Manual collapse state of the advanced nav group. `null` means "follow the
+  // advanced-mode preference"; flipping the preference resets it to null so the
+  // group re-opens with the mode, while a hand collapse still sticks.
+  const [advancedNavOpen, setAdvancedNavOpen] = useState<boolean | null>(null);
+  const showAdvanced = advancedNavOpen ?? advancedMode;
   const setPendingRunConfig = useNavigationStore((s) => s.setPendingRunConfig);
 
   // App-level Corner_Toast listener for `schedule-finished`.
@@ -332,6 +342,31 @@ export function AppLayout() {
                   </Group>
                 </Badge>
               </Tooltip>
+              <Tooltip
+                label={advancedMode ? t('common.advancedModeOn') : t('common.advancedModeOff')}
+                withArrow
+                multiline
+                w={260}
+              >
+                <Switch
+                  size="sm"
+                  labelPosition="left"
+                  // The text label is dropped below md so the header cannot
+                  // crowd on a laptop width; the tooltip + aria-label carry the
+                  // meaning when only the switch is visible.
+                  label={
+                    <Text size="xs" visibleFrom="md">
+                      {t('common.advancedMode')}
+                    </Text>
+                  }
+                  aria-label={t('common.advancedMode')}
+                  checked={advancedMode}
+                  onChange={(e) => {
+                    setAdvancedMode(e.currentTarget.checked);
+                    setAdvancedNavOpen(null);
+                  }}
+                />
+              </Tooltip>
               <LanguageToggle />
               <NotificationCenter />
             </Group>
@@ -348,7 +383,7 @@ export function AppLayout() {
               rightSection={
                 showAdvanced ? <TbChevronDown size={14} /> : <TbChevronRight size={14} />
               }
-              onClick={() => setShowAdvanced((v) => !v)}
+              onClick={() => setAdvancedNavOpen(!showAdvanced)}
               variant="subtle"
               c={showAdvanced ? undefined : 'dimmed'}
             />

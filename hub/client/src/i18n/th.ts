@@ -865,4 +865,14 @@ export const th: Record<TranslationKey, string> = {
   // Webhooks
   'webhooks.lineTokenPlaceholder': 'token แบบอายุยาวจาก LINE Developers Console',
   'webhooks.lineTargetPlaceholder': 'User ID หรือ Group ID (เช่น U1234...)',
+
+  // Simple / advanced view
+  'common.advancedMode': 'โหมดขั้นสูง',
+  'common.advancedModeOn': 'เปิดโหมดขั้นสูง — แสดงคอลัมน์และช่องกรอกเชิงเทคนิคครบทุกอย่าง',
+  'common.advancedModeOff': 'มุมมองแบบง่าย — ซ่อนรายละเอียดเชิงเทคนิคไว้ ไม่ได้ลบข้อมูลทิ้ง',
+  'run.technicalOutput': 'ผลลัพธ์เชิงเทคนิค',
+  'run.verdictAllPassed': 'ผ่านทั้งหมด {total} ข้อ',
+  'run.verdictFailed': 'ไม่ผ่าน {failed} จาก {total} ข้อ',
+  'run.verdictCritical': 'ในนั้นเป็นระดับ Critical {n} ข้อ',
+  'run.verdictNoChecks': 'รันจบแต่ไม่มีข้อทดสอบถูกรัน',
 };

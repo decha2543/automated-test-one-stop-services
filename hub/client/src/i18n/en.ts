@@ -874,6 +874,16 @@ export const en = {
   // Webhooks
   'webhooks.lineTokenPlaceholder': 'Long-lived token from the LINE Developers Console',
   'webhooks.lineTargetPlaceholder': 'User ID or Group ID (e.g. U1234...)',
+
+  // Simple / advanced view
+  'common.advancedMode': 'Advanced mode',
+  'common.advancedModeOn': 'Advanced mode on — every technical column and field is shown',
+  'common.advancedModeOff': 'Simple view — technical details are hidden, nothing is deleted',
+  'run.technicalOutput': 'Technical output',
+  'run.verdictAllPassed': 'All {total} checks passed',
+  'run.verdictFailed': '{failed} of {total} checks did not pass',
+  'run.verdictCritical': '{n} of them are Critical',
+  'run.verdictNoChecks': 'Finished without running any check',
 } as const;
 
 export type TranslationKey = keyof typeof en;

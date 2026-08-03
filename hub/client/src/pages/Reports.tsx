@@ -45,6 +45,7 @@ import { PAGE_SIZE_OPTIONS, SortableHeader } from '~/components/table/SortableHe
 import { useTableSort } from '~/hooks/useTableSort.js';
 import { useTools } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
+import { usePreferences } from '~/stores/hub.js';
 import { formatAbsolute, formatDurationMs, formatRelative } from '~/utils/datetime.js';
 import { getStatusColor, getStatusIcon } from '~/utils/run-status.js';
 
@@ -104,6 +105,9 @@ export function ReportsPage() {
   const [pageSize, setPageSize] = useState(25);
   const { sortField, sortDir, handleSort } = useTableSort<SortField>('timestamp');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  // Tool and Mode are engineering metadata: shown only in advanced mode. Sort
+  // state is untouched when a hidden column is the active sort field.
+  const advancedMode = usePreferences((s) => s.advancedMode);
 
   const reports = useQuery<ReportEntry[]>({
     queryKey: ['reports'],
@@ -273,45 +277,52 @@ export function ReportsPage() {
   }
 
   return (
-    <Stack gap="md" h="100%">
-      <PageHeader
-        title={t('reports.title')}
-        description={t('nav.reports.desc')}
-        actions={
-          <>
-            {selectedRows.size > 0 && (
+    // The root is bounded and clips: the table's ScrollArea below is the only
+    // scroll container on the page, so mounting the pagination bar can never
+    // hand a scrollbar to the surrounding content region.
+    <Stack gap="md" h="100%" style={{ minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0 }}>
+        <PageHeader
+          title={t('reports.title')}
+          description={t('nav.reports.desc')}
+          actions={
+            <>
+              {selectedRows.size > 0 && (
+                <Button
+                  color="red"
+                  size="xs"
+                  variant="light"
+                  leftSection={<TbTrash size={14} />}
+                  onClick={handleBulkDelete}
+                  loading={bulkDeleteMutation.isPending}
+                >
+                  {t('common.delete')} {selectedRows.size}
+                </Button>
+              )}
               <Button
-                color="red"
+                variant="default"
                 size="xs"
-                variant="light"
-                leftSection={<TbTrash size={14} />}
-                onClick={handleBulkDelete}
-                loading={bulkDeleteMutation.isPending}
+                leftSection={<TbFilter size={14} />}
+                rightSection={
+                  activeFilterCount > 0 ? (
+                    <Badge size="xs" color="blue" circle>
+                      {activeFilterCount}
+                    </Badge>
+                  ) : null
+                }
+                onClick={() => setShowFilters(!showFilters)}
               >
-                {t('common.delete')} {selectedRows.size}
+                {t('reports.filters')}
               </Button>
-            )}
-            <Button
-              variant="default"
-              size="xs"
-              leftSection={<TbFilter size={14} />}
-              rightSection={
-                activeFilterCount > 0 ? (
-                  <Badge size="xs" color="blue" circle>
-                    {activeFilterCount}
-                  </Badge>
-                ) : null
-              }
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              {t('reports.filters')}
-            </Button>
-          </>
-        }
-      />
+            </>
+          }
+        />
+      </div>
 
       {showFilters && (
-        <Paper p="md" withBorder>
+        // Bounded so a tall filter panel scrolls itself instead of squeezing
+        // the table out of the clipped root.
+        <Paper p="md" withBorder mah="40vh" style={{ flexShrink: 0, overflowY: 'auto' }}>
           <Stack gap="sm">
             <Group justify="space-between">
               <Text size="xs" fw={600} c="dimmed" tt="uppercase">
@@ -450,7 +461,7 @@ export function ReportsPage() {
       )}
 
       {reports.data && (
-        <Group justify="space-between">
+        <Group justify="space-between" style={{ flexShrink: 0 }}>
           <Text size="xs" c="dimmed">
             {t('filter.showing')} {paginatedData.length} {t('filter.of')} {sorted.length}{' '}
             {t('reports.reportsWord')}
@@ -478,7 +489,7 @@ export function ReportsPage() {
 
       {/* Loading skeleton */}
       {reports.isLoading && (
-        <Paper withBorder p="md">
+        <Paper withBorder p="md" style={{ flexShrink: 0 }}>
           <Stack gap="xs">
             {Array.from({ length: 8 }).map((_, i) => (
               <Group key={i as number} gap="md" wrap="nowrap">
@@ -495,30 +506,38 @@ export function ReportsPage() {
       )}
 
       {/* Empty state */}
-      {reports.isError && <ErrorState onRetry={() => reports.refetch()} />}
+      {reports.isError && (
+        <div style={{ flexShrink: 0 }}>
+          <ErrorState onRetry={() => reports.refetch()} />
+        </div>
+      )}
       {!reports.isLoading && !reports.isError && sorted.length === 0 && (
-        <EmptyState
-          icon={<TbReportAnalytics size={48} color="var(--mantine-color-dimmed)" />}
-          description={activeFilterCount > 0 ? t('reports.noMatchFilter') : t('reports.noReports')}
-          action={
-            activeFilterCount > 0 ? (
-              <Button size="xs" variant="subtle" onClick={clearFilters}>
-                {t('common.clearFilters')}
-              </Button>
-            ) : (
-              <Button
-                size="xs"
-                color="green"
-                leftSection={<TbPlayerPlay size={14} />}
-                onClick={() => {
-                  navigate({ to: '/run' });
-                }}
-              >
-                {t('reports.runFirst')}
-              </Button>
-            )
-          }
-        />
+        <div style={{ flexShrink: 0 }}>
+          <EmptyState
+            icon={<TbReportAnalytics size={48} color="var(--mantine-color-dimmed)" />}
+            description={
+              activeFilterCount > 0 ? t('reports.noMatchFilter') : t('reports.noReports')
+            }
+            action={
+              activeFilterCount > 0 ? (
+                <Button size="xs" variant="subtle" onClick={clearFilters}>
+                  {t('common.clearFilters')}
+                </Button>
+              ) : (
+                <Button
+                  size="xs"
+                  color="green"
+                  leftSection={<TbPlayerPlay size={14} />}
+                  onClick={() => {
+                    navigate({ to: '/run' });
+                  }}
+                >
+                  {t('reports.runFirst')}
+                </Button>
+              )
+            }
+          />
+        </div>
       )}
 
       {paginatedData.length > 0 && (
@@ -536,7 +555,13 @@ export function ReportsPage() {
               header) instead of growing the page. `miw` keeps a horizontal
               scroll on narrow screens. Pagination below stays pinned. */}
           <ScrollArea type="auto" style={{ flex: 1, minHeight: 0 }}>
-            <Table striped highlightOnHover verticalSpacing="xs" stickyHeader miw={1100}>
+            <Table
+              striped
+              highlightOnHover
+              verticalSpacing="xs"
+              stickyHeader
+              miw={advancedMode ? 1100 : 820}
+            >
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th w={40}>
@@ -563,15 +588,17 @@ export function ReportsPage() {
                       onSort={handleSort}
                     />
                   </Table.Th>
-                  <Table.Th>
-                    <SortableHeader
-                      label={t('run.tool')}
-                      field="tool"
-                      currentField={sortField}
-                      currentDir={sortDir}
-                      onSort={handleSort}
-                    />
-                  </Table.Th>
+                  {advancedMode && (
+                    <Table.Th>
+                      <SortableHeader
+                        label={t('run.tool')}
+                        field="tool"
+                        currentField={sortField}
+                        currentDir={sortDir}
+                        onSort={handleSort}
+                      />
+                    </Table.Th>
+                  )}
                   <Table.Th>
                     <SortableHeader
                       label={t('run.project')}
@@ -594,7 +621,7 @@ export function ReportsPage() {
                   <Table.Th>{t('reports.passScore')}</Table.Th>
                   <Table.Th>{t('table.duration')}</Table.Th>
                   <Table.Th>{t('table.tag')}</Table.Th>
-                  <Table.Th>{t('table.mode')}</Table.Th>
+                  {advancedMode && <Table.Th>{t('table.mode')}</Table.Th>}
                   <Table.Th>
                     <SortableHeader
                       label={t('table.timestamp')}
@@ -635,11 +662,13 @@ export function ReportsPage() {
                         {r.status}
                       </Badge>
                     </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" ff="monospace" truncate maw={120}>
-                        {r.tool}
-                      </Text>
-                    </Table.Td>
+                    {advancedMode && (
+                      <Table.Td>
+                        <Text size="xs" ff="monospace" truncate maw={120}>
+                          {r.tool}
+                        </Text>
+                      </Table.Td>
+                    )}
                     <Table.Td>
                       <Tooltip label={r.project} withArrow>
                         <Text size="xs" ff="monospace" truncate maw={150}>
@@ -693,21 +722,23 @@ export function ReportsPage() {
                         </Text>
                       )}
                     </Table.Td>
-                    <Table.Td>
-                      {r.runMode ? (
-                        <Badge
-                          size="xs"
-                          variant="light"
-                          color={r.runMode === 'docker' ? 'violet' : 'gray'}
-                        >
-                          {r.runMode}
-                        </Badge>
-                      ) : (
-                        <Text size="xs" c="dimmed">
-                          —
-                        </Text>
-                      )}
-                    </Table.Td>
+                    {advancedMode && (
+                      <Table.Td>
+                        {r.runMode ? (
+                          <Badge
+                            size="xs"
+                            variant="light"
+                            color={r.runMode === 'docker' ? 'violet' : 'gray'}
+                          >
+                            {r.runMode}
+                          </Badge>
+                        ) : (
+                          <Text size="xs" c="dimmed">
+                            —
+                          </Text>
+                        )}
+                      </Table.Td>
+                    )}
                     <Table.Td>
                       <Tooltip label={formatAbsolute(r.timestamp)} withArrow>
                         <Text size="xs" c="dimmed">
@@ -772,7 +803,7 @@ export function ReportsPage() {
 
       {/* Pagination controls */}
       {totalPages > 1 && (
-        <Group justify="center">
+        <Group justify="center" style={{ flexShrink: 0 }}>
           <Pagination
             value={safePage}
             onChange={setCurrentPage}
