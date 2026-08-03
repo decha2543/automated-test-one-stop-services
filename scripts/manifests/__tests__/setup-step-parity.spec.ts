@@ -13,7 +13,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { STEP_ORDER, readState, selectResumeStep, writeState } from '../../setup/setup-state.mjs';
+import { readState, STEP_ORDER, selectResumeStep, writeState } from '../../setup/setup-state.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 const SETUP_DIR = path.join(REPO_ROOT, 'scripts', 'setup');

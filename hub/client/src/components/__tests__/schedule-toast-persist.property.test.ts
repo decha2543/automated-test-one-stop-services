@@ -4,11 +4,11 @@ import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useNotifications } from '../../stores/hub';
 import {
-    buildScheduleToast,
-    type ScheduleFinishedEvent,
-    type ScheduleToastDescriptor,
-    type ScheduleToastPreferences,
-    shouldShowScheduleToast,
+  buildScheduleToast,
+  type ScheduleFinishedEvent,
+  type ScheduleToastDescriptor,
+  type ScheduleToastPreferences,
+  shouldShowScheduleToast,
 } from '../schedule-toast-helpers';
 
 /**

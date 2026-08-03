@@ -58,7 +58,7 @@ describe('Root setup target removes central hardcodes', () => {
     expect(setupBody).toMatch(/setup-planner\.ts plan/);
   });
 
-  it('runs each tool\'s own setup task by taskfile path', () => {
+  it("runs each tool's own setup task by taskfile path", () => {
     expect(setupBody).toMatch(/--taskfile "tools\/\$id\/Taskfile\.yml"/);
     expect(setupBody).toMatch(/--dir "tools\/\$id" setup/);
   });
@@ -80,7 +80,9 @@ describe('gatherToolSetupFacts + planToolSetup reflect folder-presence', () => {
     );
     if (opts.packageJson) fs.writeFileSync(path.join(dir, 'package.json'), '{}', 'utf8');
     if (opts.pyproject) fs.writeFileSync(path.join(dir, 'pyproject.toml'), '', 'utf8');
-    const task = opts.setupTask ? '  setup:\n    cmds:\n      - echo hi\n' : '  run:\n    cmds:\n      - echo hi\n';
+    const task = opts.setupTask
+      ? '  setup:\n    cmds:\n      - echo hi\n'
+      : '  run:\n    cmds:\n      - echo hi\n';
     fs.writeFileSync(path.join(dir, 'Taskfile.yml'), `version: "3"\ntasks:\n${task}`, 'utf8');
   }
 

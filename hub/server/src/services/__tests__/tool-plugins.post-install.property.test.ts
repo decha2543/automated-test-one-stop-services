@@ -1,9 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-    type PostInstallHookEffects,
-    resolveConfirmPhaseErrors,
-    runPostInstallHook,
+  type PostInstallHookEffects,
+  resolveConfirmPhaseErrors,
+  runPostInstallHook,
 } from '../tool-plugins.js';
 
 /**

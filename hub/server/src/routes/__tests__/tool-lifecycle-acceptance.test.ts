@@ -173,7 +173,13 @@ function createTestServices(tmpDir: string, mod: ManifestModule, sync: SyncModul
           projectCount: 0,
           manifestPath: path.relative(tmpDir, record.path),
           errors: record.errors.map((e) => ({ code: e.code, message: e.message })),
-          projects: { depth: 2, typeAxis: false, fixedType: null, root: 'projects', sectionAxis: false },
+          projects: {
+            depth: 2,
+            typeAxis: false,
+            fixedType: null,
+            root: 'projects',
+            sectionAxis: false,
+          },
           ...detectOrigin(id),
         };
       }

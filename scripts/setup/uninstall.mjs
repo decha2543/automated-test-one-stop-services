@@ -25,6 +25,7 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -154,9 +155,12 @@ function plan() {
         .split(';')
         .filter((e) => e.trim() !== '' && !drop.includes(e))
         .join(';');
-      powershell("[Environment]::SetEnvironmentVariable('PATH', $env:SETUP_NEW_USER_PATH, 'User')", {
-        SETUP_NEW_USER_PATH: next,
-      });
+      powershell(
+        "[Environment]::SetEnvironmentVariable('PATH', $env:SETUP_NEW_USER_PATH, 'User')",
+        {
+          SETUP_NEW_USER_PATH: next,
+        },
+      );
       return `removed ${drop.map((d) => d.trim()).join(', ')}`;
     });
 
@@ -171,10 +175,16 @@ function plan() {
     });
   }
 
-  kept.push('node / pnpm / uv / task and their managers (volta, scoop) — other projects may use them');
+  kept.push(
+    'node / pnpm / uv / task and their managers (volta, scoop) — other projects may use them',
+  );
   kept.push(`the workspace folder itself (${WORKSPACE_ROOT}) — it holds your test projects`);
-  kept.push('downloaded browsers under .cache/playwright-browsers — delete that folder to reclaim the space');
-  kept.push('global git tweaks (core.fscache, core.preloadindex, gc.auto) — harmless, shared with other repos');
+  kept.push(
+    'downloaded browsers under .cache/playwright-browsers — delete that folder to reclaim the space',
+  );
+  kept.push(
+    'global git tweaks (core.fscache, core.preloadindex, gc.auto) — harmless, shared with other repos',
+  );
 }
 
 function report() {
@@ -240,7 +250,11 @@ async function selfTest() {
     'C:\\Program Files\\Git\\usr\\bin\\',
     'c:\\users\\tester\\.LOCAL\\Bin',
   ]);
-  assert.equal(pathEntriesToDrop('C:\\tools\\keep-me;C:\\Windows').length, 0, 'keeps unrelated entries');
+  assert.equal(
+    pathEntriesToDrop('C:\\tools\\keep-me;C:\\Windows').length,
+    0,
+    'keeps unrelated entries',
+  );
 
   const managed = (name) =>
     `export FOO=1\n\n# >>> ${name}-workspace begin >>>\nexport PS1='x'\n# <<< ${name}-workspace end <<<\nexport BAR=2\n`;

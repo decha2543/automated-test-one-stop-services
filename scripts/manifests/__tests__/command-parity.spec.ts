@@ -23,10 +23,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-    buildRunCommandFromInput,
-    buildTaskCommand,
-    type RunCommandInput,
-    type RunnerAnswers,
+  buildRunCommandFromInput,
+  buildTaskCommand,
+  type RunCommandInput,
+  type RunnerAnswers,
 } from '../runner-command.js';
 import type { ToolManifest } from '../types.js';
 import { validateManifest } from '../validate.js';
@@ -94,7 +94,8 @@ const scenarios: Scenario[] = [
       mode: '--headed',
       args: '--workers=1',
     },
-    expected: 'task pw:run-local TYPE=web PROJECT=ecom TAG=(?=.*@TEST-C001) -- --headed --workers=1',
+    expected:
+      'task pw:run-local TYPE=web PROJECT=ecom TAG=(?=.*@TEST-C001) -- --headed --workers=1',
     expectedQuoted:
       "task pw:run-local TYPE='web' PROJECT='ecom' TAG='(?=.*@TEST-C001)' -- --headed --workers=1",
   },
@@ -220,19 +221,20 @@ const scenarios: Scenario[] = [
 describe.skipIf(!TOOLS_PRESENT)(
   'command parity — Hub (buildRunCommandFromInput) ≡ CLI (buildTaskCommand)',
   () => {
-  for (const s of scenarios) {
-    it(`${s.name}: identity-quote Hub output equals the CLI builder and the canonical literal`, () => {
-      const cli = buildTaskCommand(s.manifest, s.cliAnswers);
-      const hub = buildRunCommandFromInput(s.manifest, { ...s.hub, quote: identity });
-      // The Hub's delegation target reproduces the CLI builder byte-for-byte…
-      expect(hub).toBe(cli);
-      // …and both match the pinned canonical command string (anti-drift).
-      expect(hub).toBe(s.expected);
-    });
+    for (const s of scenarios) {
+      it(`${s.name}: identity-quote Hub output equals the CLI builder and the canonical literal`, () => {
+        const cli = buildTaskCommand(s.manifest, s.cliAnswers);
+        const hub = buildRunCommandFromInput(s.manifest, { ...s.hub, quote: identity });
+        // The Hub's delegation target reproduces the CLI builder byte-for-byte…
+        expect(hub).toBe(cli);
+        // …and both match the pinned canonical command string (anti-drift).
+        expect(hub).toBe(s.expected);
+      });
 
-    it(`${s.name}: shell-quoted Hub output quotes task-var values only`, () => {
-      const hub = buildRunCommandFromInput(s.manifest, { ...s.hub, quote: shellQuote });
-      expect(hub).toBe(s.expectedQuoted);
-    });
-  }
-});
+      it(`${s.name}: shell-quoted Hub output quotes task-var values only`, () => {
+        const hub = buildRunCommandFromInput(s.manifest, { ...s.hub, quote: shellQuote });
+        expect(hub).toBe(s.expectedQuoted);
+      });
+    }
+  },
+);

@@ -9,11 +9,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-    buildTaskCommand,
-    matchesWhen,
-    type RunnerAnswers,
-    resolveValue,
-    substitute,
+  buildTaskCommand,
+  matchesWhen,
+  type RunnerAnswers,
+  resolveValue,
+  substitute,
 } from '../runner-command.js';
 import type { ToolManifest, ToolRunnerStep, ToolRunnerWhen } from '../types.js';
 import { realToolsPresent } from './_helpers.js';

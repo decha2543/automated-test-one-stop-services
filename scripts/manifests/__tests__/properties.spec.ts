@@ -21,9 +21,9 @@ import { projectPipeline } from '../pipeline-projection.js';
 import { buildTaskCommand, type RunnerAnswers } from '../runner-command.js';
 import type { ManifestError, ToolManifest, ToolManifestRecord } from '../types.js';
 import {
-    arbToolManifest,
-    arbTwoManifestsSameAlias,
-    arbTwoManifestsSameNamespace,
+  arbToolManifest,
+  arbTwoManifestsSameAlias,
+  arbTwoManifestsSameNamespace,
 } from './arbitraries.js';
 
 // ── Workspace helpers ─────────────────────────────────────────────────────────

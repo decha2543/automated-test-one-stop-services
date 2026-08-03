@@ -102,8 +102,7 @@ vi.mock('../../services/tool-plugins.js', () => ({
   updateTool: (...args: unknown[]) => mockUpdateTool(...(args as [string, string | undefined])),
   runPostInstallHook: (...args: unknown[]) =>
     mockRunPostInstallHook(...(args as [string, unknown])),
-  defaultPostInstallEffects: (...args: unknown[]) =>
-    mockDefaultPostInstallEffects(...(args as [])),
+  defaultPostInstallEffects: (...args: unknown[]) => mockDefaultPostInstallEffects(...(args as [])),
 }));
 
 vi.mock('../../services/doctor.js', () => ({

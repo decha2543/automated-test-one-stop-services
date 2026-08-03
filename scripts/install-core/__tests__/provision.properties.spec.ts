@@ -23,8 +23,7 @@ describe('Playwright provision decision never reuses a mismatched revision', () 
     fc.assert(
       fc.property(arbProvisionInputs, (inputs) => {
         const action = decideProvisionAction(inputs);
-        const mirrorConfigured =
-          inputs.mirrorHost !== null && inputs.mirrorHost.trim().length > 0;
+        const mirrorConfigured = inputs.mirrorHost !== null && inputs.mirrorHost.trim().length > 0;
 
         // 1) The precedence holds exactly: mirror > reuse > reprovision > archive.
         if (mirrorConfigured) {

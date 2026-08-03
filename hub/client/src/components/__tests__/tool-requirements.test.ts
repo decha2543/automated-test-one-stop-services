@@ -26,7 +26,10 @@ describe('tool run requirements', () => {
       { name: 'python', ok: false, category: 'required-install' },
     ];
     expect(
-      missingChecksForTool({ id: 'robot-framework', runtime: 'python', packageManager: 'uv' }, checks),
+      missingChecksForTool(
+        { id: 'robot-framework', runtime: 'python', packageManager: 'uv' },
+        checks,
+      ),
     ).toEqual(['python']);
   });
 

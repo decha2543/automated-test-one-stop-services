@@ -196,7 +196,9 @@ async function daemonlessStart() {
     }
     clearPid();
     if (attempt < 3) {
-      console.warn(`  Startup attempt ${attempt} exited early; waiting for the port and retrying...`);
+      console.warn(
+        `  Startup attempt ${attempt} exited early; waiting for the port and retrying...`,
+      );
       await waitForPortClosed(HOST, PORT, 5_000);
       await sleep(500);
     }
@@ -462,7 +464,9 @@ async function enableBootSystemd() {
   if (!r.error && r.status === 0) {
     console.log(`  Enabled systemd --user unit ${SYSTEMD_UNIT} (Restart=always, starts at boot).`);
   } else {
-    console.warn('  [warn] systemctl --user enable failed; the Hub runs now but may not auto-start at boot.');
+    console.warn(
+      '  [warn] systemctl --user enable failed; the Hub runs now but may not auto-start at boot.',
+    );
   }
   return 0;
 }
@@ -499,7 +503,9 @@ async function enableBootLaunchd() {
   if (!r.error && r.status === 0) {
     console.log(`  Loaded launchd agent ${LAUNCHD_LABEL} (RunAtLoad, KeepAlive).`);
   } else {
-    console.warn('  [warn] launchctl load failed; the Hub runs now but may not auto-start at boot.');
+    console.warn(
+      '  [warn] launchctl load failed; the Hub runs now but may not auto-start at boot.',
+    );
   }
   return 0;
 }
@@ -566,13 +572,19 @@ async function openBrowser() {
     await sleep(500);
   }
   if (!ready) {
-    console.warn(`  [warn] Hub not confirmed on ${url} yet — opening anyway (refresh if the page is blank).`);
+    console.warn(
+      `  [warn] Hub not confirmed on ${url} yet — opening anyway (refresh if the page is blank).`,
+    );
   }
   // stdio ignored + windowsHide so no console window flashes for a non-tech user.
   let r;
   if (IS_WIN) {
     // `start` is a cmd builtin; the empty "" is its (required) window-title arg.
-    r = spawnSync('cmd', ['/c', 'start', '', url], { stdio: 'ignore', windowsHide: true, timeout: 15_000 });
+    r = spawnSync('cmd', ['/c', 'start', '', url], {
+      stdio: 'ignore',
+      windowsHide: true,
+      timeout: 15_000,
+    });
   } else if (IS_MAC) {
     r = spawnSync('open', [url], { stdio: 'ignore', timeout: 15_000 });
   } else {
@@ -621,7 +633,9 @@ function installShortcut() {
   const dir = shortcutDir();
   try {
     if (!fs.existsSync(dir)) {
-      console.warn(`  [warn] No Desktop folder at ${dir}; skipping the "Test Hub" shortcut (non-fatal).`);
+      console.warn(
+        `  [warn] No Desktop folder at ${dir}; skipping the "Test Hub" shortcut (non-fatal).`,
+      );
       return 0;
     }
     const file = shortcutPath();
@@ -659,7 +673,10 @@ function installShortcut() {
       fs.chmodSync(file, 0o755);
       // GNOME flags unknown .desktop files "untrusted" until this metadata is set.
       // Best-effort; `gio` may be absent on non-GNOME desktops.
-      spawnSync('gio', ['set', file, 'metadata::trusted', 'true'], { stdio: 'ignore', timeout: 5_000 });
+      spawnSync('gio', ['set', file, 'metadata::trusted', 'true'], {
+        stdio: 'ignore',
+        timeout: 5_000,
+      });
     }
     console.log(`  Created desktop shortcut: ${file}`);
   } catch (e) {
@@ -774,7 +791,9 @@ function bootAutostartState() {
       : 'not enabled (run: enable-boot)';
   }
   if (IS_MAC) {
-    return fs.existsSync(LAUNCHD_PLIST_PATH) ? 'enabled (launchd)' : 'not enabled (run: enable-boot)';
+    return fs.existsSync(LAUNCHD_PLIST_PATH)
+      ? 'enabled (launchd)'
+      : 'not enabled (run: enable-boot)';
   }
   return 'unsupported platform';
 }

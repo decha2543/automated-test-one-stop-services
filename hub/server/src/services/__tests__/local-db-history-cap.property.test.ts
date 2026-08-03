@@ -94,25 +94,22 @@ describe('openLocalDb history cap', () => {
   });
 
   // Example cases pinning the boundary around MAX_HISTORY (= 200).
-  it.each([
-    1,
-    199,
-    MAX_HISTORY,
-    MAX_HISTORY + 1,
-    300,
-  ])('retains min(N, MAX_HISTORY) newest records for N=%i (example)', (n) => {
-    const db = openLocalDb(':memory:');
-    // startedAt strictly increases with index, so the newest are the highest indices.
-    const records = Array.from({ length: n }, (_, i) => makeRecord(i, i));
+  it.each([1, 199, MAX_HISTORY, MAX_HISTORY + 1, 300])(
+    'retains min(N, MAX_HISTORY) newest records for N=%i (example)',
+    (n) => {
+      const db = openLocalDb(':memory:');
+      // startedAt strictly increases with index, so the newest are the highest indices.
+      const records = Array.from({ length: n }, (_, i) => makeRecord(i, i));
 
-    for (const rec of records) db.appendHistory(rec);
+      for (const rec of records) db.appendHistory(rec);
 
-    const stored = db.readCollection<RunRecord>('history');
-    const cap = Math.min(n, MAX_HISTORY);
+      const stored = db.readCollection<RunRecord>('history');
+      const cap = Math.min(n, MAX_HISTORY);
 
-    expect(stored.length).toBe(cap);
-    // Newest cap records are the highest indices; ordered DESC by startedAt.
-    const expectedIds = Array.from({ length: cap }, (_, i) => `run-${n - 1 - i}`);
-    expect(stored.map((r) => r.id)).toEqual(expectedIds);
-  });
+      expect(stored.length).toBe(cap);
+      // Newest cap records are the highest indices; ordered DESC by startedAt.
+      const expectedIds = Array.from({ length: cap }, (_, i) => `run-${n - 1 - i}`);
+      expect(stored.map((r) => r.id)).toEqual(expectedIds);
+    },
+  );
 });

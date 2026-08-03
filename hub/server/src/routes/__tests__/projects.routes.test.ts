@@ -121,7 +121,12 @@ describe('POST /api/projects/clone', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/projects/clone',
-      payload: { tool: 'playwright', type: 'web', url: 'https://github.com/org/repo.git', name: 'p' },
+      payload: {
+        tool: 'playwright',
+        type: 'web',
+        url: 'https://github.com/org/repo.git',
+        name: 'p',
+      },
     });
 
     expect(res.statusCode).toBe(400);

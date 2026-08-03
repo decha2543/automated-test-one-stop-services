@@ -26,13 +26,6 @@
  *         semantics and that STEP_ORDER is exactly
  *         node,pnpm,uv,task,install-deps,start-hub (start-hub last, so
  *         verify can only run after every step).
- *       - launcher contract, by running a *copy* of the
- *         real launcher in a throwaway sandbox next to a STUB
- *         `setup-linux.sh`. The stub touches a sentinel then exits non-zero,
- *         so the real Setup_Bootstrap is physically unreachable (no installs,
- *         no network, no 60s Hub poll). We prove: no CLI arg is needed, a
- *         single stdin line (the Target_Directory) drives it to the bootstrap,
- *         and a fresh nested target dir is created INCLUDING parents.
  *
  *   • STRUCTURALLY-verified — clean-container behaviour that cannot execute
  *     without real installs, asserted by grepping the REAL script content of
@@ -43,6 +36,9 @@
  *         final step.
  *       - network retry ≤3 @ 30s timeout; after retries → no Hub, re-runnable;
  *         user-scope install; privilege handling.
+ *       - launcher contract — argv[1] target stays OPTIONAL, exactly one
+ *         Target_Directory prompt, `mkdir -p` creates parents, "." default,
+ *         clone then invoke setup-linux.sh.
  *       - launcher polls Hub readiness up to 60s then shows the URL.
  *       - Windows double-click (no arg) — static check on the .bat.
  *
@@ -50,12 +46,12 @@
  * convention, so the suite passes regardless of where `node --test` runs.
  */
 
-import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import os from 'node:os';
-import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 // Static import of the canonical ledger engine (resolved relative to THIS file,
 // so it works regardless of cwd). Its exported STEP_ORDER is the single source
@@ -66,7 +62,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // `scripts/__tests__/<file>.spec.mjs` → repo root is two levels up.
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const SETUP_DIR = path.join(REPO_ROOT, 'scripts', 'setup');
-const LAUNCHER_SH = path.join(SETUP_DIR, 'automated-test-one-stop-service_installer_mac-and-linux.sh');
+const LAUNCHER_SH = path.join(
+  SETUP_DIR,
+  'automated-test-one-stop-service_installer_mac-and-linux.sh',
+);
 const LAUNCHER_BAT = path.join(SETUP_DIR, 'automated-test-one-stop-service_installer_windows.bat');
 const BOOTSTRAP_SH = path.join(SETUP_DIR, 'setup-linux.sh');
 const BOOTSTRAP_BAT = path.join(SETUP_DIR, 'setup-windows.bat');
@@ -78,17 +77,7 @@ const STATE_HELPER_MJS = path.join(SETUP_DIR, 'setup-state.mjs');
  *  leaving 4 Core tools + deps + Hub = 6 steps. The Hub runs as a daemonless
  *  background process (optionally OS-supervised), so no process manager is a
  *  Core step. */
-const EXPECTED_STEP_ORDER = [
-  'node',
-  'pnpm',
-  'uv',
-  'task',
-  'install-deps',
-  'start-hub',
-];
-
-/** Convert a Windows path to a forward-slash form that MSYS bash accepts. */
-const toBashPath = (p) => p.replace(/\\/g, '/');
+const EXPECTED_STEP_ORDER = ['node', 'pnpm', 'uv', 'task', 'install-deps', 'start-hub'];
 
 /** Count non-overlapping occurrences of a literal substring. */
 const countOccurrences = (haystack, needle) => haystack.split(needle).length - 1;
@@ -115,63 +104,6 @@ function parseLedger(stdout) {
     .map((line) => line.match(/^([a-z0-9-]+):(pending|done|failed)$/))
     .filter((m) => m !== null)
     .map((m) => ({ name: m[1], status: m[2] }));
-}
-
-// ===========================================================================
-//  Launcher sandbox — copy of the REAL install.sh + a STUB bootstrap
-// ===========================================================================
-
-/** A stub Setup_Bootstrap. Touches the sentinel then exits non-zero so that,
- *  if execution ever reaches it, the launcher aborts immediately after the
- *  bootstrap call (never reaching the 60s Hub poll) and the test stays fast.
- *  The real setup-linux.sh is never referenced — no installs, no network. */
-const STUB_BOOTSTRAP = [
-  '#!/usr/bin/env bash',
-  '# TEST STUB — stands in for the real Setup_Bootstrap (setup-linux.sh).',
-  'echo "STUB_BOOTSTRAP_INVOKED"',
-  'if [ -n "${TEST_SENTINEL:-}" ]; then',
-  '  : > "$TEST_SENTINEL" 2>/dev/null || true',
-  'fi',
-  'exit 7',
-  '',
-].join('\n');
-
-/**
- * Build an isolated sandbox: a temp dir containing a byte-for-byte copy of the
- * real install.sh next to the stub setup-linux.sh.
- * @returns {{ dir: string, launcher: string, sentinel: string }}
- */
-function makeSandbox() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'setup-boot-'));
-  const launcher = path.join(dir, 'install.sh');
-  fs.copyFileSync(LAUNCHER_SH, launcher);
-  fs.writeFileSync(path.join(dir, 'setup-linux.sh'), STUB_BOOTSTRAP, 'utf8');
-  const sentinel = path.join(dir, 'bootstrap-invoked.sentinel');
-  return { dir, launcher, sentinel };
-}
-
-/**
- * Run a sandboxed launcher copy with NO CLI args (nothing but the script path)
- * and the given stdin. Captures combined stdout+stderr, exit code,
- * and whether the bootstrap stub fired. A hard timeout guarantees the test
- * never hangs even if a future regression reaches the Hub readiness poll.
- * @param {{ launcher: string, sentinel: string }} box
- * @param {string} stdin
- */
-function runLauncher(box, stdin) {
-  const res = spawnSync('bash', [toBashPath(box.launcher)], {
-    input: stdin,
-    encoding: 'utf8',
-    timeout: 30_000,
-    env: { ...process.env, TEST_SENTINEL: toBashPath(box.sentinel) },
-  });
-  const output = `${res.stdout ?? ''}${res.stderr ?? ''}`;
-  return {
-    code: res.status,
-    output,
-    bootstrapInvoked: fs.existsSync(box.sentinel),
-    error: res.error,
-  };
 }
 
 // ===========================================================================
@@ -300,7 +232,11 @@ describe('Installer launcher contract (structural)', () => {
     // A target directory may be passed as argv[1] for an unattended install, but
     // it must stay optional: with no argument the launcher falls back to the
     // prompt, so a double-click still works with zero input.
-    assert.match(launcherSrc, /TARGET="\$\{1:-\}"/, 'launcher may accept an optional argv[1] target');
+    assert.match(
+      launcherSrc,
+      /TARGET="\$\{1:-\}"/,
+      'launcher may accept an optional argv[1] target',
+    );
     assert.match(
       launcherSrc,
       /if \[ -z "\$TARGET" \]; then\n\s+read -r -p "Enter Target Directory/,
@@ -313,7 +249,8 @@ describe('Installer launcher contract (structural)', () => {
   });
 
   it('asks for exactly ONE input — a single read prompt for Target Directory', () => {
-    const readPrompts = (launcherSrc.match(/read\s+-r\s+-p\s+"Enter Target Directory/g) ?? []).length;
+    const readPrompts = (launcherSrc.match(/read\s+-r\s+-p\s+"Enter Target Directory/g) ?? [])
+      .length;
     assert.equal(readPrompts, 1, 'launcher must prompt for the Target_Directory exactly once');
   });
 
@@ -352,12 +289,7 @@ describe('Setup_Bootstrap clean-container contracts (structural)', () => {
 
   it('installs each of the 4 Core tools (both scripts)', () => {
     // Each Core tool has a numbered step header on both platforms (k6 removed from Core).
-    for (const step of [
-      'node \\(1/6\\)',
-      'pnpm \\(2/6\\)',
-      'uv \\(3/6\\)',
-      'task \\(4/6\\)',
-    ]) {
+    for (const step of ['node \\(1/6\\)', 'pnpm \\(2/6\\)', 'uv \\(3/6\\)', 'task \\(4/6\\)']) {
       assert.match(linux, new RegExp(`\\[step\\] ${step}`), `linux missing step ${step}`);
       assert.match(win, new RegExp(`\\[step\\] ${step}`), `windows missing step ${step}`);
     }
@@ -365,7 +297,11 @@ describe('Setup_Bootstrap clean-container contracts (structural)', () => {
     assert.match(linux, /volta install "node@/, 'linux must install node via volta');
     assert.match(linux, /volta install "pnpm@/, 'linux must install the pinned pnpm via volta');
     assert.match(linux, /astral\.sh\/uv\/install\.sh|brew_install uv/, 'linux must install uv');
-    assert.match(linux, /taskfile\.dev\/install\.sh|brew_install go-task/, 'linux must install task');
+    assert.match(
+      linux,
+      /taskfile\.dev\/install\.sh|brew_install go-task/,
+      'linux must install task',
+    );
     // Windows installers (scoop/volta).
     assert.match(win, /:installNode\b/, 'windows must install node');
     assert.match(win, /:installPnpm\b/, 'windows must install pnpm');
@@ -417,26 +353,60 @@ describe('Setup_Bootstrap clean-container contracts (structural)', () => {
     // major. Presence alone used to be enough, which let an old node/pnpm through
     // and failed two steps later (pnpm lockfileVersion 9 / Hub build) with an
     // error that did not name the cause.
-    assert.match(linux, /tool_major_ok node -v "\$NODE_MAJOR_MIN"/, 'linux gates node on the pinned major');
-    assert.match(linux, /tool_major_ok pnpm -v "\$PNPM_MAJOR_MIN"/, 'linux gates pnpm on the pinned major');
-    assert.match(win, /:toolMajorOk "node -v" %NODE_MAJOR_MIN%/, 'windows gates node on the pinned major');
-    assert.match(win, /:toolMajorOk "pnpm -v" %PNPM_MAJOR_MIN%/, 'windows gates pnpm on the pinned major');
+    assert.match(
+      linux,
+      /tool_major_ok node -v "\$NODE_MAJOR_MIN"/,
+      'linux gates node on the pinned major',
+    );
+    assert.match(
+      linux,
+      /tool_major_ok pnpm -v "\$PNPM_MAJOR_MIN"/,
+      'linux gates pnpm on the pinned major',
+    );
+    assert.match(
+      win,
+      /:toolMajorOk "node -v" %NODE_MAJOR_MIN%/,
+      'windows gates node on the pinned major',
+    );
+    assert.match(
+      win,
+      /:toolMajorOk "pnpm -v" %PNPM_MAJOR_MIN%/,
+      'windows gates pnpm on the pinned major',
+    );
     // The floor is derived from versions.env, never hardcoded in the scripts.
-    assert.match(linux, /NODE_MAJOR_MIN="\$\(major_of "\$NODE_VERSION"\)"/, 'linux derives the node floor');
-    assert.match(win, /in \("%NODE_VERSION%"\) do set "NODE_MAJOR_MIN=/, 'windows derives the node floor');
-    assert.match(linux, /command -v node &>\/dev\/null/, 'linux detects an already-present tool via command -v');
+    assert.match(
+      linux,
+      /NODE_MAJOR_MIN="\$\(major_of "\$NODE_VERSION"\)"/,
+      'linux derives the node floor',
+    );
+    assert.match(
+      win,
+      /in \("%NODE_VERSION%"\) do set "NODE_MAJOR_MIN=/,
+      'windows derives the node floor',
+    );
+    assert.match(
+      linux,
+      /command -v node &>\/dev\/null/,
+      'linux detects an already-present tool via command -v',
+    );
     assert.match(win, /where node >nul 2>nul/, 'windows detects an already-present tool via where');
   });
 
   it('the verify block runs only AFTER the final step (both scripts)', () => {
     const lxStart = linux.indexOf('[step] start-hub (6/6)');
     const lxVerify = linux.indexOf('[verify] Verifying all 4 Core tools');
-    assert.ok(lxStart > 0 && lxVerify > 0, 'linux must have both the start-hub step and verify block');
+    assert.ok(
+      lxStart > 0 && lxVerify > 0,
+      'linux must have both the start-hub step and verify block',
+    );
     assert.ok(lxVerify > lxStart, 'linux verify must come after the start-hub step');
 
     const winStart = win.indexOf('[step] start-hub (6/6)');
     const winVerify = win.indexOf('[verify] Verifying all 4 Core tools');
-    assert.ok(winStart > 0 && winVerify > 0, 'windows must have both the start-hub step and verify block');
+    assert.ok(
+      winStart > 0 && winVerify > 0,
+      'windows must have both the start-hub step and verify block',
+    );
     assert.ok(winVerify > winStart, 'windows verify must come after the start-hub step');
   });
 
@@ -453,9 +423,17 @@ describe('Setup_Bootstrap clean-container contracts (structural)', () => {
   it('after exhausted retries → no Hub start, state stays re-runnable (both scripts)', () => {
     // The fail path stops before the Hub and tells the user it is re-runnable;
     // completed steps are preserved (the ledger from Group 1).
-    assert.match(linux, /Re-run to resume; completed steps are skipped/, 'linux fail path must be re-runnable');
+    assert.match(
+      linux,
+      /Re-run to resume; completed steps are skipped/,
+      'linux fail path must be re-runnable',
+    );
     assert.match(linux, /fail_step\(\)/, 'linux must define fail_step that stops the run');
-    assert.match(win, /Re-run to resume; completed steps are skipped/, 'windows fail path must be re-runnable');
+    assert.match(
+      win,
+      /Re-run to resume; completed steps are skipped/,
+      'windows fail path must be re-runnable',
+    );
     assert.match(win, /:fail\b/, 'windows must define a :fail routine that stops the run');
   });
 
@@ -475,7 +453,11 @@ describe('Setup_Bootstrap clean-container contracts (structural)', () => {
     // Windows scoop/volta are user-scope; the script still probes elevation so
     // privilege-sensitive sub-steps can choose user-scope vs report.
     assert.match(win, /net session/, 'windows must probe for elevation');
-    assert.match(win, /IS_ADMIN/, 'windows must record the elevation state for privilege decisions');
+    assert.match(
+      win,
+      /IS_ADMIN/,
+      'windows must record the elevation state for privilege decisions',
+    );
   });
 
   it('launcher polls Hub readiness up to 60s then shows the URL (both launchers)', () => {
@@ -491,7 +473,11 @@ describe('Setup_Bootstrap clean-container contracts (structural)', () => {
     assert.match(launcherSh, /Open: \$HUB_URL/, 'linux launcher shows the URL on success');
     // Windows launcher: poll bounded at 60, success prints the URL.
     assert.match(launcherBat, /up to 60s/, 'windows launcher documents the 60s readiness window');
-    assert.match(launcherBat, /_poll! GEQ 60|_poll GEQ 60/, 'windows launcher bounds the poll at 60');
+    assert.match(
+      launcherBat,
+      /_poll! GEQ 60|_poll GEQ 60/,
+      'windows launcher bounds the poll at 60',
+    );
     assert.match(
       launcherBat,
       /if not defined HUB_PORT set "HUB_PORT=5174"/,
@@ -508,7 +494,11 @@ describe('Setup_Bootstrap clean-container contracts (structural)', () => {
     // Target_Directory input and that a CLI argument stays OPTIONAL: %~1 may
     // pre-fill the target for an unattended install, but with no argument the
     // prompt still runs, so a double-click needs zero input.
-    assert.match(launcherBat, /set \/p "TARGET=/, 'windows launcher must read the Target_Directory input');
+    assert.match(
+      launcherBat,
+      /set \/p "TARGET=/,
+      'windows launcher must read the Target_Directory input',
+    );
     assert.match(
       launcherBat,
       /if not defined TARGET set \/p "TARGET=/,

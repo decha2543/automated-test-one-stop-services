@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-    addTestCaseRow,
-    editedPathFor,
-    editTestCaseCell,
-    parseCsvText,
-    readTestCaseGrid,
+  addTestCaseRow,
+  editedPathFor,
+  editTestCaseCell,
+  parseCsvText,
+  readTestCaseGrid,
 } from '../testcases.js';
 
 describe('parseCsvText', () => {

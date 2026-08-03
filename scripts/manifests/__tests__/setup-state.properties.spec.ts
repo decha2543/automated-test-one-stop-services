@@ -10,7 +10,7 @@
 import * as path from 'node:path';
 import * as fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
-import { STEP_ORDER, readState, selectResumeStep, writeState } from '../../setup/setup-state.mjs';
+import { readState, STEP_ORDER, selectResumeStep, writeState } from '../../setup/setup-state.mjs';
 import { makeTmpDir, rmTmpDir } from './_helpers.js';
 
 const tmpDirs: string[] = [];

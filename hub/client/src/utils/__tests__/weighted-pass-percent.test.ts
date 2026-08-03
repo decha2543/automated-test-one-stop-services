@@ -34,9 +34,7 @@ describe('weightedPassPercent', () => {
     expect(weightedPassPercent(failLow)).toBeCloseTo(80);
 
     // A failing critical must hurt the score more than a failing low.
-    expect(weightedPassPercent(failCritical)).toBeLessThan(
-      weightedPassPercent(failLow) as number,
-    );
+    expect(weightedPassPercent(failCritical)).toBeLessThan(weightedPassPercent(failLow) as number);
   });
 
   it('applies the 4/3/2/1 weights across all levels', () => {

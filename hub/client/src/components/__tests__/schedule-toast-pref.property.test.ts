@@ -2,9 +2,9 @@ import type { RunStatus } from '@hub/shared';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-    type ScheduleFinishedEvent,
-    type ScheduleToastPreferences,
-    shouldShowScheduleToast,
+  type ScheduleFinishedEvent,
+  type ScheduleToastPreferences,
+  shouldShowScheduleToast,
 } from '../schedule-toast-helpers';
 
 /**

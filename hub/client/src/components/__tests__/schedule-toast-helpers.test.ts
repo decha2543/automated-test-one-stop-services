@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-    buildScheduleToast,
-    type ScheduleFinishedEvent,
-    scheduleToastId,
-    shouldShowScheduleToast,
+  buildScheduleToast,
+  type ScheduleFinishedEvent,
+  scheduleToastId,
+  shouldShowScheduleToast,
 } from '../schedule-toast-helpers';
 
 function event(overrides: Partial<ScheduleFinishedEvent> = {}): ScheduleFinishedEvent {

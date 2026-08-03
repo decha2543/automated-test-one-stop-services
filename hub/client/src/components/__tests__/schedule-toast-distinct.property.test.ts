@@ -3,9 +3,9 @@ import type { RunStatus } from '@hub/shared';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-    buildScheduleToast,
-    type ScheduleFinishedEvent,
-    scheduleToastId,
+  buildScheduleToast,
+  type ScheduleFinishedEvent,
+  scheduleToastId,
 } from '../schedule-toast-helpers';
 
 /**

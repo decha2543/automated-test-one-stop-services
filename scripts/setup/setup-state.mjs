@@ -33,14 +33,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const STEP_ORDER = [
-  'node',
-  'pnpm',
-  'uv',
-  'task',
-  'install-deps',
-  'start-hub',
-];
+export const STEP_ORDER = ['node', 'pnpm', 'uv', 'task', 'install-deps', 'start-hub'];
 
 const VALID = new Set(['pending', 'done', 'failed']);
 

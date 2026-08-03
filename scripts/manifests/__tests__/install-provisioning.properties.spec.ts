@@ -11,14 +11,14 @@ import * as fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
 import { discoverManifestPaths, discoverToolIds, isToolPresent } from '../discover.js';
 import {
-    aggregateSetupFailures,
-    planToolSetup,
-    SETUP_FAILURE_HINT,
-    type ToolSetupFacts,
-    type ToolSetupOutcome,
+  aggregateSetupFailures,
+  planToolSetup,
+  SETUP_FAILURE_HINT,
+  type ToolSetupFacts,
+  type ToolSetupOutcome,
 } from '../setup-planner.js';
-import { arbToolFolderSet, type ToolFolderSpec, toolFolderName } from './arbitraries.js';
 import { makeTmpDir, rmTmpDir } from './_helpers.js';
+import { arbToolFolderSet, type ToolFolderSpec, toolFolderName } from './arbitraries.js';
 
 const tmpDirs: string[] = [];
 

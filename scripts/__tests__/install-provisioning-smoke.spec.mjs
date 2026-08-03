@@ -52,12 +52,12 @@
  * so there is nothing to resolve relative to this file or to cwd.
  */
 
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { describe, it } from 'node:test';
 
 // ── Live-environment facts (sourced from design.md, verified) ──────────────
 /** Core_Tool_Set (k6 is no longer Core; it self-provisions by folder). */
@@ -71,8 +71,22 @@ const HUB_HEALTH_URL = `http://127.0.0.1:${process.env.HUB_PORT || '5174'}/api/h
 const HUB_TASK_NAME = 'AutoQA Hub';
 /** The exact external commands the Taskfiles invoke (verbatim list). */
 const TASKFILE_COREUTILS = [
-  'date', 'whoami', 'find', 'sed', 'cp', 'mv', 'mkdir', 'rm',
-  'basename', 'dirname', 'cat', 'tee', 'seq', 'sleep', 'head', 'git',
+  'date',
+  'whoami',
+  'find',
+  'sed',
+  'cp',
+  'mv',
+  'mkdir',
+  'rm',
+  'basename',
+  'dirname',
+  'cat',
+  'tee',
+  'seq',
+  'sleep',
+  'head',
+  'git',
 ];
 
 const SMOKE = process.env.SETUP_SMOKE === '1';
@@ -103,7 +117,10 @@ function resolveOnPath(cmd) {
   const finder = IS_WIN ? 'where' : 'which';
   const r = spawnSync(finder, [cmd], { encoding: 'utf8', timeout: 15_000 });
   if (r.status !== 0 || typeof r.stdout !== 'string') return null;
-  const first = r.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0];
+  const first = r.stdout
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
   return first ?? null;
 }
 
@@ -133,7 +150,11 @@ describe('Core-install smoke (live VM — SETUP_SMOKE=1)', () => {
     for (const tool of CORE_TOOLS) {
       const r = spawnSync(`${tool} --version`, { shell: true, encoding: 'utf8', timeout: 30_000 });
       assert.equal(r.error, undefined, `spawning "${tool}" failed: ${r.error?.message}`);
-      assert.equal(r.status, 0, `"${tool} --version" must exit 0 (present on PATH) — got ${r.status}`);
+      assert.equal(
+        r.status,
+        0,
+        `"${tool} --version" must exit 0 (present on PATH) — got ${r.status}`,
+      );
     }
   });
 
@@ -163,50 +184,48 @@ describe('Core-install smoke (live VM — SETUP_SMOKE=1)', () => {
 //  opt-in & boot-survival smoke
 // ===========================================================================
 describe('opt-in & boot-survival smoke (live VM — SETUP_SMOKE=1)', () => {
-  it(
-    'Android SDK + emulator present after `task setup-android`',
-    { skip: smokeSkip(process.env.SETUP_SMOKE_ANDROID === '1'
+  it('Android SDK + emulator present after `task setup-android`', {
+    skip: smokeSkip(
+      process.env.SETUP_SMOKE_ANDROID === '1'
         ? false
-        : 'opt-in: run `task setup-android`, then set SETUP_SMOKE_ANDROID=1') },
-    () => {
-      // the opt-in path actually INSTALLS (not just prints guidance);
-      // equivalent components on every platform → assert the SDK layout
-      // exists regardless of OS (path differs only by executable suffix).
-      const androidHome = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
-      assert.ok(androidHome, 'ANDROID_HOME / ANDROID_SDK_ROOT must be set after setup-android');
-      assert.ok(fs.existsSync(androidHome), `Android SDK dir must exist: ${androidHome}`);
-      const sdkmanager = path.join(
-        androidHome, 'cmdline-tools', 'latest', 'bin', IS_WIN ? 'sdkmanager.bat' : 'sdkmanager',
-      );
-      const emulator = path.join(androidHome, 'emulator', IS_WIN ? 'emulator.exe' : 'emulator');
-      assert.ok(fs.existsSync(sdkmanager), `SDK manager must be installed: ${sdkmanager}`);
-      assert.ok(fs.existsSync(emulator), `emulator must be installed: ${emulator}`);
-    },
-  );
+        : 'opt-in: run `task setup-android`, then set SETUP_SMOKE_ANDROID=1',
+    ),
+  }, () => {
+    // the opt-in path actually INSTALLS (not just prints guidance);
+    // equivalent components on every platform → assert the SDK layout
+    // exists regardless of OS (path differs only by executable suffix).
+    const androidHome = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+    assert.ok(androidHome, 'ANDROID_HOME / ANDROID_SDK_ROOT must be set after setup-android');
+    assert.ok(fs.existsSync(androidHome), `Android SDK dir must exist: ${androidHome}`);
+    const sdkmanager = path.join(
+      androidHome,
+      'cmdline-tools',
+      'latest',
+      'bin',
+      IS_WIN ? 'sdkmanager.bat' : 'sdkmanager',
+    );
+    const emulator = path.join(androidHome, 'emulator', IS_WIN ? 'emulator.exe' : 'emulator');
+    assert.ok(fs.existsSync(sdkmanager), `SDK manager must be installed: ${sdkmanager}`);
+    assert.ok(fs.existsSync(emulator), `emulator must be installed: ${emulator}`);
+  });
 
-  it(
-    'Windows logon Scheduled Task starts the Hub, no daemon required',
-    { skip: smokeSkip(IS_WIN ? false : 'Windows-only: logon Scheduled Task') },
-    () => {
-      // the Hub auto-starts on login → the user-scope logon task must exist.
-      const q = spawnSync('schtasks', ['/query', '/tn', HUB_TASK_NAME], {
-        encoding: 'utf8',
-        timeout: 30_000,
-      });
-      assert.equal(q.status, 0, `logon task "${HUB_TASK_NAME}" must exist`);
-      // node must resolve in the bare logon context → the task action is
-      // hub-autostart.cmd, which seeds the Volta shim PATH before running node.
-      const xml = spawnSync('schtasks', ['/query', '/tn', HUB_TASK_NAME, '/xml'], {
-        encoding: 'utf8',
-        timeout: 30_000,
-      });
-      assert.match(
-        xml.stdout,
-        /hub-autostart\.cmd/i,
-        'auto-start action must be hub-autostart.cmd',
-      );
-    },
-  );
+  it('Windows logon Scheduled Task starts the Hub, no daemon required', {
+    skip: smokeSkip(IS_WIN ? false : 'Windows-only: logon Scheduled Task'),
+  }, () => {
+    // the Hub auto-starts on login → the user-scope logon task must exist.
+    const q = spawnSync('schtasks', ['/query', '/tn', HUB_TASK_NAME], {
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    assert.equal(q.status, 0, `logon task "${HUB_TASK_NAME}" must exist`);
+    // node must resolve in the bare logon context → the task action is
+    // hub-autostart.cmd, which seeds the Volta shim PATH before running node.
+    const xml = spawnSync('schtasks', ['/query', '/tn', HUB_TASK_NAME, '/xml'], {
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    assert.match(xml.stdout, /hub-autostart\.cmd/i, 'auto-start action must be hub-autostart.cmd');
+  });
 
   it('an OS-appropriate boot auto-start is registered', { skip: smokeSkip() }, () => {
     // a daemon-free, OS-appropriate auto-start exists on EVERY platform,
@@ -234,37 +253,36 @@ describe('opt-in & boot-survival smoke (live VM — SETUP_SMOKE=1)', () => {
     }
   });
 
-  it(
-    'coreutils resolve and `task` runs cross-shell with Layer D on',
-    { skip: smokeSkip(
-        IS_WIN
-          ? (process.env.SETUP_SMOKE_LAYERD === '1'
-              ? false
-              : 'opt-in Layer D: enable shell-decoupling on PATH, then set SETUP_SMOKE_LAYERD=1')
-          : 'Windows-only: Layer D shell decoupling (POSIX already has coreutils)') },
-    () => {
-      // every external command the Taskfiles call must resolve on PATH.
-      // PATH is shared across cmd/PowerShell/Git Bash, so resolving each once
-      // proves availability for all three shells.
-      for (const util of TASKFILE_COREUTILS) {
-        assert.ok(resolveOnPath(util), `Taskfile coreutil "${util}" must resolve on PATH`);
-      }
-      // the `task` runner itself must execute from each shell. We use the
-      // read-only `task --list-all` as the proxy — running the full mutating
-      // `task setup` from three shells is out of scope here (known ceiling:
-      // it provisions the machine; the structural suite + the manual clean-VM
-      // checklist cover the actual setup run).
-      /** @type {[string, string[]][]} */
-      const perShell = [
-        ['cmd', ['/d', '/c', 'task --list-all']],
-        ['powershell', ['-NoProfile', '-Command', 'task --list-all']],
-        ['bash', ['-lc', 'task --list-all']],
-      ];
-      for (const [sh, args] of perShell) {
-        const r = spawnSync(sh, args, { encoding: 'utf8', timeout: 60_000 });
-        assert.equal(r.error, undefined, `task must be runnable from ${sh}: ${r.error?.message}`);
-        assert.equal(r.status, 0, `"task --list-all" must exit 0 under ${sh} — got ${r.status}`);
-      }
-    },
-  );
+  it('coreutils resolve and `task` runs cross-shell with Layer D on', {
+    skip: smokeSkip(
+      IS_WIN
+        ? process.env.SETUP_SMOKE_LAYERD === '1'
+          ? false
+          : 'opt-in Layer D: enable shell-decoupling on PATH, then set SETUP_SMOKE_LAYERD=1'
+        : 'Windows-only: Layer D shell decoupling (POSIX already has coreutils)',
+    ),
+  }, () => {
+    // every external command the Taskfiles call must resolve on PATH.
+    // PATH is shared across cmd/PowerShell/Git Bash, so resolving each once
+    // proves availability for all three shells.
+    for (const util of TASKFILE_COREUTILS) {
+      assert.ok(resolveOnPath(util), `Taskfile coreutil "${util}" must resolve on PATH`);
+    }
+    // the `task` runner itself must execute from each shell. We use the
+    // read-only `task --list-all` as the proxy — running the full mutating
+    // `task setup` from three shells is out of scope here (known ceiling:
+    // it provisions the machine; the structural suite + the manual clean-VM
+    // checklist cover the actual setup run).
+    /** @type {[string, string[]][]} */
+    const perShell = [
+      ['cmd', ['/d', '/c', 'task --list-all']],
+      ['powershell', ['-NoProfile', '-Command', 'task --list-all']],
+      ['bash', ['-lc', 'task --list-all']],
+    ];
+    for (const [sh, args] of perShell) {
+      const r = spawnSync(sh, args, { encoding: 'utf8', timeout: 60_000 });
+      assert.equal(r.error, undefined, `task must be runnable from ${sh}: ${r.error?.message}`);
+      assert.equal(r.status, 0, `"task --list-all" must exit 0 under ${sh} — got ${r.status}`);
+    }
+  });
 });

@@ -1,4 +1,4 @@
-import { TAG_KIND_ORDER, buildTagGroups, classifyTag } from '@hub/shared';
+import { buildTagGroups, classifyTag, TAG_KIND_ORDER } from '@hub/shared';
 import { describe, expect, it } from 'vitest';
 
 /**

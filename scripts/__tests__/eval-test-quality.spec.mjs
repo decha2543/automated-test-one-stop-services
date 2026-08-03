@@ -32,7 +32,7 @@ test('missing assertion and missing traceability are both penalised', () => {
 });
 
 test('a brittle locator (absolute xpath + nth) is flagged', () => {
-  const src = "// @TC-1\nexpect(x).toBe(1);\nconst el = page.locator('//div[@id=\"a\"]').nth(3);";
+  const src = '// @TC-1\nexpect(x).toBe(1);\nconst el = page.locator(\'//div[@id="a"]\').nth(3);';
   const { findings } = scoreText(src, 'x.spec.ts');
   assert.ok(findings.some((f) => f.includes('brittle-locator')));
 });

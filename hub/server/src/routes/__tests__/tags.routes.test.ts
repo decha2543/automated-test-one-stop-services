@@ -205,11 +205,7 @@ describe('GET /api/tags (manifest-driven strategy dispatch)', () => {
     // The single-test custom tag splits into its own group.
     expect(tagsOf('domain-single')).toEqual(['@TA_LOOP']);
     // Only real -C### ids land in Case ID.
-    expect(tagsOf('case-id')).toEqual([
-      '@TA_DOMESTIC-C001',
-      '@TA_DOMESTIC-C002',
-      '@TA_INTER-C001',
-    ]);
+    expect(tagsOf('case-id')).toEqual(['@TA_DOMESTIC-C001', '@TA_DOMESTIC-C002', '@TA_INTER-C001']);
     // The greedy-regex regression: these must never appear under Case ID.
     for (const tag of ['@ta', '@TA_HAPPY', '@TA_LOOP']) {
       expect(tagsOf('case-id')).not.toContain(tag);

@@ -18,9 +18,9 @@
 //
 import { describe, expect, it } from 'vitest';
 import {
-    buildHeadlessToken,
-    buildRunCommandFromInput,
-    buildRunVarTokens,
+  buildHeadlessToken,
+  buildRunCommandFromInput,
+  buildRunVarTokens,
 } from '../runner-command.js';
 import type { ToolManifest } from '../types.js';
 import { DEFAULT_REPORT_GLOB, resolveCapabilities, validateManifest } from '../validate.js';

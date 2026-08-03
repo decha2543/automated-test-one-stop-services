@@ -1,5 +1,5 @@
-import type { PerformanceType } from './runs.js';
 import type { RunSummary } from './run-summary.js';
+import type { PerformanceType } from './runs.js';
 import type { SeverityBreakdown } from './severity-score.js';
 import type { ToolId } from './tools.js';
 
@@ -56,14 +56,7 @@ export interface ReportAnnotation {
 
 // Artifacts ------------------------------------------------------------------
 
-export type ArtifactType =
-  | 'screenshot'
-  | 'video'
-  | 'trace'
-  | 'log'
-  | 'html'
-  | 'json'
-  | 'other';
+export type ArtifactType = 'screenshot' | 'video' | 'trace' | 'log' | 'html' | 'json' | 'other';
 
 export interface ArtifactEntry {
   id: string;

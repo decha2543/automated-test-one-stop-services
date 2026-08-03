@@ -1,9 +1,4 @@
-import type {
-    DoctorCheck,
-    DoctorReport,
-    ProvisionResult,
-    PythonInstallResult,
-} from '@hub/shared';
+import type { DoctorCheck, DoctorReport, ProvisionResult, PythonInstallResult } from '@hub/shared';
 import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';

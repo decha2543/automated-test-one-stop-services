@@ -69,18 +69,15 @@ describe('runner.cancel non-active run', () => {
   });
 
   // Example cases pinning representative non-active ids (empty, random, nanoid-shaped).
-  it.each([
-    '',
-    'not-a-real-run',
-    'V1StGXR8_Z',
-    'aaaaaaaaaaaaaaaaaaaaa',
-    '   ',
-  ])('cancel(%j) is false and leaves the active list unchanged (example)', (id) => {
-    const before = activeIds();
-    expect(before.has(id)).toBe(false);
+  it.each(['', 'not-a-real-run', 'V1StGXR8_Z', 'aaaaaaaaaaaaaaaaaaaaa', '   '])(
+    'cancel(%j) is false and leaves the active list unchanged (example)',
+    (id) => {
+      const before = activeIds();
+      expect(before.has(id)).toBe(false);
 
-    expect(runner.cancel(id)).toBe(false);
+      expect(runner.cancel(id)).toBe(false);
 
-    expect(activeIds()).toEqual(before);
-  });
+      expect(activeIds()).toEqual(before);
+    },
+  );
 });

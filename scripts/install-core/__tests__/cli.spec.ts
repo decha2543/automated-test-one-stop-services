@@ -16,11 +16,11 @@ import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { exitCodeForResult, installTool } from '../../install-tool.js';
 import {
-    buildToolSetupInvocation,
-    type InstallEffects,
-    type InstallRequest,
-    type InstallStage,
-    runInstallPipeline,
+  buildToolSetupInvocation,
+  type InstallEffects,
+  type InstallRequest,
+  type InstallStage,
+  runInstallPipeline,
 } from '../index.js';
 import { arbInvalidToolId, arbValidGitUrl, arbValidToolId } from './arbitraries.js';
 
@@ -99,7 +99,9 @@ function buildScenario(s: Scenario): BuiltScenario {
 /** Scenario generator: each failing stage + the success case, over valid/invalid ids. */
 const arbScenario: fc.Arbitrary<Scenario> = fc.oneof(
   arbInvalidToolId.map((id) => ({ kind: 'validate', id }) as const),
-  fc.tuple(arbValidToolId, arbValidGitUrl).map(([id, gitUrl]) => ({ kind: 'clone', id, gitUrl }) as const),
+  fc
+    .tuple(arbValidToolId, arbValidGitUrl)
+    .map(([id, gitUrl]) => ({ kind: 'clone', id, gitUrl }) as const),
   arbValidToolId.map((id) => ({ kind: 'deps', id }) as const),
   arbValidToolId.map((id) => ({ kind: 'setup', id }) as const),
   arbValidToolId.map((id) => ({ kind: 'success', id }) as const),

@@ -265,7 +265,7 @@ describe('tool-plugins service', () => {
 
     it('with local scope writes to .tool-overrides.json', async () => {
       const fsMod = await import('node:fs');
-      const result = await service.setEnabled('k6', false, 'local');
+      await service.setEnabled('k6', false, 'local');
 
       // Verify writeFileSync was called with the overrides path
       expect(fsMod.default.writeFileSync).toHaveBeenCalled();

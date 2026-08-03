@@ -11,9 +11,9 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createManifestRegistry } from '../index.js';
 import {
-    loadPipelineStatic,
-    type PipelineProjection,
-    projectPipeline,
+  loadPipelineStatic,
+  type PipelineProjection,
+  projectPipeline,
 } from '../pipeline-projection.js';
 import { makeTmpDir, mkDir, realToolsPresent, rmTmpDir } from './_helpers.js';
 

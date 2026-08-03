@@ -8,10 +8,10 @@
 import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-    buildToolSetupInvocation,
-    runInstallPipeline,
-    SAFE_ID,
-    TOOL_SETUP_TIMEOUT_MS,
+  buildToolSetupInvocation,
+  runInstallPipeline,
+  SAFE_ID,
+  TOOL_SETUP_TIMEOUT_MS,
 } from '../index.js';
 import { arbRejectableRequest, arbValidToolId, makeSpyEffects } from './arbitraries.js';
 

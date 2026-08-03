@@ -59,7 +59,7 @@
   "files": {
     "ignoreUnknown": true,
     "includes": [
-      "**/*.{js,jsx,ts,tsx,json}",
+      "**/*.{js,jsx,mjs,ts,tsx,json}",
       "!!**/*.{robot,resource,py,pem,key,log,xml,db}",
       "!!**/.vscode",
       "!!**/.idea",
@@ -92,7 +92,6 @@
       "!!**/.cache",
       "!!**/*_cache",
       "!!**/*.html",
-      "!!**/shared",
       "!!**/libs",
       "!!**/.playwright-mcp",
       "!!**/.playwright-report",
@@ -101,7 +100,6 @@
       "!!**/hub/server/data",
       "!!**/selectorshub",
       "!!**/brain",
-      "!!**/__tests__",
       "!!**/*lock.json",
       "!**/package*.json",
       "!**/tsconfig.json",
@@ -110,6 +108,18 @@
       "tools/tool-template-example/**"
     ]
   },
+  "overrides": [
+    {
+      "includes": ["**/__tests__/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    }
+  ],
   "vcs": {
     "clientKind": "git",
     "enabled": true,

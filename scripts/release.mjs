@@ -47,9 +47,12 @@ export function bumpVersion(current, levelOrExact) {
   if (!m) throw new Error(`current version is not clean semver: ${current}`);
   const [maj, min, pat] = [Number(m[1]), Number(m[2]), Number(m[3])];
   switch (levelOrExact) {
-    case 'major': return `${maj + 1}.0.0`;
-    case 'minor': return `${maj}.${min + 1}.0`;
-    case 'patch': return `${maj}.${min}.${pat + 1}`;
+    case 'major':
+      return `${maj + 1}.0.0`;
+    case 'minor':
+      return `${maj}.${min + 1}.0`;
+    case 'patch':
+      return `${maj}.${min}.${pat + 1}`;
     default:
       if (/^\d+\.\d+\.\d+$/.test(levelOrExact)) return levelOrExact;
       throw new Error(`invalid version/bump '${levelOrExact}' (use patch|minor|major|X.Y.Z)`);
@@ -58,7 +61,8 @@ export function bumpVersion(current, levelOrExact) {
 
 /** Suggest a bump from Conventional Commit subjects since the last tag. */
 export function suggestBump(subjects) {
-  if (subjects.some((s) => /^[a-z]+(\(.+\))?!:/.test(s) || /BREAKING CHANGE/.test(s))) return 'major';
+  if (subjects.some((s) => /^[a-z]+(\(.+\))?!:/.test(s) || /BREAKING CHANGE/.test(s)))
+    return 'major';
   if (subjects.some((s) => /^feat(\(.+\))?:/.test(s))) return 'minor';
   return 'patch';
 }
@@ -97,7 +101,8 @@ function main(argv) {
   const lastTag = git(['describe', '--tags', '--abbrev=0'], { allowFail: true });
   const range = lastTag ? `${lastTag}..HEAD` : 'HEAD';
   const subjects = git(['log', range, '--format=%s'], { allowFail: true })
-    .split('\n').filter(Boolean);
+    .split('\n')
+    .filter(Boolean);
   const suggested = suggestBump(subjects);
 
   const next = bumpVersion(current, arg ?? suggested);
@@ -109,13 +114,18 @@ function main(argv) {
   // ── preconditions ──
   const problems = [];
   if (git(['tag', '--list', tag])) problems.push(`tag ${tag} already exists`);
-  if (dirty && !allowDirty) problems.push('working tree is dirty (commit/stash first, or pass --allow-dirty)');
+  if (dirty && !allowDirty)
+    problems.push('working tree is dirty (commit/stash first, or pass --allow-dirty)');
 
   console.log(`release plan`);
   console.log(`  current version : ${current}`);
-  console.log(`  next version    : ${next}  ${arg ? '(requested)' : `(suggested ${suggested} from ${subjects.length} commit(s) since ${lastTag || 'start'})`}`);
+  console.log(
+    `  next version    : ${next}  ${arg ? '(requested)' : `(suggested ${suggested} from ${subjects.length} commit(s) since ${lastTag || 'start'})`}`,
+  );
   console.log(`  tag             : ${tag}`);
-  console.log(`  branch          : ${branch}${branch === BRANCH ? '' : `  (warning: not the release branch '${BRANCH}')`}`);
+  console.log(
+    `  branch          : ${branch}${branch === BRANCH ? '' : `  (warning: not the release branch '${BRANCH}')`}`,
+  );
   console.log('');
   console.log(`commands:`);
   console.log(`  # 1. bump package.json to ${next}`);
@@ -157,8 +167,13 @@ function main(argv) {
 }
 
 function help() {
-  console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8')
-    .split('\n').filter((l) => l.startsWith(' *')).map((l) => l.slice(3)).join('\n'));
+  console.log(
+    readFileSync(fileURLToPath(import.meta.url), 'utf8')
+      .split('\n')
+      .filter((l) => l.startsWith(' *'))
+      .map((l) => l.slice(3))
+      .join('\n'),
+  );
   return 0;
 }
 
@@ -175,9 +190,10 @@ function selftest() {
     ok = ok && got === want;
     console.log(`${got === want ? 'ok  ' : 'FAIL'} bump(${cur}, ${lvl}) = ${got} (want ${want})`);
   }
-  const s = suggestBump(['feat(login): add x', 'fix: y']) === 'minor'
-    && suggestBump(['fix: y']) === 'patch'
-    && suggestBump(['feat!: drop x']) === 'major';
+  const s =
+    suggestBump(['feat(login): add x', 'fix: y']) === 'minor' &&
+    suggestBump(['fix: y']) === 'patch' &&
+    suggestBump(['feat!: drop x']) === 'major';
   console.log(`${s ? 'ok  ' : 'FAIL'} suggestBump`);
   return ok && s ? 0 : 1;
 }

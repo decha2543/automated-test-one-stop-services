@@ -35,9 +35,19 @@ import { pathToFileURL } from 'node:url';
 
 const MIN_SCORE = Number(process.env.EVAL_MIN_SCORE ?? 70);
 const SKIP_DIRS = new Set([
-  'node_modules', 'dist', 'build', '.git', '.venv', 'outputs',
-  'test-results', 'playwright-report', 'blob-report', 'performance-results',
-  'coverage', '.cache', '.playwright-cli',
+  'node_modules',
+  'dist',
+  'build',
+  '.git',
+  '.venv',
+  'outputs',
+  'test-results',
+  'playwright-report',
+  'blob-report',
+  'performance-results',
+  'coverage',
+  '.cache',
+  '.playwright-cli',
 ]);
 
 // ─── rubric ──────────────────────────────────────────────────────────────────
@@ -46,7 +56,10 @@ const SKIP_DIRS = new Set([
 // subtract weight once if the pattern is absent.
 const RULES = [
   {
-    id: 'hardcoded-wait', kind: 'penalty', weight: 15, cap: 45,
+    id: 'hardcoded-wait',
+    kind: 'penalty',
+    weight: 15,
+    cap: 45,
     applies: () => true,
     detect: (t) =>
       count(t, /\bwaitForTimeout\s*\(/g) +
@@ -55,30 +68,40 @@ const RULES = [
       count(t, /^\s*Sleep\s+\d/gim),
   },
   {
-    id: 'brittle-locator', kind: 'penalty', weight: 10, cap: 30,
+    id: 'brittle-locator',
+    kind: 'penalty',
+    weight: 10,
+    cap: 30,
     applies: (f) => f.endsWith('.ts') || f.endsWith('.js') || f.endsWith('.robot'),
     detect: (t) =>
       count(t, /\bxpath\s*=/gi) +
-      count(t, /['"`]\/\/[a-z]/gi) +       // string literal starting with //elem (absolute xpath)
+      count(t, /['"`]\/\/[a-z]/gi) + // string literal starting with //elem (absolute xpath)
       count(t, /\.nth\(\s*\d+\s*\)/g) +
       count(t, /:nth-child\(/g),
   },
   {
-    id: 'hardcoded-url', kind: 'penalty', weight: 10, cap: 20,
+    id: 'hardcoded-url',
+    kind: 'penalty',
+    weight: 10,
+    cap: 20,
     applies: () => true,
     detect: (t) => count(t, /["'`]https?:\/\/(?!localhost|127\.0\.0\.1)[^"'`]+["'`]/g),
   },
   {
-    id: 'missing-assertion', kind: 'required', weight: 20,
+    id: 'missing-assertion',
+    kind: 'required',
+    weight: 20,
     applies: () => true,
     present: (t) =>
-      /\bexpect\s*\(/.test(t) ||                 // playwright / jest
+      /\bexpect\s*\(/.test(t) || // playwright / jest
       /\btoBe|toEqual|toContain|toHaveText|toBeVisible/.test(t) ||
-      /\bcheck\s*\(/.test(t) ||                   // k6
+      /\bcheck\s*\(/.test(t) || // k6
       /(Should\s+(Be|Contain)|Wait\s+Until|Page\s+Should)/i.test(t), // robot
   },
   {
-    id: 'missing-traceability', kind: 'required', weight: 10,
+    id: 'missing-traceability',
+    kind: 'required',
+    weight: 10,
     applies: () => true,
     present: (t) =>
       /@?(REQ|TC)-[A-Z0-9]+/.test(t) ||
@@ -168,24 +191,39 @@ function main(argv) {
   const pass = avg >= MIN_SCORE;
 
   if (asJson) {
-    console.log(JSON.stringify({ files: results.length, average: avg, min: MIN_SCORE, pass, results }, null, 2));
+    console.log(
+      JSON.stringify(
+        { files: results.length, average: avg, min: MIN_SCORE, pass, results },
+        null,
+        2,
+      ),
+    );
   } else {
     console.log(`test-quality — ${results.length} file(s), average ${avg}/100 (min ${MIN_SCORE})`);
-    for (const r of below) console.log(`  ${r.score}/100  ${r.file}\n      ${r.findings.join('; ')}`);
+    for (const r of below)
+      console.log(`  ${r.score}/100  ${r.file}\n      ${r.findings.join('; ')}`);
     console.log(pass ? '✓ average meets threshold' : `✗ average ${avg} below ${MIN_SCORE}`);
   }
   return pass ? 0 : 1;
 }
 
 function safeRead(f) {
-  try { return readFileSync(f, 'utf8'); } catch { return ''; }
+  try {
+    return readFileSync(f, 'utf8');
+  } catch {
+    return '';
+  }
 }
 
 function selftest() {
   const cases = [
-    ['clean', "import { expect } from '@playwright/test';\n// @TC-X-001\nexpect(page.getByRole('button')).toBeVisible();", 100],
-    ['waits', "await page.waitForTimeout(2000);\nexpect(x).toBe(1);\n// @REQ-1", 85],
-    ['no-assert-no-trace', "const x = 1;", 70], // -20 missing-assertion -10 missing-traceability
+    [
+      'clean',
+      "import { expect } from '@playwright/test';\n// @TC-X-001\nexpect(page.getByRole('button')).toBeVisible();",
+      100,
+    ],
+    ['waits', 'await page.waitForTimeout(2000);\nexpect(x).toBe(1);\n// @REQ-1', 85],
+    ['no-assert-no-trace', 'const x = 1;', 70], // -20 missing-assertion -10 missing-traceability
   ];
   let ok = true;
   for (const [name, text, want] of cases) {
