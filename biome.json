@@ -102,9 +102,9 @@
       "!!**/selectorshub",
       "!!**/brain",
       "!!**/__tests__",
+      "!!**/*lock.json",
       "!**/package*.json",
       "!**/tsconfig.json",
-      "!**/*lock.json",
       "!config/pipeline.json",
       "!tools/*",
       "tools/tool-template-example/**"

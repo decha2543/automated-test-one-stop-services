@@ -263,7 +263,7 @@
   "git.autofetchPeriod": 600,
   "git.autoRepositoryDetection": "subFolders",
 
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts",
   "ruff.lineLength": 100,
   "ruff.configuration": "${workspaceFolder}/pyproject.toml",
   "ty.configurationFile": "${workspaceFolder}/pyproject.toml",
@@ -339,4 +339,9 @@
     "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
   },
   "typescript.autoClosingTags": false,
+
+  // Registers the workspace ignore files with the agent. Without this array the
+  // root `.kiroignore` is read by nothing and its secret patterns are inert.
+  // Docs: https://kiro.dev/docs/editor/kiroignore/
+  "kiroAgent.agentIgnoreFiles": [".gitignore", ".kiroignore"],
 }

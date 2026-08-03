@@ -1,11 +1,21 @@
+# Files the agent must never read.
+# Only effective while `.kiroignore` is listed in the VS Code setting
+# `kiroAgent.agentIgnoreFiles` (see .vscode/settings.json).
+# Note: a file under an excluded DIRECTORY cannot be re-included, so exclude
+# by pattern rather than by folder when a sibling must stay readable.
+
+# Secrets & credentials
 *.pem
 *.key
+*.p12
+*.pfx
+credentials/
+**/credentials
+
+# Noise: lockfiles and installed trees
 *-lock.yml
 *-lock.yaml
 *-lock.json
-
-credentials/
-**/credentials
 node_modules/
 **/node_modules
 .venv/
