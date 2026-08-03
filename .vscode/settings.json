@@ -1,4 +1,10 @@
 {
+  // Exclusion lists share one direction: hide GENERATED noise (caches, reports,
+  // installed trees, run artefacts) and never hide committed config — a hidden
+  // config file is a forgotten config file, which is how `.kiroignore` sat
+  // unregistered and inert. The noise set is kept identical across every list
+  // below (files / search / watcher / localHistory / git / npm / robotcode /
+  // python.analysis) so a path is never excluded in one place and scanned in another.
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,
@@ -11,17 +17,14 @@
     "**/.pytest_cache": true,
     "**/.ruff_cache": true,
     "**/.robocop_cache": true,
+    "**/.robotcode_cache": true,
     "**/.pabotsuitenames": true,
     "**/.last-run": true,
     "**/.playwright-mcp": true,
+    "**/.playwright-cli": true,
     "**/.cache": true,
     "**/.venv": true,
     "**/node_modules": true,
-    "**/.dockerignore": true,
-    "**/.editorconfig": true,
-    "**/.gitattributes": true,
-    "**/.kiroignore": true,
-    "**/.markdownlint-cli2.jsonc": true,
     "**/.setup-state.json": true
   },
   "search.exclude": {
@@ -50,24 +53,29 @@
     "**/report.html": true,
     "**/*.db": true,
     "**/*.sqlite": true,
+    "**/.mypy_cache": true,
+    "**/.pytest_cache": true,
     "**/.ruff_cache": true,
     "**/.robocop_cache": true,
+    "**/.robotcode_cache": true,
+    "**/.pabotsuitenames": true,
     "**/libs": true,
     "**/.last-run": true,
     "**/.playwright-mcp": true,
+    "**/.playwright-cli": true,
     "**/schedulers": true,
     "**/.cache": true,
     "**/.venv": true,
     "**/node_modules": true,
     "**/selectorshub": true,
-    "**/.setup-state.json": true,
-    "**/.playwright-cli": true
+    "**/.setup-state.json": true
   },
   "files.watcherExclude": {
     "**/.git/**": true,
     "**/node_modules/*/**": true,
     "**/outputs/**": true,
     "**/__pycache__": true,
+    "**/.mypy_cache": true,
     "**/.pytest_cache": true,
     "**/.venv/**": true,
     "**/.vscode": true,
@@ -90,15 +98,19 @@
     "**/tmp/**": true,
     "**/.ruff_cache": true,
     "**/.robocop_cache": true,
+    "**/.robotcode_cache": true,
+    "**/.pabotsuitenames": true,
     "**/.last-run": true,
     "**/.playwright-mcp": true,
+    "**/.playwright-cli": true,
     "**/.cache": true,
     "**/selectorshub": true,
-    "**/.setup-state.json": true,
-    "**/.playwright-cli": true
+    "**/.setup-state.json": true
   },
   "workbench.localHistory.exclude": {
     "**/__pycache__": true,
+    "**/.mypy_cache": true,
+    "**/.pytest_cache": true,
     "**/.venv": true,
     "**/*.db": true,
     "**/*.log": true,
@@ -114,7 +126,9 @@
     "**/test-results": true,
     "**/.ruff_cache": true,
     "**/.robocop_cache": true,
+    "**/.robotcode_cache": true,
     "**/.playwright-mcp": true,
+    "**/.playwright-cli": true,
     "**/.cache": true,
     "**/.setup-state.json": true
   },
@@ -127,7 +141,11 @@
     "venv",
     "env",
     "__pycache__",
+    ".mypy_cache",
     ".pytest_cache",
+    ".ruff_cache",
+    ".robocop_cache",
+    ".robotcode_cache",
     "dist",
     "build",
     "bin",
@@ -139,6 +157,7 @@
     ".vscode",
     ".idea",
     ".playwright-mcp",
+    ".playwright-cli",
     ".cache"
   ],
   "npm.exclude": [
@@ -151,30 +170,40 @@
     "**/.kiro/",
     "**/brain/",
     "**/outputs/",
+    "**/.mypy_cache",
+    "**/.pytest_cache",
     "**/.ruff_cache",
     "**/.robocop_cache",
+    "**/.robotcode_cache",
     "**/.playwright-mcp",
+    "**/.playwright-cli",
     "**/.cache"
   ],
   "npm.scriptExplorerExclude": [
+    "**/node_modules",
     "**/.venv",
     "**/__pycache__",
     "**/.kiro/",
     "**/brain/",
     "**/outputs/",
+    "**/.mypy_cache",
+    "**/.pytest_cache",
     "**/.ruff_cache",
     "**/.robocop_cache",
-    "**/.playwright-mc",
-    "**/.cache",
-    "**/node_modules"
+    "**/.robotcode_cache",
+    "**/.playwright-mcp",
+    "**/.playwright-cli",
+    "**/.cache"
   ],
   "robotcode.workspace.excludePatterns": [
     ".hatch/",
     ".venv/",
     "node_modules/",
-    ".pytest_cache/",
     "__pycache__/",
     ".mypy_cache/",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    ".robocop_cache/",
     ".robotcode_cache/",
     ".kiro/",
     "brain/",
@@ -182,6 +211,7 @@
     "outputs/",
     "scripts/",
     ".playwright-mcp",
+    ".playwright-cli",
     ".cache"
   ],
   "robotcode.analysis.cache.ignoredLibraries": [
@@ -200,7 +230,8 @@
     "**/test-results",
     "**/robot_output",
     "**/.kiro",
-    "**/brain"
+    "**/brain",
+    "**/.cache"
   ],
 
   "search.followSymlinks": false,
@@ -224,7 +255,9 @@
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
 
-  "editor.tabSize": 4,
+  // Indentation mirrors `.editorconfig`: 2 spaces for `[*]`, 4 for Python and Robot.
+  // Keep the two files in step — `.editorconfig` is the source of truth.
+  "editor.tabSize": 2,
   "editor.wordWrap": "on",
   "editor.guides.bracketPairs": "active",
   "editor.codeLens": false,
@@ -263,7 +296,14 @@
   "git.autofetchPeriod": 600,
   "git.autoRepositoryDetection": "subFolders",
 
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts",
+  // No `python.defaultInterpreterPath` on purpose. It must name the interpreter
+  // BINARY, and that path is OS-specific (`.venv/Scripts/python.exe` on Windows vs
+  // `.venv/bin/python` on macOS/Linux) — settings.json has no per-OS form for this
+  // key, so any committed value breaks somebody. A folder path does not resolve
+  // ("Could not resolve interpreter path"). The extension auto-discovers `.venv/`
+  // in the workspace root instead, and this key is ignored anyway once an
+  // interpreter has been picked explicitly. Select it once via
+  // "Python: Select Interpreter" if discovery misses.
   "ruff.lineLength": 100,
   "ruff.configuration": "${workspaceFolder}/pyproject.toml",
   "ty.configurationFile": "${workspaceFolder}/pyproject.toml",
@@ -274,12 +314,15 @@
   "robotcode.testExplorer.enabled": false,
   "robotcode.debug.outputLog": false,
 
-  "typescript.tsdk": "node_modules\\typescript\\lib",
+  // Forward slashes: VS Code accepts them on every OS, backslashes break the
+  // setting on macOS/Linux (steering `portability-and-config`).
+  "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.tsserver.log": "off",
   "typescript.tsserver.maxTsServerMemory": 3072,
   "typescript.disableAutomaticTypeAcquisition": true,
   "typescript.validate.enable": true,
   "javascript.validate.enable": true,
+  "typescript.autoClosingTags": false,
 
   "telemetry.feedback.enabled": false,
   "telemetry.editStats.enabled": false,
@@ -298,10 +341,12 @@
   ],
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "editor.tabSize": 4
   },
   "[robotframework]": {
-    "editor.defaultFormatter": "d-biehl.robotcode"
+    "editor.defaultFormatter": "d-biehl.robotcode",
+    "editor.tabSize": 4
   },
   "[javascript]": {
     "editor.defaultFormatter": "biomejs.biome",
@@ -338,10 +383,14 @@
   "[markdown]": {
     "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
   },
-  "typescript.autoClosingTags": false,
 
   // Registers the workspace ignore files with the agent. Without this array the
   // root `.kiroignore` is read by nothing and its secret patterns are inert.
   // Docs: https://kiro.dev/docs/editor/kiroignore/
-  "kiroAgent.agentIgnoreFiles": [".gitignore", ".kiroignore"],
+  //
+  // Deliberately `.kiroignore` ONLY — do NOT add ".gitignore" here. This repo
+  // gitignores `.kiro/`, `brain/`, `config/pipeline.json` and `tools/*/` (nested
+  // repos and generated files), so honouring .gitignore would hide the AI layer,
+  // the brain vault and every tool project from the agent.
+  "kiroAgent.agentIgnoreFiles": [".kiroignore"]
 }
