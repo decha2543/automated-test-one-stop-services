@@ -18,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { TbFolderPlus, TbPlus, TbRocket, TbX } from 'react-icons/tb';
 import { api } from '~/api/client.js';
 import { qProjects } from '~/api/queries.js';
-import { BookmarkPanel } from '~/components/BookmarkPanel.js';
+import { BookmarkLoadMenu, BookmarkPanel } from '~/components/BookmarkPanel.js';
 import { confirmDialog } from '~/components/confirmDialog.js';
 import { EmptyState } from '~/components/EmptyState.js';
 import { RunQueuePanel } from '~/components/RunQueuePanel.js';
@@ -189,6 +189,20 @@ export function RunPage() {
     [addNotification, t, tools],
   );
 
+  /** Live config of the active session's form — the bookmark filter scope, and
+   * what the panel captures when saving. Read through the ref at call time, so
+   * it is never a stale render snapshot. */
+  const getActiveConfig = useCallback(
+    (): RunRequest =>
+      sessionRefs.current.get(activeId)?.getConfig() ?? {
+        tool: 'playwright',
+        type: '',
+        project: '',
+        mode: 'local',
+      },
+    [activeId],
+  );
+
   function handleLoadBookmark(config: RunRequest) {
     const active = sessions.find((s) => s.id === activeId);
     if (active && active.status === 'idle') {
@@ -275,18 +289,15 @@ export function RunPage() {
   }
 
   return (
-    <Stack gap="sm" style={{ height: '100%' }}>
+    // The page fills the content region and clips: every child below is pinned
+    // except the sessions area, so nothing that mounts mid-run (inline alerts,
+    // the command bar, the selected-tags block) can hand a scrollbar to the app
+    // frame.
+    <Stack gap="sm" style={{ height: '100%', minHeight: 0, overflow: 'hidden' }}>
       {/* Bookmarks — prominent position at top */}
       <div style={{ flexShrink: 0 }}>
         <BookmarkPanel
-          getConfig={() =>
-            sessionRefs.current.get(activeId)?.getConfig() ?? {
-              tool: 'playwright',
-              type: '',
-              project: '',
-              mode: 'local',
-            }
-          }
+          getConfig={getActiveConfig}
           onLoad={handleLoadBookmark}
           disabled={sessions.find((s) => s.id === activeId)?.status === 'running'}
         />
@@ -297,95 +308,102 @@ export function RunPage() {
         <RunQueuePanel />
       </div>
 
-      {/* Tab bar */}
-      <ScrollArea scrollbarSize={6} type="auto" style={{ flexShrink: 0 }}>
-        <Group gap={4} wrap="nowrap" pb={6}>
-          {sessions.map((s) => {
-            const isActive = activeId === s.id;
-            const sColor = getStatusColor(s.status);
-            return (
-              <Group
-                key={s.id}
-                gap={0}
-                wrap="nowrap"
-                style={{
-                  borderRadius: 8,
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderColor: isActive
-                    ? 'var(--mantine-color-brand-filled)'
-                    : 'var(--mantine-color-default-border)',
-                  background: isActive
-                    ? 'var(--mantine-color-brand-light)'
-                    : 'var(--mantine-color-default)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setActiveId(s.id)}
+      {/* Tab bar + bookmark loader: one pinned row. The tabs scroll
+          horizontally inside it; the loader is a dropdown pinned beside them, so
+          neither adds height to the page. */}
+      <Group gap="xs" wrap="nowrap" align="center" style={{ flexShrink: 0 }}>
+        <ScrollArea scrollbarSize={6} type="auto" style={{ flex: 1, minWidth: 0 }}>
+          <Group gap={4} wrap="nowrap" pb={6}>
+            {sessions.map((s) => {
+              const isActive = activeId === s.id;
+              const sColor = getStatusColor(s.status);
+              return (
+                <Group
+                  key={s.id}
+                  gap={0}
+                  wrap="nowrap"
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: '6px 10px',
-                    cursor: 'pointer',
-                    color: 'inherit',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
+                    borderRadius: 8,
+                    border: '1px solid var(--mantine-color-default-border)',
+                    borderColor: isActive
+                      ? 'var(--mantine-color-brand-filled)'
+                      : 'var(--mantine-color-default-border)',
+                    background: isActive
+                      ? 'var(--mantine-color-brand-light)'
+                      : 'var(--mantine-color-default)',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                   }}
                 >
-                  <Badge
-                    size="xs"
-                    color={sColor}
-                    variant={s.status === 'running' ? 'dot' : 'filled'}
-                    circle
-                  />
-                  <Text size="xs" fw={isActive ? 600 : 400}>
-                    {s.project || t('run.newSession')}
-                  </Text>
-                  {s.tool && (
-                    <Badge size="xs" color="gray" variant="light">
-                      {toolLabel(s.tool, tools)}
-                    </Badge>
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(s.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '6px 10px',
+                      cursor: 'pointer',
+                      color: 'inherit',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                    }}
+                  >
+                    <Badge
+                      size="xs"
+                      color={sColor}
+                      variant={s.status === 'running' ? 'dot' : 'filled'}
+                      circle
+                    />
+                    <Text size="xs" fw={isActive ? 600 : 400}>
+                      {s.project || t('run.newSession')}
+                    </Text>
+                    {s.tool && (
+                      <Badge size="xs" color="gray" variant="light">
+                        {toolLabel(s.tool, tools)}
+                      </Badge>
+                    )}
+                  </button>
+                  {sessions.length > 1 && (
+                    <Tooltip label={t('run.closeSessionTip')} withArrow>
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeSession(s.id);
+                        }}
+                        aria-label={t('run.closeSessionTip')}
+                      >
+                        <TbX size={14} />
+                      </ActionIcon>
+                    </Tooltip>
                   )}
-                </button>
-                {sessions.length > 1 && (
-                  <Tooltip label={t('run.closeSessionTip')} withArrow>
-                    <ActionIcon
-                      variant="subtle"
-                      color="gray"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeSession(s.id);
-                      }}
-                      aria-label={t('run.closeSessionTip')}
-                    >
-                      <TbX size={14} />
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-              </Group>
-            );
-          })}
-          <Tooltip label={t('run.newSessionTip')} withArrow>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="lg"
-              onClick={() => addSession()}
-              aria-label={t('run.newSessionTip')}
-            >
-              <TbPlus size={18} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </ScrollArea>
+                </Group>
+              );
+            })}
+            <Tooltip label={t('run.newSessionTip')} withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="lg"
+                onClick={() => addSession()}
+                aria-label={t('run.newSessionTip')}
+              >
+                <TbPlus size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        </ScrollArea>
+        <BookmarkLoadMenu getConfig={getActiveConfig} onLoad={handleLoadBookmark} />
+      </Group>
 
-      {/* Sessions */}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      {/* Sessions — the only growing child, and the scroll owner for the
+          stacked layout below `lg`, where the two session columns wrap onto two
+          rows and cannot fit the clipped page height. */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', overscrollBehavior: 'contain' }}>
         {sessions.map((s) => (
           <RunSession
             key={s.id}

@@ -20,7 +20,9 @@ import type {
 } from '@hub/shared';
 import { missingChecksForTool } from '@hub/shared';
 import {
+  ActionIcon,
   Badge,
+  Box,
   Button,
   Checkbox,
   Code,
@@ -38,17 +40,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   TbAlertTriangle,
+  TbBookmarkPlus,
+  TbChevronDown,
+  TbChevronUp,
   TbCopy,
   TbDeviceMobile,
   TbPlayerPlay,
   TbPlayerStop,
   TbRefresh,
   TbSearch,
+  TbTextDecrease,
+  TbTextIncrease,
   TbX,
 } from 'react-icons/tb';
 import { api } from '~/api/client.js';
 import { qProjectEnv } from '~/api/queries.js';
+import { useSaveBookmark } from '~/components/BookmarkPanel.js';
 import { confirmDialog } from '~/components/confirmDialog.js';
+import { FormModal } from '~/components/FormModal.js';
 import { InlineAlert } from '~/components/InlineAlert.js';
 import { SectionSelect } from '~/components/SectionSelect.js';
 import { TagSelector } from '~/components/TagSelector.js';
@@ -68,7 +77,18 @@ import { buildPerfTypeData } from '~/utils/perf-type-options.js';
 import { getStatusColor } from '~/utils/run-status.js';
 import { runVerdict } from '~/utils/run-verdict.js';
 import { buildTagExpr, parseTagExpr } from '~/utils/tag-selection.js';
-import { toolSelectData } from '~/utils/tool-label.js';
+import { toolLabel, toolSelectData } from '~/utils/tool-label.js';
+
+/** Split bounds mirror the clamp the preferences store commits, so the live drag
+ *  preview can never show a width that will not be saved. */
+const SPLIT_MIN = 25;
+const SPLIT_MAX = 70;
+/** One arrow-key press on the divider moves the split by this many percent. */
+const SPLIT_STEP = 2;
+/** Terminal font bounds mirror the store's clamp, so A−/A+ can be disabled at
+ *  the ends instead of clicking to no effect. */
+const FONT_MIN = 9;
+const FONT_MAX = 20;
 
 export interface SessionRef {
   cancel: () => void;
@@ -98,6 +118,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   const t = useT();
   const prefs = usePreferences();
   const queryClient = useQueryClient();
+  const saveBookmark = useSaveBookmark();
 
   const [tool, setTool] = useState<ToolId>(initialConfig?.tool ?? prefs.lastTool);
   const [mode, setMode] = useState<RunMode>(initialConfig?.mode ?? prefs.defaultMode);
@@ -127,6 +148,13 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   const activeRunIdRef = useRef<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [bookmarkName, setBookmarkName] = useState('');
+  // Width while a drag is in flight; `null` means "use the saved percent". The
+  // store is written once, on release, so the terminal re-fits once per drag.
+  const [dragPercent, setDragPercent] = useState<number | null>(null);
+  const [dividerFocused, setDividerFocused] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
 
   const isRunning = runStatus === 'running' || runStatus === 'pending';
   const isFinished = runStatus !== 'idle' && !isRunning;
@@ -137,10 +165,39 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   // next run.
   const effectiveExtraArgs = advancedMode ? extraArgs || undefined : undefined;
 
+  // The bar under the terminal carries the command (advanced only), Rerun and
+  // the duration. In simple view during a run it would hold none of those, so
+  // it is dropped entirely and the terminal takes the whole column height.
+  const showRunBar = !!lastCommand && (advancedMode || !isRunning);
+
+  // Layout the user arranged, remembered rather than asked for again.
+  const formCollapsed = prefs.runFormCollapsed;
+  const splitPercent = prefs.runSplitPercent;
+  const fontSize = prefs.terminalFontSize;
+  // The saved percent except mid-drag, when the preview follows the pointer.
+  const columnPercent = dragPercent ?? splitPercent;
+
+  // The footer's save action captures the form as it stands: nothing to capture
+  // without a project, and nothing new to capture mid-run (the form is locked
+  // while a run is in flight).
+  const saveBookmarkReason = !project
+    ? t('run.selectProjectFirst')
+    : isRunning
+      ? t('run.testRunning')
+      : null;
+
   // Terminal (xterm) and the per-session WebSocket live in dedicated hooks so
   // this component orchestrates state while the imperative plumbing stays in
   // one place. `term` is a stable API; `send` posts subscribe/cancel messages.
-  const { termRef, term } = useRunTerminal({ visible, refitKey: runStatus });
+  // `refitKey` covers every change to the terminal container's box, not just the
+  // run status: the bottom bar and the search row mount/unmount without one
+  // (e.g. toggling advanced mode mid-run), and the committed split percent
+  // changes the column's width — either would leave the canvas stale.
+  const { termRef, term } = useRunTerminal({
+    visible,
+    refitKey: `${runStatus}|${showRunBar}|${searchOpen}|${splitPercent}`,
+    fontSize,
+  });
   const { send } = useRunSocket({
     term,
     activeRunIdRef,
@@ -158,19 +215,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
     cancel: () => handleCancel(),
     getStatus: () => runStatus,
     getProject: () => project,
-    getConfig: () => ({
-      tool,
-      type: effectiveType,
-      project,
-      mode,
-      tag: buildTagExpr(selectedTags),
-      headless: !sectionAxis ? headless : undefined,
-      extraArgs: effectiveExtraArgs,
-      noTrack,
-      silent,
-      section: sectionAxis ? section : undefined,
-      performanceType: sectionAxis ? perfType : undefined,
-    }),
+    getConfig: () => currentConfig(),
   }));
 
   useEffect(() => {
@@ -252,6 +297,18 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   const perfTypeData = buildPerfTypeData(projectEnvQ.data?.entries);
   const tags = useProjectTags(sectionAxis ? '' : tool, effectiveType, project);
 
+  // One line of what a run will use, read from the same live state
+  // `currentConfig()` submits: the axes that decide a run's identity, in the
+  // order their fields appear in the expanded form.
+  const configSummary = [
+    toolLabel(tool, toolsQuery.data ?? []),
+    sectionAxis ? section : effectiveType,
+    project || t('run.selectProjectFirst'),
+    sectionAxis ? '' : headless === 'headed' ? t('run.headed') : t('run.headless'),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   // Mobile (Robot type=mobile) needs the host Appium server running. Gate the
   // Run button on it and offer a one-click start (Option A: host appium).
   const isMobile = effectiveType === 'mobile';
@@ -270,6 +327,79 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
     },
     onError: (err) => toast.error((err as Error).message),
   });
+
+  const credentialsMissing = !!doctorQ.data && !doctorQ.data.credentialsOk && !noTrack;
+  const appiumMissing = isMobile && !appiumRunning;
+  const hasGatingAlerts = credentialsMissing || missingReqs.length > 0 || appiumMissing;
+
+  // Gating information, not configuration: each line states why Run is disabled
+  // and what to do about it, so it stays in the card while the form is collapsed.
+  // Pinned (`flexShrink: 0`) so a short column squeezes the field area — which
+  // has its own scroll — and never the alerts.
+  const gatingAlerts = hasGatingAlerts ? (
+    <Stack gap="xs" style={{ flexShrink: 0 }}>
+      {credentialsMissing && (
+        <InlineAlert
+          icon={<TbAlertTriangle size={14} />}
+          message={t('run.credentialsMissing')}
+          action={
+            <Button
+              size="compact-xs"
+              variant="light"
+              color="yellow"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = async () => {
+                  const file = input.files?.[0];
+                  if (!file) return;
+                  const content = await file.text();
+                  try {
+                    await api.post('/api/doctor/upload-credentials', {
+                      content,
+                      filename: file.name,
+                    });
+                    toast.success(t('run.credentialsUploaded'));
+                    doctorQ.refetch();
+                  } catch {
+                    toast.error(t('run.credentialsUploadFailed'));
+                  }
+                };
+                input.click();
+              }}
+            >
+              {t('run.uploadCredentials')}
+            </Button>
+          }
+        />
+      )}
+      {missingReqs.length > 0 && (
+        <InlineAlert
+          icon={<TbAlertTriangle size={14} />}
+          message={`${t('run.missingRequirements')}: ${missingReqs.join(', ')}. ${t('run.missingRequirementsHint')}`}
+        />
+      )}
+      {appiumMissing && (
+        <InlineAlert
+          icon={<TbDeviceMobile size={14} />}
+          message={t('run.appiumWarning')}
+          action={
+            <Button
+              size="compact-xs"
+              variant="light"
+              color="yellow"
+              onClick={() => startAppium.mutate()}
+              loading={startAppium.isPending}
+              disabled={appiumQ.data ? !appiumQ.data.installed : false}
+            >
+              {t('run.startAppium')}
+            </Button>
+          }
+        />
+      )}
+    </Stack>
+  ) : null;
 
   useEffect(() => {
     if (typeAxis && types.data && types.data.length > 0 && !type) {
@@ -324,6 +454,53 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
     },
   });
 
+  /** The form as it stands right now: what the parent's ref reads and what a
+   *  bookmark captures, so both can never drift from each other. */
+  function currentConfig(): RunRequest {
+    return {
+      tool,
+      type: effectiveType,
+      project,
+      mode,
+      tag: buildTagExpr(selectedTags),
+      headless: !sectionAxis ? headless : undefined,
+      extraArgs: effectiveExtraArgs,
+      noTrack,
+      silent,
+      section: sectionAxis ? section : undefined,
+      performanceType: sectionAxis ? perfType : undefined,
+    };
+  }
+
+  /** Prefill for the save-bookmark modal, built from the run's own axes
+   *  (project, section-or-type, tag count) so accepting it is one keypress. */
+  function defaultBookmarkName(): string {
+    const axes = [project, sectionAxis ? section : effectiveType].filter(Boolean).join(' · ');
+    return selectedTags.length > 0 ? `${axes} · ${selectedTags.length} ${t('run.tags')}` : axes;
+  }
+
+  function handleSaveBookmark() {
+    saveBookmark.reset();
+    setBookmarkName(defaultBookmarkName());
+    setSaveModalOpen(true);
+  }
+
+  /** The footer's save is the only create path for bookmarks, so the name is
+   *  the user's to confirm; the config is whatever the form holds right now. */
+  function submitSaveBookmark() {
+    const name = bookmarkName.trim();
+    if (!name) return;
+    saveBookmark.mutate(
+      { name, config: currentConfig() },
+      {
+        onSuccess: () => {
+          setSaveModalOpen(false);
+          setBookmarkName('');
+        },
+      },
+    );
+  }
+
   function handleRun() {
     const tagExpr = buildTagExpr(selectedTags);
     const effectiveNoTrack = config.data?.forceTrack ? false : noTrack;
@@ -369,6 +546,40 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
     }
   }
 
+  function clampSplit(percent: number): number {
+    return Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, Math.round(percent)));
+  }
+
+  /** Pointer capture keeps the move/up events on the handle once the drag starts,
+   *  so the pointer may leave the 6px strip without dropping the drag. */
+  function handleDividerDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragPercent(splitPercent);
+  }
+
+  function handleDividerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const row = rowRef.current;
+    if (dragPercent === null || !row) return;
+    const rect = row.getBoundingClientRect();
+    if (rect.width === 0) return;
+    // Rounding to whole percent means an unchanged value bails out of the
+    // render, so a slow drag does not re-render per pixel.
+    setDragPercent(clampSplit(((e.clientX - rect.left) / rect.width) * 100));
+  }
+
+  function handleDividerUp() {
+    if (dragPercent === null) return;
+    prefs.setRunSplitPercent(dragPercent);
+    setDragPercent(null);
+  }
+
+  function handleDividerKeys(e: React.KeyboardEvent<HTMLDivElement>) {
+    const step = e.key === 'ArrowLeft' ? -SPLIT_STEP : e.key === 'ArrowRight' ? SPLIT_STEP : 0;
+    if (step === 0) return;
+    e.preventDefault();
+    prefs.setRunSplitPercent(clampSplit(splitPercent + step));
+  }
+
   // Ctrl/Cmd + Enter to run when this session is visible
   useHotkeys([
     [
@@ -389,6 +600,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
 
   return (
     <div
+      ref={rowRef}
       style={{
         display: visible ? 'flex' : 'none',
         flexDirection: 'row',
@@ -403,251 +615,228 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
           fills the middle and scrolls on its own (TagSelector `fill`) — the
           form itself never scrolls. The Run/Stop footer is pinned below, level
           with the command bar on the right. */}
+      {/* Side by side from `md` (992px) up, not `lg`: below the split point the
+          column takes the full width and the terminal wraps to a second row, and
+          two rows of `height:100%` make the session twice the viewport — the
+          scrollbar users kept hitting at 1024-1199px. When it does wrap (真
+          narrow), the rows size to content instead of demanding 100% each. */}
       <Stack
         gap="sm"
-        w={{ base: '100%', lg: '40%' }}
-        style={{ flexShrink: 0, height: '100%', minHeight: 0 }}
+        w={{ base: '100%', md: `${columnPercent}%` }}
+        h={{ base: 'auto', md: '100%' }}
+        style={{ flexShrink: 0, minHeight: 0 }}
       >
         <Paper
           p="md"
           withBorder
           style={{
             opacity: isRunning ? 0.85 : 1,
-            flex: 1,
+            // Expanded, the card is the growing member of the column. Collapsed,
+            // it is one line plus the gating alerts, so it takes its natural
+            // height (`0 1 auto`) and shrinks — scrolling inside itself — only on
+            // a viewport too short for it, rather than growing into empty space.
+            flex: formCollapsed ? '0 1 auto' : 1,
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
+            gap: 'var(--mantine-spacing-sm)',
+            overflow: formCollapsed ? 'auto' : 'hidden',
+            // A wheel that reaches the end of the collapsed card must not chain
+            // to the sessions wrapper and jump the page.
+            overscrollBehavior: 'contain',
           }}
         >
-          <Stack gap="sm" style={{ flex: 1, minHeight: 0 }}>
-            <SimpleGrid cols={2} spacing="xs">
-              <Select
-                label={t('run.tool')}
-                size="xs"
-                disabled={isRunning}
-                value={tool}
-                onChange={(v) => {
-                  if (!v) return;
-                  setTool(v as ToolId);
-                  setType('');
-                  setProject('');
-                  setSelectedTags([]);
-                }}
-                data={toolSelectData(toolsQuery.data ?? [])}
-                allowDeselect={false}
-              />
-              <Select
-                label={t('run.mode')}
-                size="xs"
-                disabled={isRunning}
-                value={mode}
-                onChange={(v) => v && setMode(v as RunMode)}
-                data={[
-                  { value: 'local', label: t('run.modeLocal') },
-                  {
-                    value: 'docker',
-                    label: `Docker${!config.data?.dockerRunning ? ` (${t('run.notRunning')})` : ''}`,
-                    disabled: !config.data?.dockerRunning,
-                  },
-                ]}
-                allowDeselect={false}
-              />
-            </SimpleGrid>
-
-            <SimpleGrid cols={typeAxis ? 2 : 1} spacing="xs">
-              {typeAxis && (
+          <Group gap="xs" wrap="nowrap" justify="space-between" style={{ flexShrink: 0 }}>
+            {formCollapsed && (
+              <Text size="xs" fw={500} truncate style={{ flex: 1, minWidth: 0 }}>
+                {configSummary}
+              </Text>
+            )}
+            <Tooltip label={formCollapsed ? t('run.editConfig') : t('run.hideConfig')} withArrow>
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="gray"
+                onClick={() => prefs.setRunFormCollapsed(!formCollapsed)}
+                aria-label={formCollapsed ? t('run.editConfig') : t('run.hideConfig')}
+                aria-expanded={!formCollapsed}
+                style={{ flex: 'none' }}
+              >
+                {formCollapsed ? <TbChevronDown size={16} /> : <TbChevronUp size={16} />}
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+          {!formCollapsed && (
+            <Stack gap="sm" style={{ flex: 1, minHeight: 0 }}>
+              <SimpleGrid cols={2} spacing="xs">
                 <Select
-                  label={t('run.type')}
+                  label={t('run.tool')}
                   size="xs"
                   disabled={isRunning}
-                  value={type || null}
+                  value={tool}
                   onChange={(v) => {
-                    setType(v ?? '');
+                    if (!v) return;
+                    setTool(v as ToolId);
+                    setType('');
                     setProject('');
                     setSelectedTags([]);
                   }}
-                  placeholder={t('common.select')}
-                  data={types.data ?? []}
-                  searchable
-                />
-              )}
-              <Select
-                label={t('run.project')}
-                size="xs"
-                disabled={isRunning}
-                value={project || null}
-                onChange={(v) => {
-                  setProject(v ?? '');
-                  setSelectedTags([]);
-                }}
-                placeholder={projectsQ.isLoading ? t('common.loading') : t('common.select')}
-                data={projectsQ.data ?? []}
-                searchable
-              />
-            </SimpleGrid>
-
-            {sectionAxis && project && (
-              <SimpleGrid cols={2} spacing="xs">
-                <SectionSelect
-                  label={t('run.section')}
-                  disabled={isRunning}
-                  value={section}
-                  onChange={setSection}
-                  placeholder={t('common.select')}
-                  sections={sectionsQ.data ?? []}
-                />
-                <Select
-                  label={t('run.perfType')}
-                  size="xs"
-                  disabled={isRunning}
-                  value={perfType}
-                  onChange={(v) => v && setPerfType(v as PerformanceType)}
-                  data={perfTypeData}
+                  data={toolSelectData(toolsQuery.data ?? [])}
                   allowDeselect={false}
                 />
-              </SimpleGrid>
-            )}
-
-            {!sectionAxis && project && !isRunning && (
-              <TagSelector
-                tags={tags.data}
-                isLoading={tags.isLoading}
-                selectedTags={selectedTags}
-                onChange={setSelectedTags}
-                fill
-              />
-            )}
-            {!sectionAxis && project && isRunning && selectedTags.length > 0 && (
-              <Stack gap={4}>
-                <Text size="xs" c="dimmed">
-                  {t('run.tags')}
-                </Text>
-                <Group gap={4}>
-                  {selectedTags.map((tag) => (
-                    <Badge key={tag} size="sm" color="blue" variant="filled">
-                      {tag}
-                    </Badge>
-                  ))}
-                </Group>
-              </Stack>
-            )}
-
-            {!sectionAxis && (
-              <SimpleGrid cols={advancedMode ? 2 : 1} spacing="xs">
                 <Select
-                  label={t('run.display')}
+                  label={t('run.mode')}
                   size="xs"
                   disabled={isRunning}
-                  value={headless}
-                  onChange={(v) => v && setHeadless(v as HeadlessMode)}
+                  value={mode}
+                  onChange={(v) => v && setMode(v as RunMode)}
                   data={[
-                    { value: 'headless', label: t('run.headless') },
-                    { value: 'headed', label: t('run.headed') },
+                    { value: 'local', label: t('run.modeLocal') },
+                    {
+                      value: 'docker',
+                      label: `Docker${!config.data?.dockerRunning ? ` (${t('run.notRunning')})` : ''}`,
+                      disabled: !config.data?.dockerRunning,
+                    },
                   ]}
                   allowDeselect={false}
                 />
-                {advancedMode && (
-                  <TextInput
-                    label={t('run.extraArgs')}
+              </SimpleGrid>
+
+              <SimpleGrid cols={typeAxis ? 2 : 1} spacing="xs">
+                {typeAxis && (
+                  <Select
+                    label={t('run.type')}
                     size="xs"
                     disabled={isRunning}
-                    value={extraArgs}
-                    onChange={(e) => setExtraArgs(e.currentTarget.value)}
-                    placeholder="--workers=4"
+                    value={type || null}
+                    onChange={(v) => {
+                      setType(v ?? '');
+                      setProject('');
+                      setSelectedTags([]);
+                    }}
+                    placeholder={t('common.select')}
+                    data={types.data ?? []}
+                    searchable
                   />
                 )}
-              </SimpleGrid>
-            )}
-
-            <Group gap="lg" wrap="wrap">
-              {!config.data?.forceTrack && (
-                <Checkbox
+                <Select
+                  label={t('run.project')}
                   size="xs"
-                  label={t('run.skipUsageLogging')}
                   disabled={isRunning}
-                  checked={noTrack}
-                  onChange={(e) => setNoTrack(e.currentTarget.checked)}
+                  value={project || null}
+                  onChange={(v) => {
+                    setProject(v ?? '');
+                    setSelectedTags([]);
+                  }}
+                  placeholder={projectsQ.isLoading ? t('common.loading') : t('common.select')}
+                  data={projectsQ.data ?? []}
+                  searchable
                 />
+              </SimpleGrid>
+
+              {sectionAxis && project && (
+                <SimpleGrid cols={2} spacing="xs">
+                  <SectionSelect
+                    label={t('run.section')}
+                    disabled={isRunning}
+                    value={section}
+                    onChange={setSection}
+                    placeholder={t('common.select')}
+                    sections={sectionsQ.data ?? []}
+                  />
+                  <Select
+                    label={t('run.perfType')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={perfType}
+                    onChange={(v) => v && setPerfType(v as PerformanceType)}
+                    data={perfTypeData}
+                    allowDeselect={false}
+                  />
+                </SimpleGrid>
               )}
 
-              <Checkbox
-                size="xs"
-                label={t('run.silentMode')}
-                disabled={isRunning}
-                checked={silent}
-                onChange={(e) => setSilent(e.currentTarget.checked)}
-              />
-            </Group>
+              {!sectionAxis && project && !isRunning && (
+                <TagSelector
+                  tags={tags.data}
+                  isLoading={tags.isLoading}
+                  selectedTags={selectedTags}
+                  onChange={setSelectedTags}
+                  fill
+                />
+              )}
+              {!sectionAxis && project && isRunning && selectedTags.length > 0 && (
+                <Stack gap={4}>
+                  <Text size="xs" c="dimmed">
+                    {t('run.tags')}
+                  </Text>
+                  <Group gap={4}>
+                    {selectedTags.map((tag) => (
+                      <Badge key={tag} size="sm" color="blue" variant="filled">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </Group>
+                </Stack>
+              )}
 
-            {doctorQ.data && !doctorQ.data.credentialsOk && !noTrack && (
-              <InlineAlert
-                icon={<TbAlertTriangle size={14} />}
-                message={t('run.credentialsMissing')}
-                action={
-                  <Button
-                    size="compact-xs"
-                    variant="light"
-                    color="yellow"
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = '.json';
-                      input.onchange = async () => {
-                        const file = input.files?.[0];
-                        if (!file) return;
-                        const content = await file.text();
-                        try {
-                          await api.post('/api/doctor/upload-credentials', {
-                            content,
-                            filename: file.name,
-                          });
-                          toast.success(t('run.credentialsUploaded'));
-                          doctorQ.refetch();
-                        } catch {
-                          toast.error(t('run.credentialsUploadFailed'));
-                        }
-                      };
-                      input.click();
-                    }}
-                  >
-                    {t('run.uploadCredentials')}
-                  </Button>
-                }
-              />
-            )}
+              {!sectionAxis && (
+                <SimpleGrid cols={advancedMode ? 2 : 1} spacing="xs">
+                  <Select
+                    label={t('run.display')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={headless}
+                    onChange={(v) => v && setHeadless(v as HeadlessMode)}
+                    data={[
+                      { value: 'headless', label: t('run.headless') },
+                      { value: 'headed', label: t('run.headed') },
+                    ]}
+                    allowDeselect={false}
+                  />
+                  {advancedMode && (
+                    <TextInput
+                      label={t('run.extraArgs')}
+                      size="xs"
+                      disabled={isRunning}
+                      value={extraArgs}
+                      onChange={(e) => setExtraArgs(e.currentTarget.value)}
+                      placeholder="--workers=4"
+                    />
+                  )}
+                </SimpleGrid>
+              )}
 
-            {missingReqs.length > 0 && (
-              <InlineAlert
-                icon={<TbAlertTriangle size={14} />}
-                message={`${t('run.missingRequirements')}: ${missingReqs.join(', ')}. ${t('run.missingRequirementsHint')}`}
-              />
-            )}
+              <Group gap="lg" wrap="wrap">
+                {!config.data?.forceTrack && (
+                  <Checkbox
+                    size="xs"
+                    label={t('run.skipUsageLogging')}
+                    disabled={isRunning}
+                    checked={noTrack}
+                    onChange={(e) => setNoTrack(e.currentTarget.checked)}
+                  />
+                )}
 
-            {isMobile && !appiumRunning && (
-              <InlineAlert
-                icon={<TbDeviceMobile size={14} />}
-                message={t('run.appiumWarning')}
-                action={
-                  <Button
-                    size="compact-xs"
-                    variant="light"
-                    color="yellow"
-                    onClick={() => startAppium.mutate()}
-                    loading={startAppium.isPending}
-                    disabled={appiumQ.data ? !appiumQ.data.installed : false}
-                  >
-                    {t('run.startAppium')}
-                  </Button>
-                }
-              />
-            )}
-          </Stack>
+                <Checkbox
+                  size="xs"
+                  label={t('run.silentMode')}
+                  disabled={isRunning}
+                  checked={silent}
+                  onChange={(e) => setSilent(e.currentTarget.checked)}
+                />
+              </Group>
+            </Stack>
+          )}
+          {gatingAlerts}
         </Paper>
 
         {/* Pinned action footer — stays level with the command bar on the right;
-            the tag list above scrolls independently. */}
-        <Group gap="xs" grow style={{ flexShrink: 0 }}>
+            the tag list above scrolls independently. Widths are explicit (Run
+            `flex: 1`, secondary controls `flex: 'none'`) instead of Mantine
+            `grow`, whose `preventGrowOverflow` cap divides the row by child
+            count — with three controls that would shrink Run to a third. */}
+        <Group gap="xs" style={{ flexShrink: 0 }}>
           {(() => {
             const tagsLoading = !sectionAxis && !!project && !!effectiveType && tags.isLoading;
             const disabledReason =
@@ -696,12 +885,71 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
               {t('run.stop')}
             </Button>
           )}
+          {/* Saves the same live config the Bookmarks panel captures, next to the
+              form instead of in the panel at the top of the page. */}
+          <Tooltip label={saveBookmarkReason ?? t('bookmark.saveCurrent')} withArrow>
+            {/* Wrapper div is required so Tooltip can show on a disabled control. */}
+            <div style={{ flex: 'none' }}>
+              <ActionIcon
+                size="lg"
+                variant="default"
+                onClick={handleSaveBookmark}
+                loading={saveBookmark.isPending}
+                disabled={!!saveBookmarkReason}
+                aria-label={t('bookmark.saveCurrent')}
+              >
+                <TbBookmarkPlus size={18} />
+              </ActionIcon>
+            </div>
+          </Tooltip>
         </Group>
       </Stack>
 
-      {/* Right column: terminal scrolls internally (flex:1); the command bar is
-          pinned at the bottom, level with the Run button on the left. */}
-      <Stack gap="sm" style={{ flex: 1, minWidth: 0, height: '100%', minHeight: 0 }}>
+      {/* The split between the columns is a width the user sets, not a fixed
+          40%. The handle is a flex item of the row — 6px wide, stretched by the
+          row's own cross-axis alignment, so it adds no height of its own — and
+          is hidden below `md`, where the columns wrap and each line owns the
+          full width (LESS-061 §6). */}
+      <Box
+        visibleFrom="md"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={`${t('run.editConfig')} / ${advancedMode ? t('run.liveOutput') : t('run.technicalOutput')}`}
+        aria-valuenow={columnPercent}
+        aria-valuemin={SPLIT_MIN}
+        aria-valuemax={SPLIT_MAX}
+        tabIndex={0}
+        onPointerDown={handleDividerDown}
+        onPointerMove={handleDividerMove}
+        onPointerUp={handleDividerUp}
+        onPointerCancel={handleDividerUp}
+        onKeyDown={handleDividerKeys}
+        onFocus={() => setDividerFocused(true)}
+        onBlur={() => setDividerFocused(false)}
+        style={{
+          flex: 'none',
+          width: 6,
+          alignSelf: 'stretch',
+          borderRadius: 'var(--mantine-radius-sm)',
+          cursor: 'col-resize',
+          userSelect: 'none',
+          touchAction: 'none',
+          background:
+            dragPercent !== null || dividerFocused
+              ? 'var(--mantine-color-blue-filled)'
+              : 'var(--mantine-color-default-border)',
+        }}
+      />
+
+      {/* Right column: terminal scrolls internally (flex:1); the bottom bar is
+          pinned below it and is one button tall, like the Run/Stop footer, so
+          both cards end at the same Y. With no bar to show, the terminal takes
+          the whole column. */}
+      <Stack
+        gap="sm"
+        h={{ base: '60vh', md: '100%' }}
+        style={{ flex: 1, minWidth: 0, minHeight: 0 }}
+      >
         <Paper
           withBorder
           style={{
@@ -762,6 +1010,35 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
                   {runStatus}
                 </Badge>
               )}
+              {/* One control, so the pair sits tighter than the row's gap. Both
+                  ends disable at the store's clamp rather than clicking to no
+                  effect. */}
+              <Group gap={2} wrap="nowrap">
+                <Tooltip label={`${t('run.terminalFontSize')} −`} withArrow>
+                  <ActionIcon
+                    size="sm"
+                    variant="subtle"
+                    color="gray"
+                    onClick={() => prefs.setTerminalFontSize(fontSize - 1)}
+                    disabled={fontSize <= FONT_MIN}
+                    aria-label={`${t('run.terminalFontSize')} −`}
+                  >
+                    <TbTextDecrease size={14} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label={`${t('run.terminalFontSize')} +`} withArrow>
+                  <ActionIcon
+                    size="sm"
+                    variant="subtle"
+                    color="gray"
+                    onClick={() => prefs.setTerminalFontSize(fontSize + 1)}
+                    disabled={fontSize >= FONT_MAX}
+                    aria-label={`${t('run.terminalFontSize')} +`}
+                  >
+                    <TbTextIncrease size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
               <Button
                 size="compact-xs"
                 variant="subtle"
@@ -827,53 +1104,84 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
           <div ref={termRef} style={{ flex: 1, minHeight: 0 }} />
         </Paper>
 
-        {/* Simple view keeps only Rerun + duration here, so during a run the bar
-            has nothing to show and is dropped instead of rendering empty. */}
-        {lastCommand && (advancedMode || !isRunning) && (
-          <Paper p="xs" withBorder style={{ flexShrink: 0 }}>
-            <Group justify={advancedMode ? 'space-between' : 'flex-end'} mb={4}>
-              {advancedMode && (
-                <Text size="xs" c="dimmed">
-                  {t('run.command')}
-                </Text>
-              )}
-              <Group gap="xs">
-                {!isRunning && (
-                  <Button
-                    size="compact-xs"
-                    variant="subtle"
-                    onClick={handleRerun}
-                    leftSection={<TbRefresh size={12} />}
-                  >
-                    {t('run.rerun')}
-                  </Button>
-                )}
-                {advancedMode && (
-                  <Button
-                    size="compact-xs"
-                    variant="subtle"
-                    color="gray"
-                    onClick={handleCopyCommand}
-                    leftSection={<TbCopy size={12} />}
-                  >
-                    {t('run.copy')}
-                  </Button>
-                )}
-              </Group>
-            </Group>
+        {/* One row of `size="sm"` controls — the same Mantine size scale as the
+            Run/Stop footer, so both bars are exactly one button tall and the
+            terminal card ends level with the form card. The command stays
+            advanced-only and single-line (Copy carries the full value). */}
+        {showRunBar && (
+          <Group
+            gap="xs"
+            wrap="nowrap"
+            justify={advancedMode ? 'space-between' : 'flex-end'}
+            style={{ flexShrink: 0 }}
+          >
             {advancedMode && (
-              <Code block style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+              <Code
+                fz="xs"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {lastCommand}
               </Code>
             )}
-            {!isRunning && elapsed && (
-              <Text size="xs" c="dimmed" mt={4}>
-                {t('run.duration')}: {elapsed}
-              </Text>
-            )}
-          </Paper>
+            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+              {!isRunning && elapsed && (
+                <Text size="xs" c="dimmed">
+                  {t('run.duration')}: {elapsed}
+                </Text>
+              )}
+              {!isRunning && (
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  onClick={handleRerun}
+                  leftSection={<TbRefresh size={16} />}
+                >
+                  {t('run.rerun')}
+                </Button>
+              )}
+              {advancedMode && (
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  color="gray"
+                  onClick={handleCopyCommand}
+                  leftSection={<TbCopy size={16} />}
+                >
+                  {t('run.copy')}
+                </Button>
+              )}
+            </Group>
+          </Group>
         )}
       </Stack>
+
+      <FormModal
+        opened={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        title={t('bookmark.saveCurrent')}
+        submitLabel={t('common.save')}
+        onSubmit={submitSaveBookmark}
+        submitDisabled={!bookmarkName.trim()}
+        loading={saveBookmark.isPending}
+        error={saveBookmark.error?.message ?? null}
+      >
+        <TextInput
+          label={t('bookmark.namePlaceholder')}
+          placeholder={t('bookmark.namePlaceholder')}
+          value={bookmarkName}
+          onChange={(e) => setBookmarkName(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submitSaveBookmark();
+          }}
+          data-autofocus
+        />
+      </FormModal>
     </div>
   );
 });

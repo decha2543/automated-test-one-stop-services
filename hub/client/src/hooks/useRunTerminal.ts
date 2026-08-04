@@ -24,6 +24,8 @@ interface UseRunTerminalOptions {
   visible: boolean;
   /** Any value that, when it changes, should trigger a re-fit (e.g. run status). */
   refitKey: unknown;
+  /** xterm font size in px; the persisted preference is the only source. */
+  fontSize: number;
 }
 
 /**
@@ -35,7 +37,7 @@ interface UseRunTerminalOptions {
  * Returns the container ref to attach and a stable `term` API used by the
  * component and the WebSocket hook to write output and drive search.
  */
-export function useRunTerminal({ visible, refitKey }: UseRunTerminalOptions): {
+export function useRunTerminal({ visible, refitKey, fontSize }: UseRunTerminalOptions): {
   termRef: React.RefObject<HTMLDivElement | null>;
   term: RunTerminal;
 } {
@@ -62,7 +64,6 @@ export function useRunTerminal({ visible, refitKey }: UseRunTerminalOptions): {
     if (!termRef.current || terminalRef.current) return;
     const term = new Terminal({
       theme: { background: '#0a0a0a', foreground: '#e5e5e5', cursor: '#e5e5e5' },
-      fontSize: 12,
       fontFamily: 'JetBrains Mono, Fira Code, Consolas, monospace',
       convertEol: true,
       scrollback: 5000,
@@ -89,6 +90,18 @@ export function useRunTerminal({ visible, refitKey }: UseRunTerminalOptions): {
       searchAddonRef.current = null;
     };
   }, []);
+
+  // Font size is a persisted preference that can change while the terminal is
+  // mounted, so it is set on the live instance instead of being passed to the
+  // constructor — recreating the terminal would drop the scrollback. Declared
+  // after the init effect, so on mount the saved size is applied before paint.
+  // A larger glyph means fewer rows/cols in the same box, hence the re-fit.
+  useEffect(() => {
+    const term = terminalRef.current;
+    if (!term) return;
+    term.options.fontSize = fontSize;
+    fitAddonRef.current?.fit();
+  }, [fontSize]);
 
   // Re-fit when this tab becomes visible.
   useEffect(() => {

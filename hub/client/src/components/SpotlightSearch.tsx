@@ -11,6 +11,7 @@ import {
   TbSettings,
 } from 'react-icons/tb';
 import { api } from '~/api/client.js';
+import { useT } from '~/i18n/index.js';
 
 interface SpotlightSearchProps {
   onNavigate: (page: string) => void;
@@ -18,6 +19,8 @@ interface SpotlightSearchProps {
 }
 
 export function SpotlightSearch({ onNavigate, onLoadBookmark }: SpotlightSearchProps) {
+  const t = useT();
+
   const projects = useQuery<ProjectSummary[]>({
     queryKey: ['projects'],
     queryFn: () => api.get('/api/projects'),
@@ -97,22 +100,27 @@ export function SpotlightSearch({ onNavigate, onLoadBookmark }: SpotlightSearchP
     group: 'Projects',
   }));
 
-  const bookmarkActions: SpotlightActionData[] = (bookmarks.data ?? []).map((bm) => {
-    const c = bm.config;
-    const detail = [c.tool, c.type, c.project, c.mode, c.tag].filter(Boolean).join(' · ');
-    return {
-      id: `bookmark-${bm.id}`,
-      label: bm.name,
-      description: detail,
-      leftSection: <TbBookmark size={16} />,
-      onClick: () => {
-        onNavigate('run');
-        onLoadBookmark(bm.config);
-      },
-      keywords: [c.tool, c.type, c.project, c.tag, bm.name].filter((v): v is string => !!v),
-      group: 'Bookmarks',
-    };
-  });
+  // Newest bookmark first, so an empty query surfaces what was just saved. Mantine's
+  // default filter matches label, description and keywords, which together cover
+  // name, tool, type, project, mode and tag.
+  const bookmarkActions: SpotlightActionData[] = [...(bookmarks.data ?? [])]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((bm) => {
+      const c = bm.config;
+      const detail = [c.tool, c.type, c.project, c.mode, c.tag].filter(Boolean).join(' · ');
+      return {
+        id: `bookmark-${bm.id}`,
+        label: bm.name,
+        description: detail,
+        leftSection: <TbBookmark size={16} />,
+        onClick: () => {
+          onNavigate('run');
+          onLoadBookmark(bm.config);
+        },
+        keywords: [c.tool, c.type, c.project, c.tag, bm.name].filter((v): v is string => !!v),
+        group: t('bookmark.title'),
+      };
+    });
 
   const actions = [...navActions, ...projectActions, ...bookmarkActions];
 

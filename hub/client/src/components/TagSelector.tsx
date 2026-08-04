@@ -1,10 +1,4 @@
-import {
-  TAG_KIND_ORDER,
-  type TagGroup,
-  type TagGroupKind,
-  type TagsResponse,
-  type TestSummary,
-} from '@hub/shared';
+import { TAG_KIND_ORDER, type TagGroup, type TagsResponse, type TestSummary } from '@hub/shared';
 import {
   Badge,
   Button,
@@ -22,7 +16,7 @@ import {
 import { type ReactNode, useMemo, useState } from 'react';
 import { TbCheck, TbChevronDown, TbChevronRight, TbSearch, TbTag, TbX } from 'react-icons/tb';
 import { useT } from '~/i18n/index.js';
-import { matchTests } from '~/utils/tag-selection';
+import { getTagLevel, matchTests } from '~/utils/tag-selection';
 
 interface TagSelectorProps {
   tags: TagsResponse | undefined;
@@ -37,10 +31,27 @@ interface TagSelectorProps {
   fill?: boolean;
 }
 
-// Stable group display order — single source of truth: @hub/shared.
-function groupRank(kind: TagGroupKind): number {
-  const index = TAG_KIND_ORDER.indexOf(kind);
-  return index === -1 ? TAG_KIND_ORDER.length : index;
+/**
+ * Loop tags reach the client inside the server's `case-id` / `domain` groups —
+ * the shared taxonomy has no loop kind — so they are re-bucketed here into a
+ * client-only group whose kind is not a `TagGroupKind`.
+ */
+const LOOP_KIND = 'loop';
+
+type DisplayGroup = Omit<TagGroup, 'kind'> & { kind: string };
+
+// Stable group display order — single source of truth: @hub/shared, with the
+// client-only loop group appended after every taxonomy kind: loop cases are the
+// weakest filter and the biggest bucket, so they belong at the bottom. A new
+// shared kind still flows through ahead of it.
+const DISPLAY_KIND_ORDER: readonly string[] = [...TAG_KIND_ORDER, LOOP_KIND];
+
+/** Long-tail groups that start collapsed — hundreds of chips each otherwise. */
+const INITIALLY_COLLAPSED: readonly string[] = ['case-id', LOOP_KIND];
+
+function groupRank(kind: string): number {
+  const index = DISPLAY_KIND_ORDER.indexOf(kind);
+  return index === -1 ? DISPLAY_KIND_ORDER.length : index;
 }
 
 const GROUP_COLORS: Record<string, string> = {
@@ -48,6 +59,7 @@ const GROUP_COLORS: Record<string, string> = {
   'test-type': 'grape',
   'flow-type': 'orange',
   device: 'cyan',
+  [LOOP_KIND]: 'violet',
   domain: 'teal',
   'domain-single': 'green',
   'case-id': 'gray',
@@ -72,7 +84,13 @@ function GroupList({ fill, children }: { fill: boolean; children: ReactNode }) {
           flexDirection: 'column',
         }}
       >
-        <ScrollArea type="auto" scrollbarSize={8} style={{ flex: 1, minHeight: 0 }}>
+        {/* `contain` stops a wheel that reaches the end of the tag list from
+            chaining into the page behind it and jumping the whole form. */}
+        <ScrollArea
+          type="auto"
+          scrollbarSize={8}
+          style={{ flex: 1, minHeight: 0, overscrollBehavior: 'contain' }}
+        >
           {children}
         </ScrollArea>
       </Paper>
@@ -94,7 +112,7 @@ export function TagSelector({
 }: TagSelectorProps) {
   const t = useT();
   const [search, setSearch] = useState('');
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['case-id']));
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(INITIALLY_COLLAPSED));
   const [showMatchedTests, setShowMatchedTests] = useState(false);
 
   const tests = tags?.tests ?? [];
@@ -139,11 +157,26 @@ export function TagSelector({
     });
   }
 
-  // Sort groups in stable order.
-  const orderedGroups = useMemo<TagGroup[]>(() => {
+  // Sort groups in stable order, after lifting loop tags out of the server
+  // groups into their own category (same predicate that drives AND/OR selection
+  // semantics, so grouping and matching can never disagree).
+  const orderedGroups = useMemo<DisplayGroup[]>(() => {
     if (!tags) return [];
-    return [...tags.groups].sort((a, b) => groupRank(a.kind) - groupRank(b.kind));
-  }, [tags]);
+    const groups: DisplayGroup[] = [];
+    const loopTags: string[] = [];
+    for (const group of tags.groups) {
+      const rest: string[] = [];
+      for (const tag of group.tags) {
+        if (getTagLevel(tag) === LOOP_KIND) loopTags.push(tag);
+        else rest.push(tag);
+      }
+      if (rest.length > 0) groups.push({ ...group, tags: rest });
+    }
+    if (loopTags.length > 0) {
+      groups.push({ kind: LOOP_KIND, label: t('tagSelector.loopGroup'), tags: loopTags });
+    }
+    return groups.sort((a, b) => groupRank(a.kind) - groupRank(b.kind));
+  }, [tags, t]);
 
   // Filter by search.
   const searchLower = search.toLowerCase();

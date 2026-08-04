@@ -582,6 +582,7 @@ export const th: Record<TranslationKey, string> = {
   'tagSelector.tags': 'แท็ก',
   'tagSelector.searchPlaceholder': 'ค้นหาแท็ก...',
   'tagSelector.noMatchSearch': 'ไม่มีแท็กที่ตรงกับ',
+  'tagSelector.loopGroup': 'เคสแบบลูป',
   'common.clearAll': 'ล้างทั้งหมด',
 
   // Saved filters
@@ -875,4 +876,12 @@ export const th: Record<TranslationKey, string> = {
   'run.verdictFailed': 'ไม่ผ่าน {failed} จาก {total} ข้อ',
   'run.verdictCritical': 'ในนั้นเป็นระดับ Critical {n} ข้อ',
   'run.verdictNoChecks': 'รันจบแต่ไม่มีข้อทดสอบถูกรัน',
+
+  // Compact layout + remembered preferences
+  'nav.collapseRail': 'ย่อเมนูเหลือไอคอน',
+  'nav.expandRail': 'แสดงชื่อเมนู',
+  'run.editConfig': 'แก้ค่าการรัน',
+  'run.hideConfig': 'ซ่อนค่าการรัน',
+  'run.terminalFontSize': 'ขนาดตัวอักษรผลลัพธ์',
+  'bookmark.load': 'โหลดบุ๊กมาร์ก',
 };

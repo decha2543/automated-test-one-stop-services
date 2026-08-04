@@ -39,6 +39,18 @@ interface Preferences {
    * why it is a persisted preference and not a per-page toggle.
    */
   advancedMode: boolean;
+  /**
+   * Layout the user arranged, remembered instead of asked for again. These are
+   * per-person and per-monitor (a 240px navbar is a fifth of a 1200px screen; a
+   * comfortable terminal size differs by display), so they belong in
+   * preferences rather than in a settings page.
+   */
+  navRailCollapsed: boolean;
+  runFormCollapsed: boolean;
+  /** Width of the run form column, percent of the session row. */
+  runSplitPercent: number;
+  /** xterm font size in px. */
+  terminalFontSize: number;
 }
 
 interface PreferencesActions {
@@ -52,6 +64,10 @@ interface PreferencesActions {
   /** Enable/disable the silent-schedule completion toast for one scheduleId. */
   setSilentScheduleToast: (scheduleId: string, enabled: boolean) => void;
   setAdvancedMode: (on: boolean) => void;
+  setNavRailCollapsed: (collapsed: boolean) => void;
+  setRunFormCollapsed: (collapsed: boolean) => void;
+  setRunSplitPercent: (percent: number) => void;
+  setTerminalFontSize: (px: number) => void;
 }
 
 type PreferencesStore = Simplify<Preferences & PreferencesActions>;
@@ -66,6 +82,10 @@ const DEFAULT_PREFERENCES: Preferences = {
   sidebarCollapsed: false,
   silentScheduleToast: {},
   advancedMode: false,
+  navRailCollapsed: false,
+  runFormCollapsed: false,
+  runSplitPercent: 40,
+  terminalFontSize: 12,
 };
 
 export const usePreferences = create<PreferencesStore>()(
@@ -85,6 +105,12 @@ export const usePreferences = create<PreferencesStore>()(
           silentScheduleToast: { ...s.silentScheduleToast, [scheduleId]: enabled },
         })),
       setAdvancedMode: (on) => set({ advancedMode: on }),
+      setNavRailCollapsed: (collapsed) => set({ navRailCollapsed: collapsed }),
+      setRunFormCollapsed: (collapsed) => set({ runFormCollapsed: collapsed }),
+      // Clamped so a stray drag can never leave a column unusably narrow.
+      setRunSplitPercent: (percent) =>
+        set({ runSplitPercent: Math.min(70, Math.max(25, Math.round(percent))) }),
+      setTerminalFontSize: (px) => set({ terminalFontSize: Math.min(20, Math.max(9, px)) }),
     }),
     {
       name: 'hub-preferences',

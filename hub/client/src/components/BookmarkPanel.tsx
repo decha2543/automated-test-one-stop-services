@@ -4,7 +4,9 @@ import {
   Badge,
   Button,
   Group,
+  Kbd,
   Loader,
+  Menu,
   Paper,
   ScrollArea,
   Stack,
@@ -18,8 +20,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
   TbBookmark,
-  TbBookmarkPlus,
   TbCheck,
+  TbChevronDown,
   TbDeviceFloppy,
   TbPencil,
   TbSearch,
@@ -41,9 +43,27 @@ interface BookmarkPanelProps {
   disabled?: boolean;
 }
 
-interface SaveBookmarkPayload {
+export interface SaveBookmarkPayload {
   name: string;
   config: RunRequest;
+}
+
+/**
+ * The one write path for "save this run-form config as a new bookmark". It lives
+ * next to the list it invalidates and is called from the Run footer's save
+ * action, the only place that creates a bookmark. Callers add their own per-call
+ * `onSuccess` for local UI (closing the modal, clearing a field).
+ */
+export function useSaveBookmark() {
+  const t = useT();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SaveBookmarkPayload) => api.post<Bookmark>('/api/bookmarks', payload),
+    onSuccess: () => {
+      toast.success(t('bookmark.saved'));
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+    },
+  });
 }
 
 /** Stable-ish accent per tool so Playwright/Robot/k6 groups are tellable at a glance. */
@@ -66,6 +86,28 @@ function leafDigest(c: RunRequest): string {
   return parts.filter(Boolean).join(' · ');
 }
 
+/** How many bookmarks the inline panel shows at rest. The rest live behind the
+ * panel's search field and ⌘K, so the list cannot grow into the run form. */
+const RECENT_CAP = 5;
+
+/** Newest first. `createdAt` is an ISO timestamp, so a lexical compare is chronological. */
+function byNewest(a: Bookmark, b: Bookmark): number {
+  return b.createdAt.localeCompare(a.createdAt);
+}
+
+/** `query` must already be trimmed + lowercased; an empty query matches everything. */
+function matchesQuery(bm: Bookmark, query: string): boolean {
+  if (!query) return true;
+  const c = bm.config;
+  return (
+    bm.name.toLowerCase().includes(query) ||
+    c.project.toLowerCase().includes(query) ||
+    c.type.toLowerCase().includes(query) ||
+    c.tool.toLowerCase().includes(query) ||
+    (c.tag?.toLowerCase().includes(query) ?? false)
+  );
+}
+
 interface TreeGroup {
   key: string;
   tool: string;
@@ -77,35 +119,24 @@ interface TreeGroup {
 /**
  * Bookmarks as a self-contained SECTION at the top of the Run page (not a
  * hidden popover). Collapse the whole section to reclaim space; when open it
- * shows every saved run config grouped by tool → type → project. Click a row
- * to autofill; rename/delete happen inline. Save the current form as a new one
- * from the header.
+ * shows the `RECENT_CAP` newest saved run configs, grouped by tool → type →
+ * project, with the count of what is hidden — searching the panel or ⌘K reaches
+ * the rest. Click a row to autofill; rename/delete happen inline. New bookmarks
+ * are created from the Run footer's save action, not here.
  */
 export function BookmarkPanel({ getConfig, onLoad, disabled }: BookmarkPanelProps) {
   const t = useT();
   const queryClient = useQueryClient();
   const tools = useTools().data ?? [];
   // Collapsed by default so the run form + live output (the real work) own the
-  // top of the page; the header stays a slim, discoverable bar (count + Save).
+  // top of the page; the header stays a slim, discoverable bar (count + search).
   const [sectionOpen, { toggle: toggleSection }] = useDisclosure(false);
   const [q, setQ] = useState('');
-  const [showSave, setShowSave] = useState(false);
-  const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const bookmarks = useQuery<Bookmark[]>({
     queryKey: ['bookmarks'],
     queryFn: () => api.get('/api/bookmarks'),
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: (payload: SaveBookmarkPayload) => api.post('/api/bookmarks', payload),
-    onSuccess: () => {
-      toast.success(t('bookmark.saved'));
-      setShowSave(false);
-      setName('');
-      queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
-    },
   });
 
   const deleteMutation = useMutation({
@@ -115,37 +146,28 @@ export function BookmarkPanel({ getConfig, onLoad, disabled }: BookmarkPanelProp
 
   const list = bookmarks.data ?? [];
 
-  const groups = useMemo<TreeGroup[]>(() => {
+  // A search shows every match; at rest only the newest `RECENT_CAP` render, so
+  // the group order below stays stable while the panel keeps a fixed height cost.
+  const { groups, hiddenCount } = useMemo(() => {
     const query = q.trim().toLowerCase();
-    const match = list.filter(
-      (bm) =>
-        !query ||
-        bm.name.toLowerCase().includes(query) ||
-        bm.config.project.toLowerCase().includes(query) ||
-        bm.config.type.toLowerCase().includes(query) ||
-        bm.config.tool.toLowerCase().includes(query) ||
-        (bm.config.tag?.toLowerCase().includes(query) ?? false),
-    );
+    const matched = list.filter((bm) => matchesQuery(bm, query));
+    const visible = query ? matched : [...matched].sort(byNewest).slice(0, RECENT_CAP);
     const map = new Map<string, TreeGroup>();
-    for (const bm of match) {
+    for (const bm of visible) {
       const { tool, type, project } = bm.config;
       const key = `${tool}|${type}|${project}`;
       const g = map.get(key);
       if (g) g.items.push(bm);
       else map.set(key, { key, tool, type, project, items: [bm] });
     }
-    return [...map.values()].sort(
+    const sorted = [...map.values()].sort(
       (a, b) =>
         toolLabel(a.tool, tools).localeCompare(toolLabel(b.tool, tools)) ||
         a.type.localeCompare(b.type) ||
         a.project.localeCompare(b.project),
     );
+    return { groups: sorted, hiddenCount: query ? 0 : list.length - visible.length };
   }, [list, q, tools]);
-
-  function handleSaveNew() {
-    if (!name.trim()) return;
-    saveMutation.mutate({ name: name.trim(), config: getConfig() });
-  }
 
   async function handleDelete(id: string) {
     const ok = await confirmDialog({
@@ -160,8 +182,6 @@ export function BookmarkPanel({ getConfig, onLoad, disabled }: BookmarkPanelProp
     }
   }
 
-  const canSave = !disabled && !!getConfig().project;
-
   return (
     <CollapsibleCard
       icon={<TbBookmark size={16} />}
@@ -174,68 +194,20 @@ export function BookmarkPanel({ getConfig, onLoad, disabled }: BookmarkPanelProp
       open={sectionOpen}
       onToggle={toggleSection}
       actions={
-        <>
-          {sectionOpen && list.length > 6 && (
-            <TextInput
-              size="xs"
-              value={q}
-              onChange={(e) => setQ(e.currentTarget.value)}
-              placeholder={t('bookmark.searchPlaceholder')}
-              leftSection={<TbSearch size={12} />}
-              w={180}
-            />
-          )}
-          <Button
-            size="compact-xs"
-            variant="light"
-            leftSection={<TbBookmarkPlus size={13} />}
-            onClick={() => {
-              setShowSave((v) => !v);
-              if (!sectionOpen) toggleSection();
-            }}
-            disabled={!canSave}
-          >
-            {t('bookmark.saveCurrent')}
-          </Button>
-        </>
+        sectionOpen &&
+        list.length > RECENT_CAP && (
+          <TextInput
+            size="xs"
+            value={q}
+            onChange={(e) => setQ(e.currentTarget.value)}
+            placeholder={t('bookmark.searchPlaceholder')}
+            leftSection={<TbSearch size={12} />}
+            w={180}
+          />
+        )
       }
     >
       <Stack gap="xs" pt="xs">
-        {/* Inline "save current config" row */}
-        {showSave && (
-          <Group gap="xs" wrap="nowrap">
-            <TextInput
-              size="xs"
-              value={name}
-              onChange={(e) => setName(e.currentTarget.value)}
-              placeholder={t('bookmark.namePlaceholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveNew();
-                if (e.key === 'Escape') setShowSave(false);
-              }}
-              style={{ flex: 1 }}
-              data-autofocus
-            />
-            <Button
-              size="compact-xs"
-              color="green"
-              onClick={handleSaveNew}
-              loading={saveMutation.isPending}
-              disabled={!name.trim()}
-            >
-              {t('common.save')}
-            </Button>
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              color="gray"
-              onClick={() => setShowSave(false)}
-            >
-              {t('common.cancel')}
-            </Button>
-          </Group>
-        )}
-
         {bookmarks.isLoading && <Loader size="sm" />}
 
         {!bookmarks.isLoading && list.length === 0 && (
@@ -296,8 +268,130 @@ export function BookmarkPanel({ getConfig, onLoad, disabled }: BookmarkPanelProp
             </Stack>
           </ScrollArea.Autosize>
         )}
+
+        {hiddenCount > 0 && (
+          <Group gap={6} wrap="nowrap">
+            <Badge size="xs" variant="light" color="gray">
+              +{hiddenCount}
+            </Badge>
+            <Text size="xs" c="dimmed" truncate>
+              {t('bookmark.load')}
+            </Text>
+            <Kbd size="xs">⌘K</Kbd>
+          </Group>
+        )}
       </Stack>
     </CollapsibleCard>
+  );
+}
+
+interface BookmarkLoadMenuProps {
+  /** Pulls the LIVE run-form config of the active session — the filter scope. */
+  getConfig: () => RunRequest;
+  onLoad: (config: RunRequest) => void;
+}
+
+/**
+ * The compact load path that lives beside the run page's session tabs: a
+ * dropdown, so it costs no page height. It opens scoped to the run target of
+ * the active session (tool + type + project) and falls back to the full list
+ * when that scope holds no bookmarks or the user asks for all of them. Loading
+ * goes through the caller's `onLoad` — the same handler the inline panel uses.
+ */
+export function BookmarkLoadMenu({ getConfig, onLoad }: BookmarkLoadMenuProps) {
+  const t = useT();
+  const tools = useTools().data ?? [];
+  const [scope, setScope] = useState<RunRequest | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  const bookmarks = useQuery<Bookmark[]>({
+    queryKey: ['bookmarks'],
+    queryFn: () => api.get('/api/bookmarks'),
+  });
+
+  const list = bookmarks.data ?? [];
+
+  const visible = useMemo(() => {
+    const scoped = scope?.project
+      ? list.filter(
+          (bm) =>
+            bm.config.tool === scope.tool &&
+            bm.config.type === scope.type &&
+            bm.config.project === scope.project,
+        )
+      : [];
+    return [...(showAll || scoped.length === 0 ? list : scoped)].sort(byNewest);
+  }, [list, scope, showAll]);
+
+  const restCount = list.length - visible.length;
+  const scopeLabel =
+    restCount > 0 && scope ? `${toolLabel(scope.tool, tools)} · ${scope.project}` : t('common.all');
+
+  return (
+    <Menu
+      position="bottom-end"
+      withArrow
+      shadow="md"
+      width={280}
+      onOpen={() => {
+        setScope(getConfig());
+        setShowAll(false);
+      }}
+    >
+      <Menu.Target>
+        <Button
+          size="xs"
+          variant="light"
+          color="gray"
+          leftSection={<TbBookmark size={14} />}
+          rightSection={<TbChevronDown size={12} />}
+        >
+          {t('bookmark.load')}
+        </Button>
+      </Menu.Target>
+      <Menu.Dropdown>
+        {bookmarks.isLoading && (
+          <Group justify="center" py="xs">
+            <Loader size="xs" />
+          </Group>
+        )}
+
+        {!bookmarks.isLoading && list.length === 0 && (
+          <Text size="xs" c="dimmed" p="xs">
+            {t('bookmark.empty')}
+          </Text>
+        )}
+
+        {visible.length > 0 && <Menu.Label>{scopeLabel}</Menu.Label>}
+
+        <ScrollArea.Autosize mah="40vh" type="auto">
+          {visible.map((bm) => (
+            <Menu.Item key={bm.id} onClick={() => onLoad(bm.config)}>
+              <Text size="xs" fw={500} lineClamp={1}>
+                {bm.name}
+              </Text>
+              <Text size="xs" c="dimmed" lineClamp={1}>
+                {bm.config.project} · {leafDigest(bm.config)}
+              </Text>
+            </Menu.Item>
+          ))}
+        </ScrollArea.Autosize>
+
+        {restCount > 0 && (
+          <>
+            <Menu.Divider />
+            <Menu.Item closeMenuOnClick={false} onClick={() => setShowAll(true)}>
+              <Group gap={6} wrap="nowrap">
+                <Text size="xs">{t('common.all')}</Text>
+                <Badge size="xs" variant="light" color="gray">
+                  {list.length}
+                </Badge>
+              </Group>
+            </Menu.Item>
+          </>
+        )}
+      </Menu.Dropdown>
+    </Menu>
   );
 }
 

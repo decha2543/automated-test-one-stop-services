@@ -589,6 +589,7 @@ export const en = {
   'tagSelector.tags': 'TAGS',
   'tagSelector.searchPlaceholder': 'Search tags...',
   'tagSelector.noMatchSearch': 'No tags match',
+  'tagSelector.loopGroup': 'Loop Cases',
   'common.clearAll': 'Clear all',
 
   // Saved filters
@@ -884,6 +885,14 @@ export const en = {
   'run.verdictFailed': '{failed} of {total} checks did not pass',
   'run.verdictCritical': '{n} of them are Critical',
   'run.verdictNoChecks': 'Finished without running any check',
+
+  // Compact layout + remembered preferences
+  'nav.collapseRail': 'Collapse the menu to icons',
+  'nav.expandRail': 'Show menu labels',
+  'run.editConfig': 'Edit run settings',
+  'run.hideConfig': 'Hide run settings',
+  'run.terminalFontSize': 'Output text size',
+  'bookmark.load': 'Load a bookmark',
 } as const;
 
 export type TranslationKey = keyof typeof en;

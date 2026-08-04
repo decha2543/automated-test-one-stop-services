@@ -1,7 +1,16 @@
 import type { RunSummary, SeverityBreakdown } from '@hub/shared';
 import { SEVERITY_LEVELS, weightedPassPercent } from '@hub/shared';
-import { Group, Text, Tooltip } from '@mantine/core';
+import { Group, RingProgress, Text, Tooltip } from '@mantine/core';
 import { useT } from '~/i18n/index.js';
+
+/**
+ * Ring size matches the `Badge size="sm"` (1.125rem = 18px) that every row of
+ * both tables renders in its status cell, so this cell is never the tallest one
+ * and row height — which the tables' scroll maths depend on — is unchanged.
+ * Mantine clamps thickness at size/4.
+ */
+const RING_SIZE = 18;
+const RING_THICKNESS = 3;
 
 /**
  * Severity-weighted pass score cell, shared by the History and Reports tables.
@@ -11,7 +20,8 @@ import { useT } from '~/i18n/index.js';
  * - When only a `summary` is present → plain pass rate, tooltip notes the reason.
  * - When neither is present → dash.
  *
- * Color scale: ≥80% green · ≥50% yellow · <50% red.
+ * Color scale: ≥80% green · ≥50% yellow · <50% red. The ring restates the number
+ * it sits next to, so colour is never the only carrier of the score.
  */
 export function PassScoreCell({
   summary,
@@ -84,7 +94,15 @@ export function PassScoreCell({
       }
       withArrow
     >
-      <Group gap={4} wrap="nowrap">
+      <Group gap={6} wrap="nowrap">
+        {pct !== null && (
+          <RingProgress
+            size={RING_SIZE}
+            thickness={RING_THICKNESS}
+            sections={[{ value: pct, color }]}
+            aria-hidden
+          />
+        )}
         <Text size="xs" fw={600} c={color}>
           {display}
         </Text>

@@ -1,9 +1,13 @@
 import type { RunRequest } from '@hub/shared';
 import {
+  ActionIcon,
   AppShell,
   Badge,
   Burger,
+  Center,
+  Divider,
   Group,
+  Indicator,
   Kbd,
   NavLink,
   ScrollArea,
@@ -11,8 +15,9 @@ import {
   Text,
   Title,
   Tooltip,
+  useMantineTheme,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useHotkeys, useMediaQuery } from '@mantine/hooks';
 import { spotlight } from '@mantine/spotlight';
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
@@ -29,6 +34,8 @@ import {
   TbFolderFilled,
   TbHistory,
   TbKey,
+  TbLayoutSidebarLeftCollapse,
+  TbLayoutSidebarLeftExpand,
   TbPhoto,
   TbPlayerPlay,
   TbReportAnalytics,
@@ -69,16 +76,18 @@ type PagePath =
   | '/webhooks'
   | '/settings';
 
+interface NavItem {
+  path: PagePath;
+  labelKey: TranslationKey;
+  descKey: TranslationKey;
+  icon: React.ReactNode;
+}
+
 interface NavCategory {
   labelKey: TranslationKey;
   /** When true the whole category is tucked behind the "Advanced" toggle. */
   advanced?: boolean;
-  items: {
-    path: PagePath;
-    labelKey: TranslationKey;
-    descKey: TranslationKey;
-    icon: React.ReactNode;
-  }[];
+  items: NavItem[];
 }
 
 const NAV_CATEGORIES: NavCategory[] = [
@@ -173,6 +182,14 @@ const NAV_CATEGORIES: NavCategory[] = [
   },
 ];
 
+/** Pinned below the categories: reached from every page, never scrolled away. */
+const SETTINGS_ITEM: NavItem = {
+  path: '/settings',
+  labelKey: 'nav.settings',
+  descKey: 'nav.settings.desc',
+  icon: <TbSettings size={18} />,
+};
+
 // ---------------------------------------------------------------------------
 // Layout component
 // ---------------------------------------------------------------------------
@@ -181,16 +198,36 @@ const NAV_CATEGORIES: NavCategory[] = [
  * full width below this. One knob to widen/narrow every page at once. */
 const CONTENT_MAX_WIDTH = 1600;
 
+/** Navbar widths. 240px is a fifth of a 1200px screen, so the rail trades the
+ * labels — already covered by ⌘K — for ~180px of content, keeping only the
+ * icons and the two live status badges. */
+const NAVBAR_WIDTH = 240;
+const RAIL_WIDTH = 64;
+
 export function AppLayout() {
   const t = useT();
   const navigate = useNavigate();
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname as PagePath;
 
+  const theme = useMantineTheme();
+
   const [opened, { toggle, close }] = useDisclosure();
   const [floatingOpen, setFloatingOpen] = useState(false);
   const advancedMode = usePreferences((s) => s.advancedMode);
   const setAdvancedMode = usePreferences((s) => s.setAdvancedMode);
+  const navRailCollapsed = usePreferences((s) => s.navRailCollapsed);
+  const setNavRailCollapsed = usePreferences((s) => s.setNavRailCollapsed);
+  // The rail only applies where the navbar is a static column. Below the
+  // AppShell breakpoint it is the burger drawer, which keeps its labels because
+  // tooltips are unreachable on touch.
+  const staticNavbar = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`, true, {
+    getInitialValueInEffect: false,
+  });
+  const rail = navRailCollapsed && staticNavbar;
+  // Editors bind the sidebar to mod+B, so the muscle memory already exists; the
+  // header button advertises it in its tooltip rather than hiding it.
+  useHotkeys([['mod+B', () => setNavRailCollapsed(!navRailCollapsed)]]);
   // Manual collapse state of the advanced nav group. `null` means "follow the
   // advanced-mode preference"; flipping the preference resets it to null so the
   // group re-opens with the mode, while a hand collapse still sticks.
@@ -253,43 +290,102 @@ export function AppLayout() {
     [handleQuickRun],
   );
 
-  const renderCategory = (cat: NavCategory) => (
-    <div key={cat.labelKey}>
-      <Text size="xs" fw={700} c="dimmed" tt="uppercase" px="sm" pt="md" pb={4}>
-        {t(cat.labelKey)}
-      </Text>
-      {cat.items.map((item) => (
+  /** The two live status badges: the running count on Run, the doctor alert on
+   * the Dashboard. `text` names the status for assistive tech and for the hover,
+   * since a colour alone carries nothing. */
+  const itemStatus = (item: NavItem): { color: string; label: string; text: string } | null => {
+    if (item.path === '/run' && runningCount > 0) {
+      return {
+        color: 'blue',
+        label: String(runningCount),
+        text: `${runningCount} ${t('app.running')}`,
+      };
+    }
+    if (item.path === '/' && envUnhealthy) {
+      return { color: 'red', label: '!', text: t('app.envNeedsAttention') };
+    }
+    return null;
+  };
+
+  const renderItem = (item: NavItem) => {
+    const status = itemStatus(item);
+    const active = currentPath === item.path;
+
+    if (rail) {
+      const link = (
+        <NavLink
+          aria-label={status ? `${t(item.labelKey)} (${status.text})` : t(item.labelKey)}
+          label={<Center>{item.icon}</Center>}
+          active={active}
+          onClick={() => navigateTo(item.path)}
+          variant="filled"
+          px={0}
+        />
+      );
+      return (
         <Tooltip
           key={item.path}
-          label={t(item.descKey)}
+          label={t(item.labelKey)}
           position="right"
           withArrow
-          openDelay={400}
-          multiline
-          w={240}
+          openDelay={200}
         >
-          <NavLink
-            label={t(item.labelKey)}
-            leftSection={item.icon}
-            active={currentPath === item.path}
-            onClick={() => navigateTo(item.path)}
-            variant="filled"
-            rightSection={
-              item.path === '/run' && runningCount > 0 ? (
-                <Badge size="xs" color="blue" circle>
-                  {runningCount}
-                </Badge>
-              ) : item.path === '/' && envUnhealthy ? (
-                <Tooltip label={t('app.envNeedsAttention')} withArrow>
-                  <Badge size="xs" color="red" circle>
-                    !
-                  </Badge>
-                </Tooltip>
-              ) : null
-            }
-          />
+          {status ? (
+            // A 64px rail has no room for a rightSection, so the badge floats on
+            // the icon. The offset points inward: a badge outside the item box
+            // would be clipped by the navbar's ScrollArea.
+            <Indicator color={status.color} label={status.label} size={16} offset={8} withBorder>
+              {link}
+            </Indicator>
+          ) : (
+            link
+          )}
         </Tooltip>
-      ))}
+      );
+    }
+
+    return (
+      <Tooltip
+        key={item.path}
+        label={t(item.descKey)}
+        position="right"
+        withArrow
+        openDelay={400}
+        multiline
+        w={240}
+      >
+        <NavLink
+          label={t(item.labelKey)}
+          leftSection={item.icon}
+          active={active}
+          onClick={() => navigateTo(item.path)}
+          variant="filled"
+          rightSection={
+            status ? (
+              <Tooltip label={status.text} withArrow>
+                <Badge size="xs" color={status.color} circle>
+                  {status.label}
+                </Badge>
+              </Tooltip>
+            ) : null
+          }
+        />
+      </Tooltip>
+    );
+  };
+
+  const renderCategory = (cat: NavCategory, index: number) => (
+    <div key={cat.labelKey}>
+      {rail ? (
+        // The category name has nowhere to go at 64px; a rule keeps the grouping
+        // it encoded.
+        index > 0 && <Divider mx="xs" my="xs" />
+      ) : (
+        <Text size="xs" fw={700} c="dimmed" tt="uppercase" px="sm" pt="md" pb={4}>
+          {t(cat.labelKey)}
+        </Text>
+      )}
+      {cat.items.map(renderItem)}
     </div>
   );
 
@@ -303,13 +399,44 @@ export function AppLayout() {
 
       <AppShell
         header={{ height: 56 }}
-        navbar={{ width: 240, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+        navbar={{
+          width: rail ? RAIL_WIDTH : NAVBAR_WIDTH,
+          breakpoint: 'sm',
+          collapsed: { mobile: !opened },
+        }}
         padding="md"
       >
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between">
             <Group gap="sm">
               <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+              {/* The desktop twin of the Burger, in the same corner: the control
+                  that resizes the navbar sits above the navbar's own column, on
+                  the header's existing row, so it costs no extra row anywhere. */}
+              <Tooltip
+                label={
+                  <Group gap={6} wrap="nowrap">
+                    <Text size="xs">{rail ? t('nav.expandRail') : t('nav.collapseRail')}</Text>
+                    <Kbd size="xs">⌘B</Kbd>
+                  </Group>
+                }
+                withArrow
+              >
+                <ActionIcon
+                  visibleFrom="sm"
+                  size="md"
+                  variant="subtle"
+                  color="gray"
+                  aria-label={rail ? t('nav.expandRail') : t('nav.collapseRail')}
+                  onClick={() => setNavRailCollapsed(!navRailCollapsed)}
+                >
+                  {rail ? (
+                    <TbLayoutSidebarLeftExpand size={18} />
+                  ) : (
+                    <TbLayoutSidebarLeftCollapse size={18} />
+                  )}
+                </ActionIcon>
+              </Tooltip>
               <img src="/logo.png" alt="Hub" style={{ height: 32, width: 'auto' }} />
               <Title order={4}>AutoQA Hub</Title>
               {runningCount > 0 && (
@@ -376,50 +503,50 @@ export function AppLayout() {
         <AppShell.Navbar p="xs">
           <AppShell.Section grow component={ScrollArea}>
             {NAV_CATEGORIES.filter((cat) => !cat.advanced).map(renderCategory)}
-            <NavLink
-              mt="xs"
-              label={t('nav.advanced')}
-              leftSection={<TbAdjustmentsHorizontal size={18} />}
-              rightSection={
-                showAdvanced ? <TbChevronDown size={14} /> : <TbChevronRight size={14} />
-              }
-              onClick={() => setAdvancedNavOpen(!showAdvanced)}
-              variant="subtle"
-              c={showAdvanced ? undefined : 'dimmed'}
-            />
-            {/* Nest the advanced categories under the toggle with an indented
-                left rail so items like Docker Services read as "inside
-                Advanced" rather than as their own top-level section. */}
-            {showAdvanced && (
-              <div
-                style={{
-                  marginLeft: 12,
-                  paddingLeft: 8,
-                  borderLeft: '2px solid var(--mantine-color-default-border)',
-                }}
-              >
-                {NAV_CATEGORIES.filter((cat) => cat.advanced).map(renderCategory)}
-              </div>
+            {/* An "Advanced" expander cannot say what it holds at 64px, so the
+                rail drops it and follows the advanced-mode preference directly:
+                the gated items are either all there or reachable via ⌘K and the
+                header switch. */}
+            {rail ? (
+              advancedMode && (
+                <>
+                  <Divider mx="xs" my="xs" />
+                  {NAV_CATEGORIES.filter((cat) => cat.advanced)
+                    .flatMap((cat) => cat.items)
+                    .map(renderItem)}
+                </>
+              )
+            ) : (
+              <>
+                <NavLink
+                  mt="xs"
+                  label={t('nav.advanced')}
+                  leftSection={<TbAdjustmentsHorizontal size={18} />}
+                  rightSection={
+                    showAdvanced ? <TbChevronDown size={14} /> : <TbChevronRight size={14} />
+                  }
+                  onClick={() => setAdvancedNavOpen(!showAdvanced)}
+                  variant="subtle"
+                  c={showAdvanced ? undefined : 'dimmed'}
+                />
+                {/* Nest the advanced categories under the toggle with an indented
+                    left rail so items like Docker Services read as "inside
+                    Advanced" rather than as their own top-level section. */}
+                {showAdvanced && (
+                  <div
+                    style={{
+                      marginLeft: 12,
+                      paddingLeft: 8,
+                      borderLeft: '2px solid var(--mantine-color-default-border)',
+                    }}
+                  >
+                    {NAV_CATEGORIES.filter((cat) => cat.advanced).map(renderCategory)}
+                  </div>
+                )}
+              </>
             )}
           </AppShell.Section>
-          <AppShell.Section>
-            <Tooltip
-              label={t('nav.settings.desc')}
-              position="right"
-              withArrow
-              openDelay={400}
-              multiline
-              w={240}
-            >
-              <NavLink
-                label={t('nav.settings')}
-                leftSection={<TbSettings size={18} />}
-                active={currentPath === '/settings'}
-                onClick={() => navigateTo('/settings')}
-                variant="filled"
-              />
-            </Tooltip>
-          </AppShell.Section>
+          <AppShell.Section>{renderItem(SETTINGS_ITEM)}</AppShell.Section>
         </AppShell.Navbar>
 
         {/* Pin the shell to the viewport height (dvh, not a fixed px) and clip
