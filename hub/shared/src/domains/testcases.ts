@@ -8,6 +8,12 @@ export interface TestCaseDoc {
   path: string;
   ext: 'xlsx' | 'csv';
   size: number;
+  /**
+   * True when a `.edited.json` overlay sits beside the doc — Hub edits and
+   * synced run results live there, so this is what makes the `result` download
+   * variant meaningful. The source doc itself is never modified.
+   */
+  edited: boolean;
 }
 
 /** Parsed contents of a CSV test-case document. */
@@ -60,4 +66,71 @@ export interface TestCaseEditRequest {
   row: number;
   col: number;
   value: string;
+}
+
+/** One test case's outcome from a run, as mapped onto a doc row. */
+export interface TestCaseRunResult {
+  status: 'passed' | 'failed';
+  /** First line of the failure message — fills the row's "Actual Result". */
+  error?: string;
+}
+
+/**
+ * The `.edited.json` overlay that sits beside a source doc. Hub edits and synced
+ * run results are written here; the source `.xlsx`/`.csv` is never modified.
+ */
+export interface TestCaseOverlay {
+  /** Basename of the source doc this overlay belongs to. */
+  source: string;
+  savedAt: string;
+  sheets: TestCaseSheet[];
+  /**
+   * Row → Hub user id, keyed `"<sheetIdx>:<rowIdx>"`. Records WHO edited a row
+   * independently of the display name written into "Edited By", so renaming a
+   * user can rewrite that column without name matching (two users may share a
+   * display name). Absent for overlays written before user identity existed.
+   */
+  editors?: Record<string, string>;
+  /** ISO time of the run whose results were last mapped into this overlay. */
+  lastRunAt?: string;
+}
+
+/** A module of a project that can own a test-case doc. */
+export interface TestCaseModule {
+  /** Module folder name, e.g. `health` — also the doc's filename prefix. */
+  name: string;
+  /** Where the module was discovered: an automation spec folder, a docs folder, or both. */
+  source: 'spec' | 'docs' | 'both';
+  /** Relative path of the module's existing test-case doc, when it already has one. */
+  docRelPath?: string;
+}
+
+/** Payload to scaffold a new per-module test-case doc from the standard template. */
+export interface TestCaseCreateRequest {
+  tool: string;
+  type: string;
+  project: string;
+  /** Module the doc belongs to; must be one of the project's discovered modules. */
+  module: string;
+}
+
+/** The Hub's single local user identity, used to auto-fill "Edited By". */
+export interface HubUser {
+  /**
+   * Stable id, minted once. "Edited By" cells carry the display NAME, so the id
+   * is what lets a rename find and rewrite the rows this user actually edited.
+   */
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Result of renaming the Hub user: how many doc rows had "Edited By" rewritten. */
+export interface HubUserSaveResult {
+  user: HubUser;
+  /** Doc rows whose "Edited By" was rewritten to the new name. */
+  rowsRenamed: number;
+  /** Overlay files touched by the rename. */
+  docsTouched: number;
 }

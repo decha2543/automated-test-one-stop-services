@@ -17,6 +17,7 @@ import {
   Switch,
   Table,
   Text,
+  TextInput,
   Title,
   useMantineColorScheme,
 } from '@mantine/core';
@@ -25,7 +26,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { TbChevronRight, TbMoonStars, TbQrcode, TbRefresh, TbSun, TbTrash } from 'react-icons/tb';
+import {
+  TbChevronRight,
+  TbMoonStars,
+  TbQrcode,
+  TbRefresh,
+  TbSun,
+  TbTrash,
+  TbUser,
+} from 'react-icons/tb';
 import { api } from '~/api/client';
 import { confirmDialog } from '~/components/confirmDialog';
 import { ImportExportPanel } from '~/components/ImportExportPanel';
@@ -35,6 +44,7 @@ import {
   requestDesktopPermission,
   useDesktopNotification,
 } from '~/hooks/useDesktopNotification.js';
+import { useHubUser, useSaveHubUser } from '~/hooks/useHubUser.js';
 import { useNotificationSound } from '~/hooks/useNotificationSound.js';
 import { useResyncWorkspace, useToolOptions } from '~/hooks/useTools.js';
 import { type Locale, useI18nStore, useT } from '~/i18n';
@@ -114,6 +124,15 @@ export function SettingsPage() {
   const resync = useResyncWorkspace();
   const toolOptions = useToolOptions();
   const [qrOpened, { open: openQr, close: closeQr }] = useDisclosure(false);
+
+  // Identity — the name stamped into test-case "Edited By". Seeded from the
+  // server once loaded so the field shows the current name, not a blank.
+  const hubUser = useHubUser();
+  const saveUser = useSaveHubUser();
+  const [nameInput, setNameInput] = useState('');
+  useEffect(() => {
+    if (hubUser.user) setNameInput(hubUser.user.name);
+  }, [hubUser.user]);
 
   // Concurrency
   const concurrencyQ = useQuery<{
@@ -376,7 +395,56 @@ export function SettingsPage() {
         </Paper>
       </SimpleGrid>
 
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+      <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
+        {/* Identity — the name stamped into test-case "Edited By" */}
+        <Paper p="md" withBorder>
+          <Title order={5} mb="sm">
+            {t('user.identity')}
+          </Title>
+          <Stack gap="sm">
+            <Stack gap={2}>
+              <Text size="sm">{t('user.name')}</Text>
+              <Text size="xs" c="dimmed">
+                {t('user.nameDesc')}
+              </Text>
+            </Stack>
+            {hubUser.isLoading ? (
+              <Skeleton height={30} radius="sm" aria-hidden />
+            ) : (
+              <Group gap="xs" wrap="nowrap">
+                <TextInput
+                  size="xs"
+                  style={{ flex: 1 }}
+                  leftSection={<TbUser size={14} />}
+                  placeholder={t('user.namePlaceholder')}
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.currentTarget.value)}
+                  error={saveUser.error ? saveUser.error.message : null}
+                />
+                <Button
+                  size="xs"
+                  loading={saveUser.isPending}
+                  disabled={
+                    nameInput.trim() === '' || nameInput.trim() === (hubUser.user?.name ?? '')
+                  }
+                  onClick={() =>
+                    saveUser.mutate(nameInput.trim(), {
+                      onSuccess: (res) =>
+                        toast.success(
+                          res.rowsRenamed > 0
+                            ? `${t('user.renamed')} — ${res.rowsRenamed} ${t('user.rowsUpdated')}`
+                            : t('user.saved'),
+                        ),
+                    })
+                  }
+                >
+                  {t('common.save')}
+                </Button>
+              </Group>
+            )}
+          </Stack>
+        </Paper>
+
         {/* Webhooks */}
         <Paper p="md" withBorder>
           <Group justify="space-between">

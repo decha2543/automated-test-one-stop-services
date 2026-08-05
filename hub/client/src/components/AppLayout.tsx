@@ -50,6 +50,7 @@ import { LanguageToggle } from '~/components/LanguageToggle.js';
 import { NotificationCenter } from '~/components/NotificationCenter.js';
 import { PageLoader } from '~/components/PageLoader.js';
 import { SpotlightSearch } from '~/components/SpotlightSearch.js';
+import { UserNameGate } from '~/components/UserNameGate.js';
 import { useRunFinishedNotifier } from '~/hooks/useRunFinishedNotifier.js';
 import { useScheduleToasts } from '~/hooks/useScheduleToasts.js';
 import type { TranslationKey } from '~/i18n/en';
@@ -396,6 +397,9 @@ export function AppLayout() {
         onLoadBookmark={handleSpotlightBookmark}
       />
       <KeyboardShortcuts />
+      {/* Asks for a display name on first open — test-case edits are stamped
+          with it, so there is no useful state without one. */}
+      <UserNameGate />
 
       <AppShell
         header={{ height: 56 }}

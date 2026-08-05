@@ -25,6 +25,7 @@ import { isDockerRunning } from './services/docker.js';
 import { historyStore } from './services/history-store.js';
 import { flushPersistence } from './services/persistence.js';
 import { runner } from './services/runner.js';
+import { startTestCaseStatusSync } from './services/testcase-status-sync.js';
 import { killAllTraceProcesses } from './services/trace-processes.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -97,6 +98,11 @@ async function main(): Promise<void> {
   // inside `openLocalDb`, so services that load state at construction time
   // (scheduler, webhooks, env-profiles, …) read a fully-prepared database.
   getDb();
+
+  // Map each finished run's results onto its project's test-case docs. Wired
+  // here (not lazily from a route) so a run started before anyone opens the Test
+  // Cases page still has its results recorded.
+  startTestCaseStatusSync();
 
   /**
    * Auto-load every route file under `src/routes/`. Each file exports a

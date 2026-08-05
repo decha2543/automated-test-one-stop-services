@@ -1,9 +1,13 @@
 import type {
   DoctorReport,
   EnvFile,
+  HubUser,
   ProjectSummary,
   RunRecord,
   TagsResponse,
+  TestCaseDoc,
+  TestCaseGrid,
+  TestCaseModule,
   ToolId,
 } from '@hub/shared';
 import { queryOptions } from '@tanstack/react-query';
@@ -143,4 +147,57 @@ export const qProjectEnv = (
       api.get<EnvFile>(`/api/env/project?tool=${tool}&type=${type}&project=${project}`),
     enabled: !!tool && !!type && !!project,
     staleTime: STALE.short,
+  });
+
+// ---------------------------------------------------------------------------
+// Test-case documents
+// ---------------------------------------------------------------------------
+
+/** Test-case docs (xlsx/csv) discovered under one project. */
+export const qTestCaseDocs = (
+  tool: ToolId | undefined | '',
+  type: string | undefined | '',
+  project: string | undefined | '',
+) =>
+  queryOptions({
+    queryKey: ['testcases', tool, type, project] as const,
+    queryFn: () =>
+      api.get<TestCaseDoc[]>(`/api/testcases?tool=${tool}&type=${type}&project=${project}`),
+    enabled: !!tool && !!type && !!project,
+    staleTime: STALE.short,
+  });
+
+/** A project's modules and which of them already own a test-case doc. */
+export const qTestCaseModules = (
+  tool: ToolId | undefined | '',
+  type: string | undefined | '',
+  project: string | undefined | '',
+) =>
+  queryOptions({
+    queryKey: ['testcase-modules', tool, type, project] as const,
+    queryFn: () =>
+      api.get<TestCaseModule[]>(
+        `/api/testcases/modules?tool=${tool}&type=${type}&project=${project}`,
+      ),
+    enabled: !!tool && !!type && !!project,
+    staleTime: STALE.short,
+  });
+
+/**
+ * One doc as an editable grid. Left at the default `staleTime: 0` on purpose —
+ * a run writes synced results into the doc's overlay behind the Hub's back, so
+ * reopening the editor must always show what is actually on disk.
+ */
+export const qTestCaseGrid = (docPath: string) =>
+  queryOptions({
+    queryKey: ['tc-grid', docPath] as const,
+    queryFn: () => api.get<TestCaseGrid>(`/api/testcases/grid?path=${encodeURIComponent(docPath)}`),
+  });
+
+/** The Hub's local user identity (`user: null` until a name has been set). */
+export const qHubUser = () =>
+  queryOptions({
+    queryKey: ['hub-user'] as const,
+    queryFn: () => api.get<{ user: HubUser | null }>('/api/user'),
+    staleTime: STALE.moderate,
   });

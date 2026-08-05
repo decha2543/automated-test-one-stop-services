@@ -26,7 +26,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { TbAlertTriangle, TbChevronRight, TbPlayerPlay, TbPlus, TbRefresh } from 'react-icons/tb';
 import { api } from '~/api/client.js';
-import { qProjectTags } from '~/api/queries.js';
+import { qProjectTags, qTestCaseGrid } from '~/api/queries.js';
 import { InlineAlert } from '~/components/InlineAlert.js';
 import { ListSkeleton } from '~/components/Skeletons.js';
 import { toast } from '~/components/Toast.js';
@@ -57,7 +57,19 @@ const SUMMARY_HEADERS = [
   'Test Type',
   'Severity',
   'Priority',
+  // Status is where a run's outcome lands, so it belongs on the collapsed row —
+  // otherwise the result of a run is only visible after expanding every case.
+  'Status',
 ];
+
+const STATUS_HEADER = 'Status';
+/** Status value → badge colour. Text is always shown too, never colour alone. */
+const STATUS_COLOR: Record<string, string> = {
+  Pass: 'green',
+  Fail: 'red',
+  Blocked: 'orange',
+  Skipped: 'gray',
+};
 
 // Wrap cell text the way Excel's "wrap text" does: honor explicit newlines and
 // let long content flow onto multiple lines instead of being clipped.
@@ -139,10 +151,7 @@ export function TestCaseGridEditor({ doc, tool, type, project }: TestCaseGridEdi
     setEditCell(null);
   }, [sheetIdx, doc.path]);
 
-  const gridQ = useQuery<TestCaseGrid>({
-    queryKey: key,
-    queryFn: () => api.get(`/api/testcases/grid?path=${encodeURIComponent(doc.path)}`),
-  });
+  const gridQ = useQuery(qTestCaseGrid(doc.path));
 
   // Which case ids are actually runnable — a case is runnable only when some
   // spec declares `@<caseId>` as a tag. Reuses the Run page's cached tag scan
@@ -174,6 +183,9 @@ export function TestCaseGridEditor({ doc, tool, type, project }: TestCaseGridEdi
     onSuccess: (res) => {
       qc.setQueryData(key, res.grid);
       if (res.runAt === null) toast.error(t('testcases.noRun'));
+      // A run that matched nothing is a coverage gap, not a failed sync — say so,
+      // otherwise it reads as "the Hub did nothing".
+      else if (res.matched === 0) toast.error(t('testcases.syncNoMatch'));
       else toast.success(`${res.matched}/${res.total} ${t('testcases.syncMatched')}`);
     },
   });
@@ -456,6 +468,25 @@ export function TestCaseGridEditor({ doc, tool, type, project }: TestCaseGridEdi
                       const value = row[col] ?? '';
                       if (name === ID_HEADER) {
                         return <Table.Td key={col}>{idCell(idVal)}</Table.Td>;
+                      }
+                      if (name === STATUS_HEADER) {
+                        return (
+                          <Table.Td key={col} style={{ verticalAlign: 'top' }}>
+                            {value ? (
+                              <Badge
+                                size="xs"
+                                variant="light"
+                                color={STATUS_COLOR[value] ?? 'gray'}
+                              >
+                                {value}
+                              </Badge>
+                            ) : (
+                              <Text size="xs" c="dimmed">
+                                —
+                              </Text>
+                            )}
+                          </Table.Td>
+                        );
                       }
                       return (
                         <Table.Td key={col} style={{ verticalAlign: 'top' }}>

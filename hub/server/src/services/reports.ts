@@ -104,7 +104,7 @@ function statusCompatible(reportStatus: ReportEntry['status'], runStatus: RunSta
  * report timestamp sits within (or right next to) the run's [startedAt, endedAt]
  * window. This is a heuristic — an old report whose run has aged out of the
  * capped history simply gets no summary, and two runs of the same project within
- * the match window resolve to the nearest. Advisory only: any failure to read
+ * the match window resolve to the nearest. Advisory only — a failure to read
  * history leaves reports un-enriched rather than breaking the listing.
  */
 function attachSummaries(entries: ReportEntry[]): void {
@@ -168,23 +168,29 @@ export function invalidateReportsCache(): void {
 }
 
 /**
- * Map run id → severity breakdown, by matching each run to its report entry.
+ * Map run id → the report entry that run produced.
  *
- * `RunRecord` carries no path to its output dir, so history cannot locate its
- * own `results.json`. The report listing already parses severity per report and
- * knows the outputs layout, so we reverse the report↔run match here (same
- * tool/type/project + status + nearest-time-within-window heuristic as
- * `attachSummaries`) and hand back the severity the report service already
- * computed — no second parse. Best-effort: unmatched runs are simply absent.
+ * `RunRecord` carries no path to its output dir (`reportPath` is never written
+ * by the runner), so history cannot locate its own `results.json`. The report
+ * listing already knows the outputs layout, so we reverse the report↔run match
+ * here — same tool/type/project + status + nearest-time-within-window heuristic
+ * as `attachSummaries`. Best-effort: unmatched runs are simply absent.
+ *
+ * `filter` narrows which report entries are eligible (e.g. only entries that
+ * already carry a severity breakdown), so a caller never matches a run to an
+ * entry it cannot use.
  */
-export async function severityByRun(runs: RunRecord[]): Promise<Map<string, SeverityBreakdown>> {
-  const result = new Map<string, SeverityBreakdown>();
+export async function reportEntryByRun(
+  runs: RunRecord[],
+  filter?: (entry: ReportEntry) => boolean,
+): Promise<Map<string, ReportEntry>> {
+  const result = new Map<string, ReportEntry>();
   if (runs.length === 0) return result;
 
   const entries = await listReports();
   const byKey = new Map<string, ReportEntry[]>();
   for (const e of entries) {
-    if (!e.severity) continue;
+    if (filter && !filter(e)) continue;
     const key = `${e.tool}/${e.type}/${e.project}`;
     const list = byKey.get(key);
     if (list) list.push(e);
@@ -214,7 +220,20 @@ export async function severityByRun(runs: RunRecord[]): Promise<Map<string, Seve
         best = e;
       }
     }
-    if (best?.severity && bestDist <= MATCH_WINDOW_MS) result.set(run.id, best.severity);
+    if (best && bestDist <= MATCH_WINDOW_MS) result.set(run.id, best);
+  }
+  return result;
+}
+
+/**
+ * Map run id → severity breakdown, reusing {@link reportEntryByRun} and the
+ * severity the report service already parsed — no second parse of `results.json`.
+ */
+export async function severityByRun(runs: RunRecord[]): Promise<Map<string, SeverityBreakdown>> {
+  const matched = await reportEntryByRun(runs, (e) => !!e.severity);
+  const result = new Map<string, SeverityBreakdown>();
+  for (const [runId, entry] of matched) {
+    if (entry.severity) result.set(runId, entry.severity);
   }
   return result;
 }

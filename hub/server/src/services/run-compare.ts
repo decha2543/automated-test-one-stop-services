@@ -10,11 +10,22 @@ import type {
 } from '@hub/shared';
 
 /** Minimal shape of the Playwright JSON reporter output we read. */
+interface PwError {
+  message?: string;
+}
+interface PwTestResult {
+  error?: PwError;
+  errors?: PwError[];
+}
+interface PwTest {
+  results?: PwTestResult[];
+}
 interface PwSpec {
   ok?: boolean;
   title?: string;
   id?: string;
   tags?: string[];
+  tests?: PwTest[];
 }
 interface PwSuite {
   file?: string;
@@ -30,6 +41,30 @@ export interface RunOutcome {
   status: TestStatus;
   /** Playwright tags on the spec (includes cover tags like `TC-<docId>`). */
   tags?: string[];
+  /** First line of the failure message, when the test failed. */
+  error?: string;
+}
+
+/** Max length of the failure summary we carry into a test-case doc cell. */
+const MAX_ERROR_CHARS = 500;
+// biome-ignore lint/suspicious/noControlCharactersInRegex: strip terminal colour codes from reporter output
+const ANSI_RE = /\u001B\[[0-9;]*m/g;
+
+/**
+ * First line of a failed spec's error message, stripped of ANSI colour codes and
+ * capped — enough to fill a doc's "Actual Result" without pasting a whole stack.
+ * Returns undefined when the reporter recorded no message.
+ */
+function firstErrorMessage(spec: PwSpec): string | undefined {
+  for (const test of spec.tests ?? []) {
+    for (const result of test.results ?? []) {
+      const raw = result.error?.message ?? result.errors?.find((e) => e.message)?.message;
+      if (!raw) continue;
+      const line = raw.replace(ANSI_RE, '').split('\n')[0]?.trim();
+      if (line) return line.slice(0, MAX_ERROR_CHARS);
+    }
+  }
+  return undefined;
 }
 
 const MAX_RESULTS_JSON_BYTES = 25 * 1024 * 1024;
@@ -41,7 +76,15 @@ function collectOutcomes(suite: PwSuite, fileHint: string | undefined, out: RunO
     // spec.id is a stable hash across runs of the same test; fall back to
     // file::title when a reporter omits it.
     const key = spec.id || `${file ?? ''}::${title}`;
-    out.push({ key, title, file, status: spec.ok ? 'passed' : 'failed', tags: spec.tags ?? [] });
+    const error = spec.ok ? undefined : firstErrorMessage(spec);
+    out.push({
+      key,
+      title,
+      file,
+      status: spec.ok ? 'passed' : 'failed',
+      tags: spec.tags ?? [],
+      ...(error ? { error } : {}),
+    });
   }
   for (const child of suite.suites ?? []) collectOutcomes(child, file, out);
 }
