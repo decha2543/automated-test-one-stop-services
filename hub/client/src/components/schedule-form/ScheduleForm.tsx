@@ -12,6 +12,7 @@ import {
   Stack,
   Text,
   TextInput,
+  Tooltip,
 } from '@mantine/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { CronExpressionParser } from 'cron-parser';
@@ -147,6 +148,7 @@ export function ScheduleForm({
     extraArgs: '',
     noTrack: false,
     silent: false,
+    discardReport: false,
     section: '',
     perfType: 'LOAD' as PerformanceType,
   };
@@ -162,6 +164,7 @@ export function ScheduleForm({
   const [extraArgs, setExtraArgs] = useState(defaults.extraArgs);
   const [noTrack, setNoTrack] = useState(defaults.noTrack);
   const [silent, setSilent] = useState(defaults.silent);
+  const [discardReport, setDiscardReport] = useState(defaults.discardReport);
   const [section, setSection] = useState(defaults.section);
   const [perfType, setPerfType] = useState<PerformanceType>(defaults.perfType);
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
@@ -178,6 +181,7 @@ export function ScheduleForm({
     setExtraArgs(schedule.config.extraArgs ?? '');
     setNoTrack(schedule.config.noTrack ?? false);
     setSilent(fromConfigSilent(schedule.config));
+    setDiscardReport(schedule.config.discardReport ?? false);
     setSection(schedule.config.section ?? '');
     setPerfType(schedule.config.performanceType ?? 'LOAD');
     setSelectedTags(parseTagExpression(schedule.config.tag));
@@ -195,6 +199,7 @@ export function ScheduleForm({
     setExtraArgs(defaults.extraArgs);
     setNoTrack(defaults.noTrack);
     setSilent(defaults.silent);
+    setDiscardReport(defaults.discardReport);
     setSection(defaults.section);
     setPerfType(defaults.perfType);
     setSelectedTags(defaults.selectedTags);
@@ -258,6 +263,9 @@ export function ScheduleForm({
         extraArgs: extraArgs || undefined,
         noTrack: noTrack || undefined,
         silent: toConfigSilent(silent),
+        // Silent discards the report already; storing both would read as two
+        // competing intents on the same schedule.
+        discardReport: discardReport && !silent ? true : undefined,
         section: sectionAxis ? section || undefined : undefined,
         performanceType: sectionAxis ? perfType : undefined,
       };
@@ -292,16 +300,22 @@ export function ScheduleForm({
         />
 
         <Stack gap={4}>
-          {advancedMode && (
-            <TextInput
-              label={t('schedule.cronExpr')}
-              value={cronExpr}
-              onChange={(e) => setCronExpr(e.currentTarget.value)}
-              placeholder="0 8 * * *"
-              styles={{ input: { fontFamily: 'monospace' } }}
-              description={cronDescription}
-            />
-          )}
+          {/* The cron IS the schedule, so it is always editable. Hiding it behind
+              advanced mode meant a schedule whose cron matched no preset below
+              could be read (via cronDescription) but never changed — the presets
+              cannot express an arbitrary expression. */}
+          <TextInput
+            label={t('schedule.cronExpr')}
+            value={cronExpr}
+            onChange={(e) => setCronExpr(e.currentTarget.value)}
+            placeholder="0 8 * * *"
+            styles={{ input: { fontFamily: 'monospace' } }}
+            description={cronDescription}
+            error={cronDescription?.startsWith('invalid') ? cronDescription : undefined}
+          />
+          <Text size="xs" c="dimmed">
+            {t('schedule.cronPresetHint')}
+          </Text>
           <Group gap={4} wrap="wrap">
             {cronPresets.map((p) => (
               <Badge
@@ -325,11 +339,6 @@ export function ScheduleForm({
               </Badge>
             ))}
           </Group>
-          {!advancedMode && cronDescription && (
-            <Text size="xs" c="dimmed">
-              {cronDescription}
-            </Text>
-          )}
         </Stack>
 
         <Paper withBorder p="sm" mt="xs">
@@ -456,6 +465,18 @@ export function ScheduleForm({
               checked={silent}
               onChange={(e) => setSilent(e.currentTarget.checked)}
             />
+
+            {/* The main reason this exists: a schedule that repeats daily would
+                otherwise grow outputs/ forever. Silent already discards more. */}
+            <Tooltip label={t('run.discardReportHint')} withArrow multiline w={280}>
+              <Checkbox
+                size="xs"
+                label={t('run.discardReport')}
+                disabled={silent}
+                checked={discardReport && !silent}
+                onChange={(e) => setDiscardReport(e.currentTarget.checked)}
+              />
+            </Tooltip>
           </Stack>
         </Paper>
 

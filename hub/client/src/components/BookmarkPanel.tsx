@@ -82,6 +82,7 @@ function leafDigest(c: RunRequest): string {
   if (c.performanceType) parts.push(c.performanceType);
   if (c.headless) parts.push(c.headless);
   if (c.silent) parts.push('silent');
+  if (c.discardReport) parts.push('no report');
   if (c.noTrack) parts.push('no-track');
   return parts.filter(Boolean).join(' · ');
 }

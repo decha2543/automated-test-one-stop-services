@@ -176,6 +176,10 @@ export const en = {
   'run.extraArgs': 'Extra Args',
   'run.skipUsageLogging': 'Skip usage logging',
   'run.silentMode': 'Silent mode (no history/logs)',
+  'schedule.cronPresetHint': 'Or pick a preset below.',
+  'run.discardReport': 'Discard report after the run',
+  'run.discardReportHint':
+    'Keeps the history record and updates test-case Status, then deletes the HTML report, traces and videos. For a job that repeats often, so outputs/ stays small.',
   'run.credentialsMissing': 'Google credentials not found — usage logging will fail.',
   'run.uploadCredentials': 'Upload credentials.json',
   'run.credentialsUploaded': 'Credentials uploaded',

@@ -1,11 +1,10 @@
 import path from 'node:path';
-import type { RunRecord, TestCaseRunResult, WsServerEvent } from '@hub/shared';
+import type { RunRecord, TestCaseRunResult } from '@hub/shared';
 import { TOOLS_DIR } from '../config.js';
 import { getHubUser } from './hub-user.js';
 import { isUnder } from './path-guard.js';
-import { invalidateReportsCache, reportEntryByRun } from './reports.js';
+import { reportEntryByRun } from './reports.js';
 import { parseRunOutcomes } from './run-compare.js';
-import { runner } from './runner.js';
 import { applyRunStatus, listTestCaseDocs } from './testcases.js';
 
 /** Per-doc outcome of one sync pass. */
@@ -92,62 +91,5 @@ export async function syncDocsForRun(
   return { results, ...(resolved ? { reportPath: resolved } : {}), runAt };
 }
 
-/**
- * Auto-sync run results into test-case docs when a run finishes.
- *
- * Before this, mapping only happened when the user pressed "Sync last-run
- * status" — and even then it could never match, because the manual path filtered
- * history on `RunRecord.reportPath`, which nothing ever sets. Runs therefore
- * completed without creating or updating any `.edited.json`.
- *
- * Silent runs are skipped by contract (they must leave no trace on disk).
- */
-/** Delays before each attempt to locate the finished run's report. */
-const REPORT_WAIT_STEPS_MS = [0, 2000, 5000];
-
-/**
- * Sync as soon as the run's report is on disk. The report directory is promoted
- * by the task itself, and on Windows that move is retried around file locks, so
- * it can land slightly after the process exits. We therefore poll a few times
- * instead of giving up on the first miss; a run that produced no report at all
- * (cancelled early, non-Playwright tool) simply falls through.
- */
-async function syncWhenReportLands(record: RunRecord): Promise<void> {
-  for (const [attempt, delayMs] of REPORT_WAIT_STEPS_MS.entries()) {
-    if (attempt > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-      // The reports listing is cached for 10s; without dropping it here a retry
-      // would keep reading the same pre-promotion snapshot.
-      invalidateReportsCache();
-    }
-    const reportPath = await resolveReportPath(record);
-    if (!reportPath) continue;
-    await syncDocsForRun(record, reportPath);
-    return;
-  }
-}
-
-let started = false;
-
-/**
- * Subscribe to run completion so results land in the docs' overlays without the
- * user pressing anything.
- *
- * Before this, mapping only happened on "Sync last-run status" — and even then it
- * could never match, because that path filtered history on
- * `RunRecord.reportPath`, which nothing ever sets. Runs therefore finished
- * without creating or updating any `.edited.json`.
- *
- * Idempotent, and silent runs are skipped by contract (they leave no trace).
- */
-export function startTestCaseStatusSync(): void {
-  if (started) return;
-  started = true;
-  runner.on('event', (event: WsServerEvent) => {
-    if (event.kind !== 'run-finished') return;
-    if (event.record.request.silent === true) return;
-    void syncWhenReportLands(event.record).catch(() => {
-      // Advisory: a doc that cannot be written must never fail a run.
-    });
-  });
-}
+// Run completion is wired in `post-run.ts`, which owns the order of the
+// after-run steps: locate the report, sync from it, and only then discard it.

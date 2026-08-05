@@ -133,6 +133,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   const [extraArgs, setExtraArgs] = useState(initialConfig?.extraArgs ?? '');
   const [noTrack, setNoTrack] = useState(initialConfig?.noTrack ?? false);
   const [silent, setSilent] = useState(initialConfig?.silent ?? false);
+  const [discardReport, setDiscardReport] = useState(initialConfig?.discardReport ?? false);
   const [section, setSection] = useState(initialConfig?.section ?? '');
   const [perfType, setPerfType] = useState<PerformanceType>(
     initialConfig?.performanceType ?? 'LOAD',
@@ -467,6 +468,9 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
       extraArgs: effectiveExtraArgs,
       noTrack,
       silent,
+      // Silent discards the report already, so never send both — the stored
+      // config then reads as exactly one intent.
+      discardReport: discardReport && !silent,
       section: sectionAxis ? section : undefined,
       performanceType: sectionAxis ? perfType : undefined,
     };
@@ -514,6 +518,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
       extraArgs: effectiveExtraArgs,
       noTrack: effectiveNoTrack,
       silent,
+      discardReport: discardReport && !silent,
       section: sectionAxis ? section : undefined,
       performanceType: sectionAxis ? perfType : undefined,
     });
@@ -825,6 +830,18 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
                   checked={silent}
                   onChange={(e) => setSilent(e.currentTarget.checked)}
                 />
+
+                {/* Silent already discards the report, so the narrower option is
+                    redundant (and misleading) while it is on. */}
+                <Tooltip label={t('run.discardReportHint')} withArrow multiline w={280}>
+                  <Checkbox
+                    size="xs"
+                    label={t('run.discardReport')}
+                    disabled={isRunning || silent}
+                    checked={discardReport && !silent}
+                    onChange={(e) => setDiscardReport(e.currentTarget.checked)}
+                  />
+                </Tooltip>
               </Group>
             </Stack>
           )}

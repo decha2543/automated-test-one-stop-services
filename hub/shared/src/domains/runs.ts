@@ -28,8 +28,17 @@ export interface RunRequest {
   extraArgs?: string;
   /** Disable Google Sheet usage logging. */
   noTrack?: boolean;
-  /** Disable Local logging and report. */
+  /** Leave no trace: no history row, no report on disk, no test-case status sync. */
   silent?: boolean;
+  /**
+   * Delete the run's report directory once it has been used.
+   *
+   * Unlike {@link silent} this is a fully recorded run — history, live output and
+   * the test-case status sync all happen — only the HTML report / traces / videos
+   * are removed afterwards, so a repeating job (a daily bot) does not grow
+   * `outputs/` without bound. Ignored when `silent` is set, which discards more.
+   */
+  discardReport?: boolean;
   // k6-only
   section?: string;
   performanceType?: PerformanceType;

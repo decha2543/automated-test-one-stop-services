@@ -24,8 +24,8 @@ import { getDb } from './services/db.js';
 import { isDockerRunning } from './services/docker.js';
 import { historyStore } from './services/history-store.js';
 import { flushPersistence } from './services/persistence.js';
+import { startPostRunPipeline } from './services/post-run.js';
 import { runner } from './services/runner.js';
-import { startTestCaseStatusSync } from './services/testcase-status-sync.js';
 import { killAllTraceProcesses } from './services/trace-processes.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -99,10 +99,11 @@ async function main(): Promise<void> {
   // (scheduler, webhooks, env-profiles, …) read a fully-prepared database.
   getDb();
 
-  // Map each finished run's results onto its project's test-case docs. Wired
-  // here (not lazily from a route) so a run started before anyone opens the Test
-  // Cases page still has its results recorded.
-  startTestCaseStatusSync();
+  // After-run steps: map each finished run's results onto its project's
+  // test-case docs, then drop the report when the run asked for that. Wired here
+  // (not lazily from a route) so a run started before anyone opens the Test Cases
+  // page still has its results recorded.
+  startPostRunPipeline();
 
   /**
    * Auto-load every route file under `src/routes/`. Each file exports a

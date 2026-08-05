@@ -1,8 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import fs from 'node:fs';
-import fsp from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -54,19 +51,6 @@ const RECENT_FINISHED_LIMIT = 20;
  */
 const CANCEL_FINALIZE_GRACE_MS = 5000;
 
-/**
- * Filesystem prefix for a silent run's ephemeral output directory. The run id
- * is appended to form `os.tmpdir()/hub-silent-<id>`. The directory exists only
- * for the lifetime of the run and is removed by `purgeRunArtifacts`, so a
- * silent run never touches the persistent `outputs/` tree.
- */
-const SILENT_TMP_PREFIX = 'hub-silent-';
-
-/** Resolve the ephemeral temp dir path for a silent run id. */
-function silentTmpDirFor(id: string): string {
-  return path.join(os.tmpdir(), `${SILENT_TMP_PREFIX}${id}`);
-}
-
 interface ActiveRun {
   record: RunRecord;
   child: ChildProcess;
@@ -76,11 +60,6 @@ interface ActiveRun {
   outputTruncated: boolean;
   /** True when the run requested silent mode (no trace). */
   silent: boolean;
-  /**
-   * Absolute path to the ephemeral temp dir for a silent run's output, or
-   * `null` for a normal run. Created on spawn, deleted in `purgeRunArtifacts`.
-   */
-  silentTmpDir: string | null;
   /**
    * Set to `true` by `cancel(id)` when a cancellation has been requested for
    * this run. The close handler consults it so the terminal status is
@@ -275,20 +254,6 @@ class RunnerService extends EventEmitter {
 
     const silent = record.request.silent === true;
 
-    // For silent runs, create an ephemeral temp dir to absorb any output the
-    // task would otherwise write under outputs/. It is deleted in
-    // purgeRunArtifacts so the persistent outputs/ tree never changes.
-    let silentTmpDir: string | null = null;
-    if (silent) {
-      silentTmpDir = silentTmpDirFor(record.id);
-      try {
-        fs.mkdirSync(silentTmpDir, { recursive: true });
-      } catch {
-        // Non-fatal: the run still proceeds; purge is best-effort either way.
-        silentTmpDir = null;
-      }
-    }
-
     // Strip pnpm internals from PATH (same trick scripts/runner.ts uses).
     // PYTHONUNBUFFERED=1 forces line-buffered stdout from Python tools (Robot
     // Framework) so the Hub streams their output live instead of in big blocks
@@ -303,13 +268,6 @@ class RunnerService extends EventEmitter {
         .filter((p) => !p.includes('@pnpm'))
         .join(path.delimiter);
     }
-    // Point a silent run's output at its ephemeral temp dir. The task layer
-    // reads HUB_SILENT_OUTPUT_DIR when present; absent it falls back to
-    // outputs/. Either way purgeRunArtifacts removes the temp dir afterwards.
-    if (silent && silentTmpDir) {
-      env.HUB_SILENT_OUTPUT_DIR = silentTmpDir;
-    }
-
     const child = spawn(command, {
       shell: BASH_PATH,
       cwd: WORKSPACE_ROOT,
@@ -339,7 +297,6 @@ class RunnerService extends EventEmitter {
       outputBuffer: '',
       outputTruncated: false,
       silent,
-      silentTmpDir,
       cancelRequested: false,
       killJob,
     };
@@ -438,8 +395,9 @@ class RunnerService extends EventEmitter {
       this.updateLastStatus(finished);
       invalidateReportsCache();
     } else {
-      // drop the output buffer, active entry and ephemeral temp
-      // dir immediately so nothing about the run remains in memory or on disk.
+      // Drop the output buffer and active entry immediately so nothing about the
+      // run stays in memory. The report files it wrote under `outputs/` are
+      // removed by `post-run`, which waits for them to land first.
       this.purgeRunArtifacts(id);
     }
 
@@ -461,19 +419,16 @@ class RunnerService extends EventEmitter {
   }
 
   /**
-   * Remove every in-memory and on-disk trace of a run: its live output
-   * buffer, its active-list entry, and its ephemeral silent temp dir. Safe to
-   * call for any run id (no-op when nothing is tracked). Synchronous removals
-   * happen immediately; the temp-dir delete is fire-and-forget but scheduled
-   * right away so it completes well within 1s.
+   * Drop a run's in-memory trace: its live output buffer and active-list entry.
+   * Safe to call for any run id (no-op when nothing is tracked).
+   *
+   * On-disk report files are NOT removed here — the report lands under
+   * `outputs/` written by the tool itself, and deleting it has to wait until
+   * anything that reads it (the test-case status sync) is done. `post-run` owns
+   * that ordering.
    */
   purgeRunArtifacts(id: string): void {
-    const run = this.active.get(id);
-    // Resolve the temp dir even if the active entry is already gone so a
-    // late/duplicate purge still cleans up disk.
-    const tmpDir = run?.silentTmpDir ?? silentTmpDirFor(id);
     this.active.delete(id);
-    void fsp.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
 
   private drainQueue(): void {

@@ -174,6 +174,10 @@ export const th: Record<TranslationKey, string> = {
   'run.extraArgs': 'ตัวเลือกเพิ่มเติม',
   'run.skipUsageLogging': 'ไม่บันทึกการใช้งาน',
   'run.silentMode': 'โหมดเงียบ (ไม่เก็บประวัติ/log)',
+  'schedule.cronPresetHint': 'หรือเลือกจากรูปแบบสำเร็จด้านล่าง',
+  'run.discardReport': 'ลบ report หลังรันเสร็จ',
+  'run.discardReportHint':
+    'ยังเก็บประวัติและอัปเดต Status ในเทสเคสให้ แล้วค่อยลบ HTML report, trace, วิดีโอ เหมาะกับงานที่รันซ้ำบ่อยเพื่อไม่ให้ outputs/ บวม',
   'run.credentialsMissing': 'ไม่พบ Google credentials — การบันทึกการใช้งานจะล้มเหลว',
   'run.uploadCredentials': 'อัปโหลด credentials.json',
   'run.credentialsUploaded': 'อัปโหลด credentials แล้ว',

@@ -38,6 +38,7 @@ export const RUN_REQUEST_DDL = `
   req_extra_args       TEXT,
   req_no_track         INTEGER,
   req_silent           INTEGER,
+  req_discard_report   INTEGER,
   req_section          TEXT,
   req_performance_type TEXT
 `;

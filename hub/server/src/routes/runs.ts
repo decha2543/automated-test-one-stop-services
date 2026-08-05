@@ -24,6 +24,7 @@ const runRequestSchema = z.object({
   extraArgs: z.string().optional(),
   noTrack: z.boolean().optional(),
   silent: z.boolean().optional(),
+  discardReport: z.boolean().optional(),
   section: z.string().optional(),
   performanceType: z
     .enum(['TEST_PROTOCOL', 'MINIMAL_LOAD', 'LOAD', 'STRESS', 'ENDURANCE', 'PEAK'])
