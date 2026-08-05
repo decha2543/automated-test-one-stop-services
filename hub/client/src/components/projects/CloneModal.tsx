@@ -14,7 +14,7 @@ interface CloneModalProps {
   opened: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  /** When provided, pre-selects this tool on open (used by per-tool "Clone project"). */
+  /** When provided, pre-selects this tool on open (used by per-tool "Import project"). */
   initialTool?: ToolId;
 }
 

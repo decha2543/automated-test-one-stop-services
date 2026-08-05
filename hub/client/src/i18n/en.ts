@@ -234,7 +234,7 @@ export const en = {
   'history.title': 'Run History',
   'webhooks.title': 'Webhooks',
   'projects.addTools': 'Add other tools',
-  'projects.pullAll': 'Pull All',
+  'projects.pullAll': 'Update All',
   'webhooks.newWebhook': 'New Webhook',
   'history.exportCsv': 'Export CSV',
   'history.clearHistory': 'Clear History',
@@ -252,7 +252,7 @@ export const en = {
   'flaky.emptyForProject': 'No flaky tests for this project.',
 
   // Projects modals (create / clone)
-  'projects.cloneTitle': 'Clone project',
+  'projects.cloneTitle': 'Import project',
   'projects.gitUrl': 'Git URL',
   'projects.folderName': 'Folder name (optional)',
   'projects.folderNamePlaceholder': 'Defaults to the repository name',
@@ -286,7 +286,7 @@ export const en = {
   'projectRow.noEnv': 'no .env',
   'projectRow.envMissing': 'env missing',
   'projectRow.ready': 'ready',
-  'projectRow.pull': 'Pull',
+  'projectRow.pull': 'Update',
   'projectRow.lastRun': 'Last run:',
   'projectRow.reveal': 'Reveal in file explorer',
   'projectRow.revealFailed': 'Reveal failed',
@@ -294,7 +294,7 @@ export const en = {
   // Tool lifecycle
   'tools.enable': 'Enable tool',
   'tools.disable': 'Disable tool',
-  'tools.cloneProject': 'Clone project',
+  'tools.cloneProject': 'Import project',
   'tools.removeProjectsFirst': 'Remove its projects first',
   'tools.deletePermanently': 'Permanently delete',
   'tools.updated': 'Updated',
@@ -734,8 +734,8 @@ export const en = {
   'projects.hubRestarted': 'Hub restarted — reload to apply',
   'projects.hubRestartTimeout': 'Hub restart timed out — check server manually',
   'projects.hubRebuilt': 'Hub rebuilt successfully — reload to apply',
-  'projects.pullAllFailed': 'Pull all failed',
-  'projects.pullFailed': 'Pull failed',
+  'projects.pullAllFailed': 'Update all failed',
+  'projects.pullFailed': 'Update failed',
   'projects.envSaved': 'Env saved',
   'projects.envSaveFailed': 'Failed to save',
 

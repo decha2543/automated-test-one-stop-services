@@ -10,13 +10,13 @@ import { useT } from '~/i18n/index.js';
 
 interface ToolSectionActionsProps {
   readonly tool: ToolView;
-  /** Open the Clone Project modal pre-scoped to this tool. */
+  /** Open the Import Project modal pre-scoped to this tool. */
   readonly onCloneProject: () => void;
 }
 
 /**
  * Right-side lifecycle controls for an installed tool's section header:
- * enable/disable switch, "Clone project", and a more-menu (Update / Remove).
+ * enable/disable switch, "Import project", and a more-menu (Update / Remove).
  * Remove is disabled while the tool still owns projects — the guard is also
  * enforced server-side (409 TOOL_HAS_PROJECTS); this just blocks the UI early.
  */
