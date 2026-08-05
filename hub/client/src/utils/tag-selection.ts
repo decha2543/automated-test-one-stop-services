@@ -1,4 +1,4 @@
-import type { TestSummary } from '@hub/shared';
+import { parseTagSelection, type TagSelection, type TestSummary } from '@hub/shared';
 
 // ---------------------------------------------------------------------------
 // Tag levels — used for AND/OR semantics + Playwright grep expression.
@@ -53,17 +53,8 @@ function selectionLevel(tag: string): TagLevel {
 // Matching — AND between levels, OR within levels.
 // ---------------------------------------------------------------------------
 
-/**
- * Match tests against selection.
- * - AND between levels (must satisfy all selected levels)
- * - OR within a level (must satisfy at least one tag in that level)
- *
- * Example: [@critical, @desktop, @DAIRY_CATTLE-C001, @DAIRY_CATTLE-C002]
- * -> tests that are (@critical) AND (@desktop) AND (C001 OR C002)
- */
-export function matchTests(tests: TestSummary[], selected: string[]): TestSummary[] {
-  if (selected.length === 0) return tests;
-
+/** Group selected tags by the level that drives AND/OR semantics. */
+function groupByLevel(selected: readonly string[]): Map<TagLevel, string[]> {
   const byLevel = new Map<TagLevel, string[]>();
   for (const tag of selected) {
     const level = selectionLevel(tag);
@@ -71,8 +62,33 @@ export function matchTests(tests: TestSummary[], selected: string[]): TestSummar
     list.push(tag);
     byLevel.set(level, list);
   }
+  return byLevel;
+}
 
-  return tests.filter((t) => {
+/**
+ * Match tests against selection.
+ * - AND between levels (must satisfy all selected levels)
+ * - OR within a level (must satisfy at least one tag in that level)
+ * - `excluded` wins over everything: a test carrying ANY excluded tag is out
+ *
+ * Exclusion deliberately ignores levels. "Don't run @flaky" means exactly that
+ * whatever level `@flaky` sits in, so grouping it would only create ways for an
+ * exclusion to be quietly satisfied by a sibling tag.
+ *
+ * Example: [@critical, @desktop, @DAIRY_CATTLE-C001, @DAIRY_CATTLE-C002]
+ * -> tests that are (@critical) AND (@desktop) AND (C001 OR C002)
+ */
+export function matchTests(
+  tests: TestSummary[],
+  selected: string[],
+  excluded: string[] = [],
+): TestSummary[] {
+  const kept =
+    excluded.length === 0 ? tests : tests.filter((t) => !excluded.some((x) => t.tags.includes(x)));
+  if (selected.length === 0) return kept;
+
+  const byLevel = groupByLevel(selected);
+  return kept.filter((t) => {
     for (const [, levelTags] of byLevel) {
       if (!levelTags.some((tag) => t.tags.includes(tag))) return false;
     }
@@ -86,33 +102,75 @@ export function matchTests(tests: TestSummary[], selected: string[]): TestSummar
 
 /**
  * Build a Playwright-compatible grep expression.
- * AND between levels, OR within levels.
+ * AND between levels, OR within levels, plus one negative group for exclusions.
  *
  * Examples:
  *   [@critical] -> `(?=.*@critical)`
  *   [@critical, @desktop] -> `(?=.*@critical)(?=.*@desktop)`
  *   [@C001, @C002] -> `(?=.*(?:@C001|@C002))`
+ *   exclude [@flaky] -> `(?!.*@flaky)` (appended, or alone when nothing is included)
+ *
+ * Every emitted shape must stay readable by `parseTagSelection` in
+ * `@hub/shared` — the two are a round-trip pair (brain LESS-073).
  */
-export function buildTagExpr(selected: string[]): string | undefined {
-  if (selected.length === 0) return undefined;
+/**
+ * Tag query for ONE tool, in that tool's own syntax.
+ *
+ * Playwright greps a regex; Robot Framework's `--include` takes a tag PATTERN and
+ * rejects a regex outright — passing the Playwright form to Robot matched nothing
+ * and was the pre-existing reason Hub-driven Robot tag filtering never worked.
+ * Robot pattern operators are the documented compact spellings (`AND` / `OR` /
+ * `NOT`, no surrounding spaces).
+ *
+ * Unknown tools fall back to the Playwright form, which is what the Hub has
+ * always sent them.
+ */
+export function buildTagQuery(
+  tool: string,
+  selected: string[],
+  excluded: string[] = [],
+): string | undefined {
+  return tool === 'robot-framework'
+    ? buildRobotTagPattern(selected, excluded)
+    : buildTagExpr(selected, excluded);
+}
 
-  const byLevel = new Map<TagLevel, string[]>();
-  for (const tag of selected) {
-    const level = selectionLevel(tag);
-    const list = byLevel.get(level) ?? [];
-    list.push(tag);
-    byLevel.set(level, list);
+/**
+ * Robot tag pattern: OR inside a level, AND across levels, one trailing NOT group
+ * for the exclusions — the same semantics the Playwright emitter produces.
+ */
+function buildRobotTagPattern(selected: string[], excluded: string[]): string | undefined {
+  const groups: string[] = [];
+  for (const [, levelTags] of groupByLevel(selected)) {
+    groups.push(levelTags.length === 1 ? (levelTags[0] as string) : levelTags.join('OR'));
   }
+  const excl = [...new Set(excluded.filter((t) => t.trim() !== ''))];
+  const includePart = groups.join('AND');
+  const excludePart = excl.join('NOT');
+  if (!includePart && !excludePart) return undefined;
+  // A pattern that starts with NOT still needs something to subtract from, so an
+  // exclude-only selection matches everything first.
+  const head = includePart || '*';
+  return excludePart ? `${head}NOT${excludePart}` : head;
+}
 
+export function buildTagExpr(selected: string[], excluded: string[] = []): string | undefined {
   const parts: string[] = [];
-  for (const [, levelTags] of byLevel) {
+
+  for (const [, levelTags] of groupByLevel(selected)) {
     if (levelTags.length === 1) {
       parts.push(`(?=.*${levelTags[0]})`);
     } else {
       parts.push(`(?=.*(?:${levelTags.join('|')}))`);
     }
   }
-  return parts.join('');
+
+  // One negative group for all exclusions — level-independent by design.
+  const excl = [...new Set(excluded.filter((t) => t.trim() !== ''))];
+  if (excl.length === 1) parts.push(`(?!.*${excl[0]})`);
+  else if (excl.length > 1) parts.push(`(?!.*(?:${excl.join('|')}))`);
+
+  return parts.length === 0 ? undefined : parts.join('');
 }
 
 /**
@@ -121,4 +179,27 @@ export function buildTagExpr(selected: string[]): string | undefined {
  * single source in `@hub/shared` (server flaky uses the same one),
  * re-exported here so existing `~/utils/tag-selection` importers keep working.
  */
-export { parseTagExpr } from '@hub/shared';
+export { parseTagExpr, parseTagSelection } from '@hub/shared';
+export type { TagSelection };
+
+/**
+ * Round-trip partner of {@link buildTagQuery}: read a stored query back into its
+ * include / exclude tags, in whichever syntax that tool uses.
+ *
+ * Both emitted shapes must be readable here or a re-opened bookmark silently
+ * loses part of its selection (brain LESS-073).
+ */
+export function parseTagQuery(tool: string, expr: string | undefined | null): TagSelection {
+  if (tool !== 'robot-framework') return parseTagSelection(expr);
+  if (!expr) return { include: [], exclude: [] };
+  const [includePart = '', ...excludeParts] = expr.split('NOT');
+  const splitTags = (part: string): string[] =>
+    part
+      .split(/AND|OR/)
+      .map((tag) => tag.trim())
+      .filter((tag) => tag !== '' && tag !== '*');
+  return {
+    include: [...new Set(splitTags(includePart))],
+    exclude: [...new Set(excludeParts.flatMap(splitTags))],
+  };
+}

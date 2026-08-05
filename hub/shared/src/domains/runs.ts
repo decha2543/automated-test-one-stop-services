@@ -76,6 +76,25 @@ export interface RunRecord {
 }
 
 /**
+ * The failures of a finished run, reduced to what can select them again.
+ *
+ * Served by `GET /api/runs/:id/failed`, derived from the run's own `results.json`
+ * (Playwright's `--last-failed` state file does not survive this workspace's
+ * output cleanup). Case ids only — the client turns them into a grep expression
+ * so expression shape has a single emitter.
+ */
+export interface FailedRunSelection {
+  runId: string;
+  request: RunRequest;
+  /** Case-id tags of the failed tests. */
+  caseIds: string[];
+  /** Titles of failed tests with no case-id tag, so they cannot be re-selected. */
+  unidentified: string[];
+  total: number;
+  failed: number;
+}
+
+/**
  * A saved run-form config (macro/shortcut): a name plus the captured
  * `RunRequest`. Clicking a bookmark reloads its `config` into the run form.
  */

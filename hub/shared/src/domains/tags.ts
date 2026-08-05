@@ -162,28 +162,51 @@ export function classifyTag(tag: string): TagGroupKind {
  * and client (tag selection) import this.
  */
 export function parseTagExpr(expr: string | undefined | null): string[] {
-  if (!expr) return [];
-  const lookahead = /\(\?=\.\*(?:\(\?:([^)]*)\)|([^)]+))\)/g;
-  const tags: string[] = [];
+  return parseTagSelection(expr).include;
+}
+
+/** Tags a run selects, split by direction. Excluded tags must not run. */
+export interface TagSelection {
+  /** Tags that must match (AND across groups, OR within a group). */
+  include: string[];
+  /** Tags that must NOT match — any test carrying one is skipped. */
+  exclude: string[];
+}
+
+/**
+ * Decompose a stored grep expression into its include and exclude tags.
+ *
+ * This is the total parser: it reads BOTH shapes the builder emits, positive
+ * `(?=.*…)` and negative `(?!.*…)`, in single and OR-group form. Reading only
+ * the positives silently dropped every exclusion from a re-opened bookmark or
+ * schedule — the run then covered more than the author saved — and an
+ * exclude-only expression came back as a bogus tag literal (brain LESS-073).
+ *
+ * A value that is no lookahead expression at all (a bare tag a user typed) is
+ * returned verbatim as an include, so hand-written values still round-trip.
+ * Pure; never throws.
+ */
+export function parseTagSelection(expr: string | undefined | null): TagSelection {
+  if (!expr) return { include: [], exclude: [] };
+  // `(?=` / `(?!` then `.*`, then either an OR-group `(?:a|b)` or a single tag.
+  const lookahead = /\((\?[=!])\.\*(?:\(\?:([^)]*)\)|([^)]+))\)/g;
+  const include: string[] = [];
+  const exclude: string[] = [];
   let matched = false;
   let m = lookahead.exec(expr);
   while (m !== null) {
     matched = true;
-    const orGroup = m[1];
-    const single = m[2];
-    if (orGroup !== undefined) {
-      for (const part of orGroup.split('|')) {
-        const tag = part.trim();
-        if (tag) tags.push(tag);
-      }
-    } else if (single !== undefined) {
-      const tag = single.trim();
-      if (tag) tags.push(tag);
+    const target = m[1] === '?!' ? exclude : include;
+    const orGroup = m[2];
+    const single = m[3];
+    for (const part of (orGroup ?? single ?? '').split('|')) {
+      const tag = part.trim();
+      if (tag) target.push(tag);
     }
     m = lookahead.exec(expr);
   }
-  if (!matched) return [expr];
-  return [...new Set(tags)];
+  if (!matched) return { include: [expr], exclude: [] };
+  return { include: [...new Set(include)], exclude: [...new Set(exclude)] };
 }
 
 /**

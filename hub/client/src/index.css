@@ -1,1 +1,12 @@
 @import '@xterm/xterm/css/xterm.css';
+
+/* Test-case field in read mode: show it is editable on hover / focus, so the
+   only affordance is not the mouse cursor. Paired with the pencil icon, which
+   carries the same meaning without relying on hover (touch, keyboard). */
+.tc-editable {
+  transition: background-color 150ms ease-out;
+}
+.tc-editable:hover,
+.tc-editable:focus-visible {
+  background-color: var(--mantine-color-default-hover);
+}

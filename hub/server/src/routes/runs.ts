@@ -1,11 +1,12 @@
-import type { RunRequest } from '@hub/shared';
+import type { FailedRunSelection, RunRequest } from '@hub/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { buildTaskCommand } from '../services/command-builder.js';
 import { getEnabledToolIds } from '../services/manifest-registry.js';
 import { severityByRun } from '../services/reports.js';
-import { compareRuns } from '../services/run-compare.js';
+import { compareRuns, failedSelectionFromReport } from '../services/run-compare.js';
 import { runner } from '../services/runner.js';
+import { resolveReportPath } from '../services/testcase-status-sync.js';
 
 /**
  * Runtime schema for a run request — replaces the previous unchecked
@@ -152,6 +153,38 @@ export async function runRoutes(app: FastifyInstance): Promise<void> {
       return { tag, project, runs: matching };
     },
   );
+
+  /**
+   * GET /api/runs/:id/failed — the case ids that failed in a past run, so the
+   * Run page can re-run only those.
+   *
+   * Derived from the run's `results.json`, never from Playwright's
+   * `--last-failed` (its state file is deleted by the output cleanup, so the flag
+   * silently re-runs everything — brain LESS-074). Returns the ids only; the
+   * client builds the grep expression with its own `buildTagExpr`, keeping one
+   * emitter for the expression shape.
+   */
+  app.get<{ Params: { id: string } }>('/api/runs/:id/failed', async (req, reply) => {
+    const record = runner.getHistory().find((r) => r.id === req.params.id);
+    if (!record) {
+      reply.status(404);
+      return { code: 'RUN_NOT_FOUND', message: 'Run is not in history' };
+    }
+    const reportPath = await resolveReportPath(record);
+    const selection = failedSelectionFromReport(reportPath);
+    if (!selection) {
+      reply.status(404);
+      return {
+        code: 'NO_RESULTS',
+        message: 'This run left no machine-readable results to derive failures from',
+      };
+    }
+    return {
+      runId: record.id,
+      request: record.request,
+      ...selection,
+    } satisfies FailedRunSelection;
+  });
 
   /** GET /api/runs/compare?a=<id>&b=<id> — per-test diff of two runs (Playwright). */
   app.get<{ Querystring: { a?: string; b?: string } }>('/api/runs/compare', async (req, reply) => {

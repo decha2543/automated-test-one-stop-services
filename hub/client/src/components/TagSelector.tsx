@@ -18,11 +18,29 @@ import { TbCheck, TbChevronDown, TbChevronRight, TbSearch, TbTag, TbX } from 're
 import { useT } from '~/i18n/index.js';
 import { getTagLevel, matchTests } from '~/utils/tag-selection';
 
+/** A tag's state in the picker. Clicking cycles off -> include -> exclude -> off. */
+type TagState = 'off' | 'include' | 'exclude';
+
 interface TagSelectorProps {
   tags: TagsResponse | undefined;
   isLoading: boolean;
   selectedTags: string[];
   onChange: (next: string[]) => void;
+  /**
+   * Tags whose tests must NOT run. Omit this pair to keep the two-state picker
+   * (off <-> include) — a caller that cannot store exclusions must not offer a
+   * third state the run would then ignore.
+   */
+  excludedTags?: string[];
+  onExcludeChange?: (next: string[]) => void;
+  /**
+   * Where the "will run N tests" summary sits.
+   *
+   * `bottom` reads it as the RESULT of the picking just done and puts it next to
+   * the button pressed afterwards, so the eye travels down once. `top` (default)
+   * suits a form where the picker is one field among many.
+   */
+  matchPanelAt?: 'top' | 'bottom';
   /**
    * Fill the parent's height and make the category-group list the only scroll
    * region (used in the Run form, so the surrounding fields stay fixed and the
@@ -108,6 +126,9 @@ export function TagSelector({
   isLoading,
   selectedTags,
   onChange,
+  excludedTags,
+  onExcludeChange,
+  matchPanelAt = 'top',
   fill = false,
 }: TagSelectorProps) {
   const t = useT();
@@ -117,35 +138,72 @@ export function TagSelector({
 
   const tests = tags?.tests ?? [];
   const totalCount = tests.length;
+  const excluded = excludedTags ?? [];
 
   // Tests that match current selection (deduped by id+title — reporters
   // sometimes emit the same logical test twice across scenarios).
   const matchedTests = useMemo<TestSummary[]>(() => {
     if (totalCount === 0) return [];
-    const matched = matchTests(tests, selectedTags);
+    const matched = matchTests(tests, selectedTags, excluded);
     const seen = new Set<string>();
     const unique: TestSummary[] = [];
-    for (const t of matched) {
-      const key = `${t.id}\u0001${t.title}`;
+    for (const test of matched) {
+      const key = `${test.id}\u0001${test.title}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      unique.push(t);
+      unique.push(test);
     }
     return unique;
-  }, [tests, selectedTags, totalCount]);
+  }, [tests, selectedTags, excluded, totalCount]);
 
   const matchingCount = matchedTests.length;
-  const isFiltered = selectedTags.length > 0;
+  const isFiltered = selectedTags.length > 0 || excluded.length > 0;
   const matchColor =
     matchingCount === 0 ? 'red' : isFiltered && matchingCount < totalCount ? 'green' : 'blue';
 
-  // Simple toggle: just add or remove.
-  function toggle(tag: string) {
-    onChange(
-      selectedTags.includes(tag)
-        ? selectedTags.filter((t) => t !== tag)
-        : [...new Set([...selectedTags, tag])],
-    );
+  function stateOf(tag: string): TagState {
+    if (selectedTags.includes(tag)) return 'include';
+    return excluded.includes(tag) ? 'exclude' : 'off';
+  }
+
+  /**
+   * One click advances the tag: off -> include -> exclude -> off.
+   *
+   * Cycling in place keeps a single control per tag, so a tag can never be both
+   * included and excluded, and no second picker has to be kept in sync. Without
+   * an `onExcludeChange` the cycle collapses to off <-> include.
+   */
+  function cycle(tag: string) {
+    const current = stateOf(tag);
+    const withoutTag = selectedTags.filter((x) => x !== tag);
+    const exclWithout = excluded.filter((x) => x !== tag);
+    if (current === 'off') {
+      onChange([...new Set([...selectedTags, tag])]);
+      if (exclWithout.length !== excluded.length) onExcludeChange?.(exclWithout);
+      return;
+    }
+    if (current === 'include') {
+      onChange(withoutTag);
+      if (onExcludeChange) onExcludeChange([...new Set([...excluded, tag])]);
+      return;
+    }
+    onExcludeChange?.(exclWithout);
+  }
+
+  /**
+   * Step BACK one state: exclude -> include -> off. Bound to right-click (and
+   * Backspace), so overshooting the forward cycle costs one click on the chip
+   * already under the pointer instead of two more laps around it.
+   */
+  function stepBack(tag: string) {
+    const current = stateOf(tag);
+    if (current === 'off') return;
+    if (current === 'include') {
+      onChange(selectedTags.filter((x) => x !== tag));
+      return;
+    }
+    onExcludeChange?.(excluded.filter((x) => x !== tag));
+    onChange([...new Set([...selectedTags, tag])]);
   }
 
   function toggleGroup(kind: string) {
@@ -181,7 +239,7 @@ export function TagSelector({
   // Filter by search.
   const searchLower = search.toLowerCase();
   const filteredGroups = orderedGroups
-    .map((g) => ({ ...g, tags: g.tags.filter((t) => t.toLowerCase().includes(searchLower)) }))
+    .map((g) => ({ ...g, tags: g.tags.filter((tag) => tag.toLowerCase().includes(searchLower)) }))
     .filter((g) => g.tags.length > 0);
 
   if (isLoading) {
@@ -203,90 +261,140 @@ export function TagSelector({
     );
   }
 
+  /**
+   * The "will run N tests" summary. One compact row — the count is a glance, not
+   * a section — with the matched list folded away behind it.
+   */
+  const matchPanel =
+    totalCount === 0 ? null : (
+      <Paper
+        withBorder
+        px="xs"
+        py={6}
+        style={{
+          flexShrink: 0,
+          borderColor: `var(--mantine-color-${matchColor}-6)`,
+          backgroundColor: `var(--mantine-color-${matchColor}-light)`,
+        }}
+      >
+        <Stack gap={4}>
+          {/* Exclusions live in THIS panel rather than a row of their own above the
+              list: a row that appears with the first exclusion pushed every chip
+              down, moving the next target out from under the pointer. Here the
+              panel is always mounted, so nothing above it ever moves. */}
+          {excluded.length > 0 && (
+            <Group gap={6} wrap="wrap">
+              <Text size="xs" fw={600} c="red.7">
+                {t('tagSelector.excluded')}
+              </Text>
+              {excluded.map((tag) => (
+                <Badge
+                  key={tag}
+                  size="sm"
+                  color="red"
+                  variant="light"
+                  rightSection={<TbX size={10} />}
+                  style={{ cursor: 'pointer' }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${t('tagSelector.removeExclusion')} ${tag}`}
+                  onClick={() => onExcludeChange?.(excluded.filter((x) => x !== tag))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onExcludeChange?.(excluded.filter((x) => x !== tag));
+                    }
+                  }}
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </Group>
+          )}
+          <Group justify="space-between" wrap="nowrap">
+            <Group gap={6} wrap="nowrap">
+              <TbCheck size={14} color={`var(--mantine-color-${matchColor}-7)`} />
+              <Text size="xs" fw={700} c={`${matchColor}.8`}>
+                {matchingCount === 0
+                  ? t('tagSelector.noMatch')
+                  : isFiltered
+                    ? `${t('tagSelector.willRun')} ${matchingCount}/${totalCount} ${t('tagSelector.testsWord')}`
+                    : `${t('tagSelector.willRun')} ${t('common.all')} ${matchingCount} ${t('tagSelector.testsWord')}`}
+              </Text>
+            </Group>
+            {matchingCount > 0 && (
+              <UnstyledButton
+                onClick={() => setShowMatchedTests((v) => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                <Text size="xs" c="dimmed">
+                  {showMatchedTests ? t('tagSelector.hide') : t('tagSelector.show')}{' '}
+                  {t('tagSelector.list')}
+                </Text>
+                <TbChevronDown
+                  size={12}
+                  style={{
+                    transform: showMatchedTests ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 150ms',
+                  }}
+                />
+              </UnstyledButton>
+            )}
+          </Group>
+          <Collapse expanded={showMatchedTests && matchingCount > 0}>
+            <ScrollArea.Autosize mah="25vh">
+              <Stack gap={2}>
+                {matchedTests.map((test, idx) => (
+                  <Group
+                    key={`${test.id}-${idx as number}`}
+                    gap={6}
+                    wrap="nowrap"
+                    align="flex-start"
+                  >
+                    <Badge size="xs" color="gray" variant="light" style={{ flexShrink: 0 }}>
+                      {test.id || '?'}
+                    </Badge>
+                    <Tooltip label={test.title} multiline maw={420} withArrow openDelay={300}>
+                      <Text size="xs" lineClamp={1}>
+                        {test.title}
+                      </Text>
+                    </Tooltip>
+                  </Group>
+                ))}
+              </Stack>
+            </ScrollArea.Autosize>
+          </Collapse>
+        </Stack>
+      </Paper>
+    );
+
   return (
     <Stack gap="xs" style={fill ? { flex: 1, minHeight: 0 } : undefined}>
-      {/* ─── Match panel ON TOP ─── */}
-      {totalCount > 0 && (
-        <Paper
-          withBorder
-          p="sm"
-          style={{
-            borderColor: `var(--mantine-color-${matchColor}-6)`,
-            borderWidth: 2,
-            backgroundColor: `var(--mantine-color-${matchColor}-light)`,
-          }}
-        >
-          <Stack gap={6}>
-            <Group justify="space-between" wrap="nowrap">
-              <Group gap={6} wrap="nowrap">
-                <TbCheck size={16} color={`var(--mantine-color-${matchColor}-7)`} />
-                <Text size="sm" fw={700} c={`${matchColor}.8`}>
-                  {matchingCount === 0
-                    ? t('tagSelector.noMatch')
-                    : isFiltered
-                      ? `${t('tagSelector.willRun')} ${matchingCount}/${totalCount} ${t('tagSelector.testsWord')}`
-                      : `${t('tagSelector.willRun')} ${t('common.all')} ${matchingCount} ${t('tagSelector.testsWord')}`}
-                </Text>
-              </Group>
-              {matchingCount > 0 && (
-                <UnstyledButton
-                  onClick={() => setShowMatchedTests((v) => !v)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  <Text size="xs" c="dimmed">
-                    {showMatchedTests ? t('tagSelector.hide') : t('tagSelector.show')}{' '}
-                    {t('tagSelector.list')}
-                  </Text>
-                  <TbChevronDown
-                    size={14}
-                    style={{
-                      transform: showMatchedTests ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 150ms',
-                    }}
-                  />
-                </UnstyledButton>
-              )}
-            </Group>
-            <Collapse expanded={showMatchedTests && matchingCount > 0}>
-              <ScrollArea.Autosize mah="25vh">
-                <Stack gap={2}>
-                  {matchedTests.map((t, idx) => (
-                    <Group
-                      key={`${t.id}-${idx as number}`}
-                      gap={6}
-                      wrap="nowrap"
-                      align="flex-start"
-                    >
-                      <Badge size="xs" color="gray" variant="light" style={{ flexShrink: 0 }}>
-                        {t.id || '?'}
-                      </Badge>
-                      <Tooltip label={t.title} multiline maw={420} withArrow openDelay={300}>
-                        <Text size="xs" lineClamp={1}>
-                          {t.title}
-                        </Text>
-                      </Tooltip>
-                    </Group>
-                  ))}
-                </Stack>
-              </ScrollArea.Autosize>
-            </Collapse>
-          </Stack>
-        </Paper>
-      )}
+      {matchPanelAt === 'top' && matchPanel}
 
       {/* ─── Header ─── */}
-      <Group justify="space-between">
+      <Group justify="space-between" style={{ flexShrink: 0 }}>
         <Group gap={6}>
           <TbTag size={14} color="var(--mantine-color-dimmed)" />
           <Text size="xs" fw={600} c="dimmed">
             {t('tagSelector.tags')} ({tags.all.length})
           </Text>
         </Group>
-        {selectedTags.length > 0 && (
-          <Button size="compact-xs" variant="subtle" color="red" onClick={() => onChange([])}>
-            {t('common.clearAll')}
-          </Button>
-        )}
+        {/* Always rendered, disabled when there is nothing to clear: appearing on
+            the first selection used to grow this row and shove every chip below
+            it, so the tag the user was aiming at moved out from under the mouse. */}
+        <Button
+          size="compact-xs"
+          variant="subtle"
+          color="red"
+          disabled={!isFiltered}
+          onClick={() => {
+            onChange([]);
+            onExcludeChange?.([]);
+          }}
+        >
+          {t('common.clearAll')}
+        </Button>
       </Group>
 
       {/* ─── Search ─── */}
@@ -296,6 +404,7 @@ export function TagSelector({
         onChange={(e) => setSearch(e.currentTarget.value)}
         placeholder={t('tagSelector.searchPlaceholder')}
         leftSection={<TbSearch size={12} />}
+        style={{ flexShrink: 0 }}
         rightSection={
           search ? (
             <UnstyledButton onClick={() => setSearch('')}>
@@ -312,7 +421,8 @@ export function TagSelector({
           {filteredGroups.map((group) => {
             const color = GROUP_COLORS[group.kind] ?? 'teal';
             const isCollapsed = collapsed.has(group.kind);
-            const selectedInGroup = group.tags.filter((t) => selectedTags.includes(t)).length;
+            const selectedInGroup = group.tags.filter((tag) => selectedTags.includes(tag)).length;
+            const excludedInGroup = group.tags.filter((tag) => excluded.includes(tag)).length;
 
             return (
               <div
@@ -324,7 +434,7 @@ export function TagSelector({
                   onClick={() => toggleGroup(group.kind)}
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
+                    padding: '6px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -345,28 +455,47 @@ export function TagSelector({
                       ({group.tags.length})
                     </Text>
                   </Group>
-                  {selectedInGroup > 0 && (
-                    <Badge size="xs" color="blue" circle>
-                      {selectedInGroup}
-                    </Badge>
-                  )}
+                  <Group gap={4} wrap="nowrap">
+                    {selectedInGroup > 0 && (
+                      <Badge size="xs" color="blue" circle>
+                        {selectedInGroup}
+                      </Badge>
+                    )}
+                    {excludedInGroup > 0 && (
+                      <Badge size="xs" color="red" circle>
+                        {excludedInGroup}
+                      </Badge>
+                    )}
+                  </Group>
                 </UnstyledButton>
 
                 {/* Group tags */}
                 <Collapse expanded={!isCollapsed}>
-                  <Group gap={6} px="sm" pb="sm" wrap="wrap">
+                  <Group gap={6} px="sm" pb="xs" wrap="wrap">
                     {group.tags.map((tag) => {
-                      const isSelected = selectedTags.includes(tag);
+                      const state = stateOf(tag);
                       const detail = tags.details?.[tag];
-                      const tooltipLabel = detail
+                      const countLabel = detail
                         ? detail.tests.length === 1
                           ? detail.tests[0]?.title || tag
                           : `${detail.count} tests`
                         : tag;
+                      // The tooltip carries the next action, so the third state
+                      // is discoverable without a legend.
+                      const nextActionKey =
+                        state === 'off'
+                          ? 'tagSelector.clickToInclude'
+                          : state === 'include' && onExcludeChange
+                            ? 'tagSelector.clickToExclude'
+                            : 'tagSelector.clickToClear';
+                      const hint =
+                        state === 'off'
+                          ? t(nextActionKey)
+                          : `${t(nextActionKey)} · ${t('tagSelector.rightClickBack')}`;
                       return (
                         <Tooltip
                           key={tag}
-                          label={tooltipLabel}
+                          label={`${countLabel} — ${hint}`}
                           withArrow
                           openDelay={300}
                           multiline
@@ -374,17 +503,33 @@ export function TagSelector({
                         >
                           <Badge
                             size="sm"
-                            variant={isSelected ? 'filled' : 'outline'}
-                            color={isSelected ? 'blue' : color}
-                            style={{ cursor: 'pointer' }}
+                            variant={state === 'off' ? 'outline' : 'filled'}
+                            color={
+                              state === 'include' ? 'blue' : state === 'exclude' ? 'red' : color
+                            }
+                            style={{
+                              cursor: 'pointer',
+                              // Strike-through, not a prefix character: an excluded
+                              // chip must stay the SAME WIDTH as its other states,
+                              // or every chip after it reflows on each click and the
+                              // next target slides out from under the pointer.
+                              textDecoration: state === 'exclude' ? 'line-through' : undefined,
+                            }}
                             role="button"
                             tabIndex={0}
-                            aria-pressed={isSelected}
-                            onClick={() => toggle(tag)}
+                            aria-label={`${tag} — ${t(`tagSelector.state.${state}`)}`}
+                            onClick={() => cycle(tag)}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              stepBack(tag);
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                toggle(tag);
+                                cycle(tag);
+                              } else if (e.key === 'Backspace') {
+                                e.preventDefault();
+                                stepBack(tag);
                               }
                             }}
                           >
@@ -408,6 +553,8 @@ export function TagSelector({
           )}
         </Stack>
       </GroupList>
+
+      {matchPanelAt === 'bottom' && matchPanel}
     </Stack>
   );
 }

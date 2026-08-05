@@ -27,6 +27,7 @@ import {
   Checkbox,
   Code,
   Group,
+  NumberInput,
   Paper,
   Select,
   SimpleGrid,
@@ -74,9 +75,10 @@ import { useTools } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
 import { usePreferences } from '~/stores/hub.js';
 import { buildPerfTypeData } from '~/utils/perf-type-options.js';
+import { mergeExtraArgs, parseRunArgs, SUPPORTS_RUN_FLAGS } from '~/utils/run-flags.js';
 import { getStatusColor } from '~/utils/run-status.js';
 import { runVerdict } from '~/utils/run-verdict.js';
-import { buildTagExpr, parseTagExpr } from '~/utils/tag-selection.js';
+import { buildTagQuery, parseTagQuery } from '~/utils/tag-selection.js';
 import { toolLabel, toolSelectData } from '~/utils/tool-label.js';
 
 /** Split bounds mirror the clamp the preferences store commits, so the live drag
@@ -124,13 +126,19 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   const [mode, setMode] = useState<RunMode>(initialConfig?.mode ?? prefs.defaultMode);
   const [type, setType] = useState(initialConfig?.type ?? '');
   const [project, setProject] = useState(initialConfig?.project ?? '');
-  const [selectedTags, setSelectedTags] = useState<string[]>(() =>
-    parseTagExpr(initialConfig?.tag),
-  );
+  const initialSelection = parseTagQuery(initialConfig?.tool ?? '', initialConfig?.tag);
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialSelection.include);
+  const [excludedTags, setExcludedTags] = useState<string[]>(initialSelection.exclude);
   const [headless, setHeadless] = useState<HeadlessMode>(
     initialConfig?.headless ?? prefs.defaultHeadless,
   );
-  const [extraArgs, setExtraArgs] = useState(initialConfig?.extraArgs ?? '');
+  // Saved configs store the composed argument string, so split it back apart to
+  // hydrate the typed fields (round-trip pair — brain LESS-073).
+  const initialArgs = parseRunArgs(initialConfig?.extraArgs);
+  const [extraArgs, setExtraArgs] = useState(initialArgs.rest);
+  const [workers, setWorkers] = useState<number | null>(initialArgs.workers ?? null);
+  const [repeatEach, setRepeatEach] = useState<number | null>(initialArgs.repeatEach ?? null);
+
   const [noTrack, setNoTrack] = useState(initialConfig?.noTrack ?? false);
   const [silent, setSilent] = useState(initialConfig?.silent ?? false);
   const [discardReport, setDiscardReport] = useState(initialConfig?.discardReport ?? false);
@@ -164,7 +172,13 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   // field AND an advanced-only value: in simple view the field is hidden and its
   // (still-kept) text is not sent, so a value typed earlier cannot leak into the
   // next run.
-  const effectiveExtraArgs = advancedMode ? extraArgs || undefined : undefined;
+  const supportsRunFlags = SUPPORTS_RUN_FLAGS.has(tool);
+  // Free text is advanced-mode only; the typed flags always apply. Merging here
+  // means a flag set in both places resolves once, in favour of the typed field.
+  const effectiveExtraArgs = mergeExtraArgs(
+    advancedMode ? extraArgs || undefined : undefined,
+    supportsRunFlags ? { workers, repeatEach } : {},
+  );
 
   // The bar under the terminal carries the command (advanced only), Rerun and
   // the duration. In simple view during a run it would hold none of those, so
@@ -173,6 +187,22 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
 
   // Layout the user arranged, remembered rather than asked for again.
   const formCollapsed = prefs.runFormCollapsed;
+  /** Collapse/expand control — placed inline by the caller, never on its own row. */
+  const collapseToggle = (
+    <Tooltip label={formCollapsed ? t('run.editConfig') : t('run.hideConfig')} withArrow>
+      <ActionIcon
+        size="sm"
+        variant="subtle"
+        color="gray"
+        onClick={() => prefs.setRunFormCollapsed(!formCollapsed)}
+        aria-label={formCollapsed ? t('run.editConfig') : t('run.hideConfig')}
+        aria-expanded={!formCollapsed}
+        style={{ flex: 'none' }}
+      >
+        {formCollapsed ? <TbChevronDown size={16} /> : <TbChevronUp size={16} />}
+      </ActionIcon>
+    </Tooltip>
+  );
   const splitPercent = prefs.runSplitPercent;
   const fontSize = prefs.terminalFontSize;
   // The saved percent except mid-drag, when the preview follows the pointer.
@@ -463,7 +493,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
       type: effectiveType,
       project,
       mode,
-      tag: buildTagExpr(selectedTags),
+      tag: buildTagQuery(tool, selectedTags, excludedTags),
       headless: !sectionAxis ? headless : undefined,
       extraArgs: effectiveExtraArgs,
       noTrack,
@@ -506,7 +536,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   }
 
   function handleRun() {
-    const tagExpr = buildTagExpr(selectedTags);
+    const tagExpr = buildTagQuery(tool, selectedTags, excludedTags);
     const effectiveNoTrack = config.data?.forceTrack ? false : noTrack;
     runMutation.mutate({
       tool,
@@ -626,13 +656,13 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
           scrollbar users kept hitting at 1024-1199px. When it does wrap (真
           narrow), the rows size to content instead of demanding 100% each. */}
       <Stack
-        gap="sm"
+        gap="xs"
         w={{ base: '100%', md: `${columnPercent}%` }}
         h={{ base: 'auto', md: '100%' }}
         style={{ flexShrink: 0, minHeight: 0 }}
       >
         <Paper
-          p="md"
+          p="xs"
           withBorder
           style={{
             opacity: isRunning ? 0.85 : 1,
@@ -644,51 +674,89 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: 'var(--mantine-spacing-sm)',
+            gap: 'var(--mantine-spacing-xs)',
             overflow: formCollapsed ? 'auto' : 'hidden',
             // A wheel that reaches the end of the collapsed card must not chain
             // to the sessions wrapper and jump the page.
             overscrollBehavior: 'contain',
           }}
         >
-          <Group gap="xs" wrap="nowrap" justify="space-between" style={{ flexShrink: 0 }}>
-            {formCollapsed && (
+          {/* Collapsed, this row is the whole card: the summary plus the toggle.
+              Expanded, the toggle rides along the target row instead of owning a
+              full-width row of its own that shows one 16px icon. */}
+          {formCollapsed && (
+            <Group gap="xs" wrap="nowrap" justify="space-between" style={{ flexShrink: 0 }}>
               <Text size="xs" fw={500} truncate style={{ flex: 1, minWidth: 0 }}>
                 {configSummary}
               </Text>
-            )}
-            <Tooltip label={formCollapsed ? t('run.editConfig') : t('run.hideConfig')} withArrow>
-              <ActionIcon
-                size="sm"
-                variant="subtle"
-                color="gray"
-                onClick={() => prefs.setRunFormCollapsed(!formCollapsed)}
-                aria-label={formCollapsed ? t('run.editConfig') : t('run.hideConfig')}
-                aria-expanded={!formCollapsed}
-                style={{ flex: 'none' }}
-              >
-                {formCollapsed ? <TbChevronDown size={16} /> : <TbChevronUp size={16} />}
-              </ActionIcon>
-            </Tooltip>
-          </Group>
+              {collapseToggle}
+            </Group>
+          )}
           {!formCollapsed && (
-            <Stack gap="sm" style={{ flex: 1, minHeight: 0 }}>
-              <SimpleGrid cols={2} spacing="xs">
-                <Select
-                  label={t('run.tool')}
-                  size="xs"
-                  disabled={isRunning}
-                  value={tool}
-                  onChange={(v) => {
-                    if (!v) return;
-                    setTool(v as ToolId);
-                    setType('');
-                    setProject('');
-                    setSelectedTags([]);
-                  }}
-                  data={toolSelectData(toolsQuery.data ?? [])}
-                  allowDeselect={false}
-                />
+            <Stack gap="xs" style={{ flex: 1, minHeight: 0 }}>
+              {/* Row 1 — WHAT to run. The three axes that decide the target sit on
+                  one line so the eye reads them together; the collapse toggle
+                  rides at the end instead of costing its own row. */}
+              <Group gap="xs" align="flex-end" wrap="nowrap">
+                <SimpleGrid
+                  cols={{ base: 1, xs: typeAxis ? 3 : 2 }}
+                  spacing="xs"
+                  style={{ flex: 1, minWidth: 0 }}
+                >
+                  <Select
+                    label={t('run.tool')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={tool}
+                    onChange={(v) => {
+                      if (!v) return;
+                      setTool(v as ToolId);
+                      setType('');
+                      setProject('');
+                      setSelectedTags([]);
+                    }}
+                    data={toolSelectData(toolsQuery.data ?? [])}
+                    allowDeselect={false}
+                  />
+                  {typeAxis && (
+                    <Select
+                      label={t('run.type')}
+                      size="xs"
+                      disabled={isRunning}
+                      value={type || null}
+                      onChange={(v) => {
+                        setType(v ?? '');
+                        setProject('');
+                        setSelectedTags([]);
+                      }}
+                      placeholder={t('common.select')}
+                      data={types.data ?? []}
+                      searchable
+                    />
+                  )}
+                  <Select
+                    label={t('run.project')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={project || null}
+                    onChange={(v) => {
+                      setProject(v ?? '');
+                      setSelectedTags([]);
+                    }}
+                    placeholder={projectsQ.isLoading ? t('common.loading') : t('common.select')}
+                    data={projectsQ.data ?? []}
+                    searchable
+                  />
+                </SimpleGrid>
+                {collapseToggle}
+              </Group>
+
+              {/* Row 2 — HOW to run. Mode, display and the tuning numbers share one
+                  line; each was a near-empty block of its own before. */}
+              <SimpleGrid
+                cols={{ base: 2, xs: sectionAxis ? 2 : supportsRunFlags ? 4 : 2 }}
+                spacing="xs"
+              >
                 <Select
                   label={t('run.mode')}
                   size="xs"
@@ -705,38 +773,48 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
                   ]}
                   allowDeselect={false}
                 />
-              </SimpleGrid>
-
-              <SimpleGrid cols={typeAxis ? 2 : 1} spacing="xs">
-                {typeAxis && (
+                {!sectionAxis && (
                   <Select
-                    label={t('run.type')}
+                    label={t('run.display')}
                     size="xs"
                     disabled={isRunning}
-                    value={type || null}
-                    onChange={(v) => {
-                      setType(v ?? '');
-                      setProject('');
-                      setSelectedTags([]);
-                    }}
-                    placeholder={t('common.select')}
-                    data={types.data ?? []}
-                    searchable
+                    value={headless}
+                    onChange={(v) => v && setHeadless(v as HeadlessMode)}
+                    data={[
+                      { value: 'headless', label: t('run.headless') },
+                      { value: 'headed', label: t('run.headed') },
+                    ]}
+                    allowDeselect={false}
                   />
                 )}
-                <Select
-                  label={t('run.project')}
-                  size="xs"
-                  disabled={isRunning}
-                  value={project || null}
-                  onChange={(v) => {
-                    setProject(v ?? '');
-                    setSelectedTags([]);
-                  }}
-                  placeholder={projectsQ.isLoading ? t('common.loading') : t('common.select')}
-                  data={projectsQ.data ?? []}
-                  searchable
-                />
+                {!sectionAxis && supportsRunFlags && (
+                  <>
+                    <NumberInput
+                      label={t('run.workers')}
+                      size="xs"
+                      min={1}
+                      max={64}
+                      disabled={isRunning}
+                      value={workers ?? ''}
+                      onChange={(v: string | number) =>
+                        setWorkers(typeof v === 'number' ? v : null)
+                      }
+                      placeholder={t('run.autoDefault')}
+                    />
+                    <NumberInput
+                      label={t('run.repeatEach')}
+                      size="xs"
+                      min={1}
+                      max={50}
+                      disabled={isRunning}
+                      value={repeatEach ?? ''}
+                      onChange={(v: string | number) =>
+                        setRepeatEach(typeof v === 'number' ? v : null)
+                      }
+                      placeholder="1"
+                    />
+                  </>
+                )}
               </SimpleGrid>
 
               {sectionAxis && project && (
@@ -767,6 +845,9 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
                   isLoading={tags.isLoading}
                   selectedTags={selectedTags}
                   onChange={setSelectedTags}
+                  excludedTags={excludedTags}
+                  onExcludeChange={setExcludedTags}
+                  matchPanelAt="bottom"
                   fill
                 />
               )}
@@ -785,31 +866,15 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
                 </Stack>
               )}
 
-              {!sectionAxis && (
-                <SimpleGrid cols={advancedMode ? 2 : 1} spacing="xs">
-                  <Select
-                    label={t('run.display')}
-                    size="xs"
-                    disabled={isRunning}
-                    value={headless}
-                    onChange={(v) => v && setHeadless(v as HeadlessMode)}
-                    data={[
-                      { value: 'headless', label: t('run.headless') },
-                      { value: 'headed', label: t('run.headed') },
-                    ]}
-                    allowDeselect={false}
-                  />
-                  {advancedMode && (
-                    <TextInput
-                      label={t('run.extraArgs')}
-                      size="xs"
-                      disabled={isRunning}
-                      value={extraArgs}
-                      onChange={(e) => setExtraArgs(e.currentTarget.value)}
-                      placeholder="--workers=4"
-                    />
-                  )}
-                </SimpleGrid>
+              {advancedMode && !sectionAxis && (
+                <TextInput
+                  label={t('run.extraArgs')}
+                  size="xs"
+                  disabled={isRunning}
+                  value={extraArgs}
+                  onChange={(e) => setExtraArgs(e.currentTarget.value)}
+                  placeholder="--debug"
+                />
               )}
 
               <Group gap="lg" wrap="wrap">

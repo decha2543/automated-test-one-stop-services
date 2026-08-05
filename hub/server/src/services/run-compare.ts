@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type {
-  CompareCategory,
-  CompareRow,
-  CompareSide,
-  RunCompareResult,
-  RunRecord,
-  TestStatus,
+import {
+  type CompareCategory,
+  type CompareRow,
+  type CompareSide,
+  classifyTag,
+  type RunCompareResult,
+  type RunRecord,
+  type TestStatus,
 } from '@hub/shared';
 
 /** Minimal shape of the Playwright JSON reporter output we read. */
@@ -115,6 +116,45 @@ export function parseRunOutcomes(reportPath: string | undefined): RunOutcome[] |
   } catch {
     return null;
   }
+}
+
+/** What a "re-run only the failures" action can select from a finished run. */
+export interface FailedSelection {
+  /** Case-id tags of the failed tests — the selector a re-run greps on. */
+  caseIds: string[];
+  /** Titles of failed tests carrying no case-id tag, so they cannot be re-selected. */
+  unidentified: string[];
+  total: number;
+  failed: number;
+}
+
+/**
+ * Failed tests of a finished run, reduced to the case-id tags that can select
+ * them again.
+ *
+ * Deliberately built from the run's own `results.json` rather than Playwright's
+ * `--last-failed`: `.last-run.json` is deleted on every run by the output
+ * promotion + `.temp` cleanup, so that flag can never work here (brain LESS-074).
+ * Reading `results.json` also means ANY run in history can be re-run, not just
+ * the most recent one.
+ *
+ * A failed test with no case-id tag is reported in `unidentified` instead of
+ * being silently dropped — the caller can then say what it could not re-select.
+ */
+export function failedSelectionFromReport(reportPath: string | undefined): FailedSelection | null {
+  const outcomes = parseRunOutcomes(reportPath);
+  if (!outcomes) return null;
+  const caseIds = new Set<string>();
+  const unidentified: string[] = [];
+  let failed = 0;
+  for (const outcome of outcomes) {
+    if (outcome.status !== 'failed') continue;
+    failed++;
+    const ids = (outcome.tags ?? []).filter((tag) => classifyTag(tag) === 'case-id');
+    if (ids.length === 0) unidentified.push(outcome.title);
+    else for (const id of ids) caseIds.add(id);
+  }
+  return { caseIds: [...caseIds].sort(), unidentified, total: outcomes.length, failed };
 }
 
 function emptyCounts(): Record<CompareCategory, number> {

@@ -18,13 +18,22 @@ import {
   Stack,
   Table,
   Text,
+  Textarea,
   TextInput,
   Tooltip,
+  UnstyledButton,
 } from '@mantine/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { TbAlertTriangle, TbChevronRight, TbPlayerPlay, TbPlus, TbRefresh } from 'react-icons/tb';
+import {
+  TbAlertTriangle,
+  TbChevronRight,
+  TbPencil,
+  TbPlayerPlay,
+  TbPlus,
+  TbRefresh,
+} from 'react-icons/tb';
 import { api } from '~/api/client.js';
 import { qProjectTags, qTestCaseGrid } from '~/api/queries.js';
 import { InlineAlert } from '~/components/InlineAlert.js';
@@ -33,6 +42,7 @@ import { toast } from '~/components/Toast.js';
 import { useT } from '~/i18n/index.js';
 import { useNavigationStore } from '~/stores/navigation.js';
 import { type CoverageScan, isCaseRunnable, isCoverageKnown } from '~/utils/case-runnable.js';
+import { applyEnter } from '~/utils/list-continuation.js';
 import { buildTagExpr } from '~/utils/tag-selection.js';
 
 // Standard dropdown values — mirror config/pipeline.static.json `test_case_vocab`
@@ -85,39 +95,105 @@ function findCol(header: string[], name: string): number {
 }
 
 /**
- * Inline text editor — mounted ONLY for the cell being edited (click-to-edit),
- * so the grid renders plain-text values instead of many live inputs. Commits on
- * Enter/blur; Escape reverts.
+ * Fields written as prose or as a numbered / bulleted list. These get a growing
+ * textarea where Enter makes a new line, instead of a single-line input that
+ * would silently flatten the value the doc is supposed to hold.
  */
-function TextEditor({
+const MULTILINE_HEADERS = new Set([
+  'Test Scenario',
+  'Pre-Condition',
+  'Test Data Requirement',
+  'Test Data Example',
+  'Test Steps',
+  'Expected Result',
+  'Actual Result',
+  'Remark',
+]);
+
+/**
+ * Field editor — mounted ONLY for the cell being edited, so the grid renders
+ * plain text instead of many live inputs.
+ *
+ * An edit is explicitly committed with Save or dropped with Cancel; blurring does
+ * NOT write. Auto-committing on blur made every stray click a silent save, so a
+ * mistyped step was indistinguishable from an intended change.
+ *
+ * Single-line fields keep Enter as "save" (fastest for a one-word value).
+ * Multi-line fields give Enter to the text — with list continuation — and are
+ * saved with the button or Ctrl/Cmd+Enter.
+ */
+function FieldEditor({
   value,
+  multiline,
   onCommit,
   onCancel,
 }: {
   value: string;
+  multiline: boolean;
   onCommit: (next: string) => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState(value);
-  const cancelled = useRef(false);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+  const dirty = draft !== value;
+
+  /** Enter inside a textarea: continue the list, keeping the caret after the marker. */
+  function handleAreaEnter(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    const el = e.currentTarget;
+    const { value: next, caret } = applyEnter(el.value, el.selectionStart ?? el.value.length);
+    e.preventDefault();
+    setDraft(next);
+    // Restore the caret after React has rendered the new value.
+    requestAnimationFrame(() => {
+      const area = areaRef.current;
+      if (area) area.setSelectionRange(caret, caret);
+    });
+  }
+
   return (
-    <TextInput
-      size="xs"
-      autoFocus
-      value={draft}
-      onChange={(e) => setDraft(e.currentTarget.value)}
-      onBlur={() => {
-        if (!cancelled.current) onCommit(draft);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-        else if (e.key === 'Escape') {
-          cancelled.current = true;
-          e.currentTarget.blur();
-          onCancel();
-        }
-      }}
-    />
+    <Stack gap={4}>
+      {multiline ? (
+        <Textarea
+          ref={areaRef}
+          size="xs"
+          autoFocus
+          autosize
+          minRows={3}
+          maxRows={14}
+          value={draft}
+          onChange={(e) => setDraft(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onCommit(draft);
+            else if (e.key === 'Enter') handleAreaEnter(e);
+            else if (e.key === 'Escape') onCancel();
+          }}
+          styles={{ input: { fontFamily: 'inherit' } }}
+        />
+      ) : (
+        <TextInput
+          size="xs"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onCommit(draft);
+            else if (e.key === 'Escape') onCancel();
+          }}
+        />
+      )}
+      <Group gap={6}>
+        <Button size="compact-xs" onClick={() => onCommit(draft)} disabled={!dirty}>
+          {t('common.save')}
+        </Button>
+        <Button size="compact-xs" variant="subtle" color="gray" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Text size="xs" c="dimmed">
+          {multiline ? t('testcases.editorHintMultiline') : t('testcases.editorHint')}
+        </Text>
+      </Group>
+    </Stack>
   );
 }
 
@@ -300,17 +376,32 @@ export function TestCaseGridEditor({ doc, tool, type, project }: TestCaseGridEdi
         />
       );
     }
-    if (editing) return <TextEditor value={value} onCommit={commit} onCancel={cancel} />;
+    if (editing) {
+      return (
+        <FieldEditor
+          value={value}
+          multiline={MULTILINE_HEADERS.has(name)}
+          onCommit={commit}
+          onCancel={cancel}
+        />
+      );
+    }
+    // Read mode has to LOOK editable: a hover surface + a pencil, not just a
+    // title attribute. Without it the only clue was the cursor.
     return (
-      <Text
-        size="xs"
-        c={value ? undefined : 'dimmed'}
-        style={{ ...CELL_WRAP, cursor: 'pointer' }}
-        title={t('testcases.clickToEdit')}
+      <UnstyledButton
         onClick={() => setEditCell({ row: rowIdx, col })}
+        aria-label={`${t('testcases.clickToEdit')}: ${name}`}
+        style={{ width: '100%', borderRadius: 4 }}
+        className="tc-editable"
       >
-        {value || '—'}
-      </Text>
+        <Group gap={6} align="flex-start" wrap="nowrap" px={6} py={3}>
+          <Text size="xs" c={value ? undefined : 'dimmed'} style={{ ...CELL_WRAP, flex: 1 }}>
+            {value || '—'}
+          </Text>
+          <TbPencil size={12} style={{ flexShrink: 0, marginTop: 2, opacity: 0.45 }} aria-hidden />
+        </Group>
+      </UnstyledButton>
     );
   }
 

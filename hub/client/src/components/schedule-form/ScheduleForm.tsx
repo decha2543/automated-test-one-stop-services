@@ -34,7 +34,7 @@ import { useTools } from '~/hooks/useTools.js';
 import { useT } from '~/i18n/index.js';
 import { usePreferences } from '~/stores/hub.js';
 import { buildPerfTypeData } from '~/utils/perf-type-options.js';
-import { buildTagExpr, parseTagExpr } from '~/utils/tag-selection.js';
+import { buildTagQuery, parseTagQuery, type TagSelection } from '~/utils/tag-selection.js';
 import { toolSelectData } from '~/utils/tool-label.js';
 import { fromConfigSilent, toConfigSilent } from './schedule-silent.js';
 
@@ -68,8 +68,8 @@ function humanizeCron(cronExpr: string): string {
 }
 
 /** Pull `(?=.*@TAG)` lookaheads back into a flat tag list when editing. */
-function parseTagExpression(tag: string | undefined): string[] {
-  return parseTagExpr(tag);
+function parseTagExpression(tool: string, tag: string | undefined): TagSelection {
+  return parseTagQuery(tool, tag);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,6 +161,7 @@ export function ScheduleForm({
   const [runMode, setRunMode] = useState<RunMode>(defaults.runMode);
   const [headless, setHeadless] = useState<HeadlessMode>(defaults.headless);
   const [selectedTags, setSelectedTags] = useState<string[]>(defaults.selectedTags);
+  const [excludedTags, setExcludedTags] = useState<string[]>([]);
   const [extraArgs, setExtraArgs] = useState(defaults.extraArgs);
   const [noTrack, setNoTrack] = useState(defaults.noTrack);
   const [silent, setSilent] = useState(defaults.silent);
@@ -184,7 +185,9 @@ export function ScheduleForm({
     setDiscardReport(schedule.config.discardReport ?? false);
     setSection(schedule.config.section ?? '');
     setPerfType(schedule.config.performanceType ?? 'LOAD');
-    setSelectedTags(parseTagExpression(schedule.config.tag));
+    const selection = parseTagExpression(schedule.config.tool, schedule.config.tag);
+    setSelectedTags(selection.include);
+    setExcludedTags(selection.exclude);
     setInitializedFor(schedule.id);
   }
 
@@ -203,6 +206,7 @@ export function ScheduleForm({
     setSection(defaults.section);
     setPerfType(defaults.perfType);
     setSelectedTags(defaults.selectedTags);
+    setExcludedTags([]);
     setInitializedFor(null);
   }
 
@@ -241,7 +245,7 @@ export function ScheduleForm({
   const perfTypeData = buildPerfTypeData(projectEnvQ.data?.entries);
   const tags = useProjectTags(sectionAxis ? '' : tool, effectiveType, project);
 
-  const tagExpr = buildTagExpr(selectedTags);
+  const tagExpr = buildTagQuery(tool, selectedTags, excludedTags);
   // Human reading of the current cron plus its next fire time. Shown as the raw
   // input's description in advanced view, and standalone under the presets in
   // simple view, where the raw input is hidden.
@@ -427,6 +431,8 @@ export function ScheduleForm({
                 isLoading={tags.isLoading}
                 selectedTags={selectedTags}
                 onChange={setSelectedTags}
+                excludedTags={excludedTags}
+                onExcludeChange={setExcludedTags}
               />
             )}
 

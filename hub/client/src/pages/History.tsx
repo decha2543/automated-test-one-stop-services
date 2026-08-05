@@ -1,5 +1,5 @@
 import type { RunRecord, RunRequest, RunStatus, ToolId } from '@hub/shared';
-import { parseTagExpr } from '@hub/shared';
+import { type FailedRunSelection, parseTagExpr } from '@hub/shared';
 import {
   ActionIcon,
   Badge,
@@ -31,6 +31,7 @@ import {
   TbGitCompare,
   TbHistory,
   TbPlayerPlay,
+  TbRefreshAlert,
   TbTerminal,
   TbTrash,
 } from 'react-icons/tb';
@@ -51,6 +52,7 @@ import { usePreferences } from '~/stores/hub.js';
 import { useNavigationStore } from '~/stores/navigation.js';
 import { formatAbsolute, formatDurationBetween, formatRelative } from '~/utils/datetime.js';
 import { getStatusColor, getStatusIcon } from '~/utils/run-status.js';
+import { buildTagExpr } from '~/utils/tag-selection.js';
 import { toolLabel } from '~/utils/tool-label.js';
 
 const ALL_STATUSES: RunStatus[] = ['passed', 'failed'];
@@ -134,6 +136,34 @@ export function HistoryPage() {
   function handleRerun(run: RunRecord) {
     onRerun(run.request);
   }
+
+  /**
+   * Re-run only the cases that failed in this run.
+   *
+   * The failed set comes from the server, which reads the run's own
+   * `results.json` — Playwright's `--last-failed` cannot work here because its
+   * state file is deleted by the output cleanup (brain LESS-074). This also means
+   * ANY run in history can be narrowed, not just the latest.
+   */
+  const rerunFailed = useMutation({
+    mutationFn: (run: RunRecord) =>
+      api.get<FailedRunSelection>(`/api/runs/${run.id}/failed`).then((res) => ({ run, res })),
+    onSuccess: ({ run, res }) => {
+      if (res.caseIds.length === 0) {
+        toast.error(
+          res.failed === 0
+            ? t('history.rerunFailedNone')
+            : `${t('history.rerunFailedUntagged')} (${res.unidentified.length})`,
+        );
+        return;
+      }
+      if (res.unidentified.length > 0) {
+        // Partial selection is still useful — say what could not be included.
+        toast.error(`${t('history.rerunFailedUntagged')} (${res.unidentified.length})`);
+      }
+      onRerun({ ...run.request, tag: buildTagExpr(res.caseIds) });
+    },
+  });
 
   function toggleCompare(id: string) {
     setCompareSel((prev) => {
@@ -715,6 +745,22 @@ export function HistoryPage() {
                             <TbPlayerPlay size={12} />
                           </ActionIcon>
                         </Tooltip>
+                        {/* Only offered where there is something to narrow to —
+                            a green run has no failures to re-select. */}
+                        {(r.status === 'failed' || r.status === 'error') && (
+                          <Tooltip label={t('history.rerunFailed')}>
+                            <ActionIcon
+                              variant="light"
+                              color="orange"
+                              size="sm"
+                              loading={rerunFailed.isPending && rerunFailed.variables?.id === r.id}
+                              onClick={() => rerunFailed.mutate(r)}
+                              aria-label={t('history.rerunFailed')}
+                            >
+                              <TbRefreshAlert size={12} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
                         <Tooltip label={t('history.copyCommand')}>
                           <ActionIcon
                             variant="light"
