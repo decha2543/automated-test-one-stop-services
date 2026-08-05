@@ -32,6 +32,7 @@ import { ListSkeleton } from '~/components/Skeletons.js';
 import { toast } from '~/components/Toast.js';
 import { useT } from '~/i18n/index.js';
 import { useNavigationStore } from '~/stores/navigation.js';
+import { type CoverageScan, isCaseRunnable, isCoverageKnown } from '~/utils/case-runnable.js';
 import { buildTagExpr } from '~/utils/tag-selection.js';
 
 // Standard dropdown values — mirror config/pipeline.static.json `test_case_vocab`
@@ -158,14 +159,16 @@ export function TestCaseGridEditor({ doc, tool, type, project }: TestCaseGridEdi
   // (same query key) so opening the grid adds no extra backend work when the
   // user has already visited Run for this project.
   const tagsQ = useQuery(qProjectTags(tool, type, project));
-  const coveredIds = useMemo(
-    () => new Set((tagsQ.data?.all ?? []).map((tag) => tag.replace(/^@/, ''))),
-    [tagsQ.data],
+  const scan: CoverageScan = useMemo(
+    () => ({
+      coveredIds: new Set((tagsQ.data?.all ?? []).map((tag) => tag.replace(/^@/, ''))),
+      settled: tagsQ.isSuccess,
+      failed: tagsQ.isError,
+    }),
+    [tagsQ.data, tagsQ.isSuccess, tagsQ.isError],
   );
-  // Only gate on coverage once we truly have a tag set; an empty or failed scan
-  // must not label every case "no spec" (that would be a false negative).
-  const coverageKnown = coveredIds.size > 0;
-  const isRunnable = (id: string) => !coverageKnown || coveredIds.has(id.trim());
+  const coverageKnown = isCoverageKnown(scan);
+  const isRunnable = (id: string) => isCaseRunnable(scan, id);
 
   const save = useMutation({
     mutationFn: (body: { row: number; col: number; value: string }) =>
@@ -197,7 +200,7 @@ export function TestCaseGridEditor({ doc, tool, type, project }: TestCaseGridEdi
    */
   function runIds(ids: string[]) {
     const wanted = ids.map((s) => s.trim()).filter(Boolean);
-    const runnable = coverageKnown ? wanted.filter((id) => coveredIds.has(id)) : wanted;
+    const runnable = wanted.filter((id) => isCaseRunnable(scan, id));
     if (runnable.length === 0) {
       toast.error(coverageKnown ? t('testcases.noRunnable') : t('testcases.noIds'));
       return;
@@ -208,7 +211,10 @@ export function TestCaseGridEditor({ doc, tool, type, project }: TestCaseGridEdi
     navigate({ to: '/run' });
   }
 
-  if (gridQ.isLoading) return <ListSkeleton rows={6} />;
+  // Hold the whole grid until the rows AND the coverage scan have both arrived.
+  // Rendering on rows alone showed every case as a runnable link for as long as
+  // the tag scan was in flight, so a case with no spec could be clicked to run.
+  if (gridQ.isLoading || tagsQ.isLoading) return <ListSkeleton rows={6} />;
   const grid = gridQ.data;
   const sheets = grid?.sheets ?? [];
   const sheet = sheets[Math.min(sheetIdx, Math.max(0, sheets.length - 1))];
