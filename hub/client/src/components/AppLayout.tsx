@@ -511,44 +511,48 @@ export function AppLayout() {
                 rail drops it and follows the advanced-mode preference directly:
                 the gated items are either all there or reachable via ⌘K and the
                 header switch. */}
-            {rail ? (
-              advancedMode && (
-                <>
-                  <Divider mx="xs" my="xs" />
-                  {NAV_CATEGORIES.filter((cat) => cat.advanced)
-                    .flatMap((cat) => cat.items)
-                    .map(renderItem)}
-                </>
-              )
-            ) : (
-              <>
-                <NavLink
-                  mt="xs"
-                  label={t('nav.advanced')}
-                  leftSection={<TbAdjustmentsHorizontal size={18} />}
-                  rightSection={
-                    showAdvanced ? <TbChevronDown size={14} /> : <TbChevronRight size={14} />
-                  }
-                  onClick={() => setAdvancedNavOpen(!showAdvanced)}
-                  variant="subtle"
-                  c={showAdvanced ? undefined : 'dimmed'}
-                />
-                {/* Nest the advanced categories under the toggle with an indented
+            {rail
+              ? advancedMode && (
+                  <>
+                    <Divider mx="xs" my="xs" />
+                    {NAV_CATEGORIES.filter((cat) => cat.advanced)
+                      .flatMap((cat) => cat.items)
+                      .map(renderItem)}
+                  </>
+                )
+              : // Basic mode hides the expander itself, not just its contents: a row
+                // labelled "Advanced" that only ever reveals operator surfaces is
+                // noise for someone who has opted out of them. The header switch and
+                // ⌘K still reach everything.
+                advancedMode && (
+                  <>
+                    <NavLink
+                      mt="xs"
+                      label={t('nav.advanced')}
+                      leftSection={<TbAdjustmentsHorizontal size={18} />}
+                      rightSection={
+                        showAdvanced ? <TbChevronDown size={14} /> : <TbChevronRight size={14} />
+                      }
+                      onClick={() => setAdvancedNavOpen(!showAdvanced)}
+                      variant="subtle"
+                      c={showAdvanced ? undefined : 'dimmed'}
+                    />
+                    {/* Nest the advanced categories under the toggle with an indented
                     left rail so items like Docker Services read as "inside
                     Advanced" rather than as their own top-level section. */}
-                {showAdvanced && (
-                  <div
-                    style={{
-                      marginLeft: 12,
-                      paddingLeft: 8,
-                      borderLeft: '2px solid var(--mantine-color-default-border)',
-                    }}
-                  >
-                    {NAV_CATEGORIES.filter((cat) => cat.advanced).map(renderCategory)}
-                  </div>
+                    {showAdvanced && (
+                      <div
+                        style={{
+                          marginLeft: 12,
+                          paddingLeft: 8,
+                          borderLeft: '2px solid var(--mantine-color-default-border)',
+                        }}
+                      >
+                        {NAV_CATEGORIES.filter((cat) => cat.advanced).map(renderCategory)}
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
           </AppShell.Section>
           <AppShell.Section>{renderItem(SETTINGS_ITEM)}</AppShell.Section>
         </AppShell.Navbar>

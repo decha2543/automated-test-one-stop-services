@@ -173,6 +173,14 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   // (still-kept) text is not sent, so a value typed earlier cannot leak into the
   // next run.
   const supportsRunFlags = SUPPORTS_RUN_FLAGS.has(tool);
+  /**
+   * Basic mode runs locally, full stop: the Docker choice needs a running daemon
+   * and an understanding of the compose setup, so it belongs to advanced mode.
+   * Derived rather than written back to state, so flipping advanced mode back on
+   * restores whatever the user had picked.
+   */
+  const effectiveMode: RunMode = advancedMode ? mode : 'local';
+
   // Free text is advanced-mode only; the typed flags always apply. Merging here
   // means a flag set in both places resolves once, in favour of the typed field.
   const effectiveExtraArgs = mergeExtraArgs(
@@ -306,6 +314,9 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
   const toolsQuery = useTools();
   const toolView = (toolsQuery.data ?? []).find((t) => t.id === tool);
   const sectionAxis = toolView?.projects.sectionAxis ?? false;
+  /** Fields actually rendered in the options row — drives its column count. */
+  const optionFieldCount =
+    (advancedMode ? 1 : 0) + (sectionAxis ? 0 : 1) + (!sectionAxis && supportsRunFlags ? 2 : 0);
   const typeAxis = toolView?.projects.typeAxis ?? true;
   const fixedType = toolView?.projects.fixedType ?? null;
 
@@ -492,7 +503,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
       tool,
       type: effectiveType,
       project,
-      mode,
+      mode: effectiveMode,
       tag: buildTagQuery(tool, selectedTags, excludedTags),
       headless: !sectionAxis ? headless : undefined,
       extraArgs: effectiveExtraArgs,
@@ -542,7 +553,7 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
       tool,
       type: effectiveType,
       project,
-      mode,
+      mode: effectiveMode,
       tag: tagExpr,
       headless: !sectionAxis ? headless : undefined,
       extraArgs: effectiveExtraArgs,
@@ -753,26 +764,29 @@ export const RunSession = forwardRef<SessionRef, RunSessionProps>(function RunSe
 
               {/* Row 2 — HOW to run. Mode, display and the tuning numbers share one
                   line; each was a near-empty block of its own before. */}
-              <SimpleGrid
-                cols={{ base: 2, xs: sectionAxis ? 2 : supportsRunFlags ? 4 : 2 }}
-                spacing="xs"
-              >
-                <Select
-                  label={t('run.mode')}
-                  size="xs"
-                  disabled={isRunning}
-                  value={mode}
-                  onChange={(v) => v && setMode(v as RunMode)}
-                  data={[
-                    { value: 'local', label: t('run.modeLocal') },
-                    {
-                      value: 'docker',
-                      label: `Docker${!config.data?.dockerRunning ? ` (${t('run.notRunning')})` : ''}`,
-                      disabled: !config.data?.dockerRunning,
-                    },
-                  ]}
-                  allowDeselect={false}
-                />
+              <SimpleGrid cols={{ base: 2, xs: Math.max(2, optionFieldCount) }} spacing="xs">
+                {/* Docker needs a running daemon and knowledge of the compose
+                    setup, so basic mode neither shows it nor uses it —
+                    `effectiveMode` pins the run to local. A visible-but-ignored
+                    select would be the worse half-measure. */}
+                {advancedMode && (
+                  <Select
+                    label={t('run.mode')}
+                    size="xs"
+                    disabled={isRunning}
+                    value={mode}
+                    onChange={(v) => v && setMode(v as RunMode)}
+                    data={[
+                      { value: 'local', label: t('run.modeLocal') },
+                      {
+                        value: 'docker',
+                        label: `Docker${!config.data?.dockerRunning ? ` (${t('run.notRunning')})` : ''}`,
+                        disabled: !config.data?.dockerRunning,
+                      },
+                    ]}
+                    allowDeselect={false}
+                  />
+                )}
                 {!sectionAxis && (
                   <Select
                     label={t('run.display')}
