@@ -1,0 +1,36 @@
+# =============================================================================
+# Composite action: best-effort clone of the built-in tool repos into tools/<id>.
+#
+# The portable tools live in their OWN git repos and are git-ignored here
+# (.gitignore `tools/*/`), so a CI checkout does not contain them. Jobs that want
+# to look at real tool code clone them first; if a repo is private or unreachable
+# the clone is skipped and the caller must degrade gracefully — never fail because
+# of another repository's access.
+#
+# Shared by the test job (manifest-integration tests self-skip via
+# realToolsPresent) and the typecheck-tools job (skips each absent tool).
+# The caller must run actions/checkout FIRST.
+# =============================================================================
+
+name: Clone tool repos (best-effort)
+description: Clone tools/playwright, tools/robot-framework and tools/k6 when reachable; skip quietly otherwise.
+
+inputs:
+  base-url:
+    description: Group URL the tool repos live under.
+    required: false
+    default: https://gitlab.com/automated-tester-project-template/one-stop-service-tools-collections
+
+runs:
+  using: composite
+  steps:
+    - name: Clone tool repos
+      shell: bash
+      env:
+        BASE: ${{ inputs.base-url }}
+      run: |
+        for t in playwright robot-framework k6; do
+          [ -d "tools/$t/.git" ] && continue
+          git clone --depth 1 "$BASE/$t.git" "tools/$t" \
+            || echo "[tools] clone of $t skipped — dependent checks will self-skip"
+        done

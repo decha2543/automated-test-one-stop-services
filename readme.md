@@ -93,6 +93,12 @@ set "HUB_PORT=5180"
 automated-test-one-stop-service_installer_windows.bat
 ```
 
+Already installed and the Hub misbehaves? `task hub-status` answers who owns the
+port and whether start-at-login is registered, and `task hub-stop` releases it. One
+gotcha: `task hub` (dev mode) serves the UI on **:5173** — the single-port `:5174`
+experience is the built Hub (`task hub-build` then `task hub-start`), which is what
+the installer and the desktop shortcut run.
+
 ### Removing it again
 
 ```bash
@@ -151,8 +157,12 @@ task hub-start            # serve the built Hub — UI and API both on :5174
 task hub-stop             # stop the Hub running on HUB_PORT
 task hub-restart          # stop, wait for the port, start again
 task hub-status           # port, pid, and boot auto-start state
-task --list               # all tasks
+task --list               # common tasks
+task --list-all           # every task, generated — the only complete list
 ```
+
+`task help` is a hand-written quick reference of the common ones. If a command is
+not in `task --list-all`, it does not exist — trust the generated list.
 
 ## Environment variables
 
@@ -188,6 +198,19 @@ on the installer has no effect:
 | `SETUP_NO_OPEN=1` | off | Do not open the browser when setup finishes. |
 | `SETUP_NO_PAUSE=1` | off | Windows: skip the final "press any key". For unattended runs. |
 
+A test reading an env var and getting an empty string usually means the key was never
+declared, so nothing told you to set it. Each project's committed `.env.template` is
+the contract of what is tunable; this finds every key the code reads but no template
+declares:
+
+```bash
+node scripts/lib/env-contract.mjs            # report
+node scripts/lib/env-contract.mjs --strict   # exit 1 if anything is undeclared
+```
+
+Add the missing key to that project's `.env.template` with a placeholder and a
+one-line comment, then put the real value in your own `.env` — never in the template.
+
 Android is opt-in and never part of the install — these apply to `task setup-android`:
 
 | Variable | Default | Meaning |
@@ -221,6 +244,12 @@ Other scopes keep their own contract, so there is one place per concern:
 
 ## Documentation
 
+- Writing tests with a tool: that tool's own `tools/<tool>/README.md` — how to run it,
+  where files go, and the rules for its runtime. Each tool is a removable plugin, so
+  its guide ships inside it (`tools/playwright/README.md`,
+  `tools/robot-framework/README.md`, `tools/k6/README.md` for the built-in three).
+- Something broken: this file — the section that owns the topic (install warning,
+  ports, env vars, removing). Tool-specific problems live in that tool's README.
 - Hub: [`hub/README.md`](hub/README.md)
 - Knowledge base (Obsidian vault): [`brain/README.md`](brain/README.md)
 

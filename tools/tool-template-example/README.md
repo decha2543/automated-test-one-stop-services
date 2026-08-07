@@ -27,6 +27,7 @@ Use this folder as a starting point when creating a new portable tool plugin.
 | `tsconfig.template.json` | TypeScript tools with `tsconfigGen` set | If tsconfigGen≠null |
 | `biome.json` | Per-tool lint overrides (node tools) | Optional |
 | `.dockerignore` | Docker build exclusions | Optional |
+| `README.md` | How to run this tool, where project files go, and the rules for its runtime. Ships WITH the tool: a plugin can be removed, so its guide must leave with it rather than rot in the workspace | **Yes** |
 | `resources/` | Shared fixtures/helpers/modules across projects | Recommended |
 | `projects/<type>/<name>-template-example/` | Scaffold for `Create project` | **Yes** (≥1) |
 

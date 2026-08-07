@@ -47,22 +47,38 @@ jobs:
       - run: pnpm -C hub/server run typecheck
       - run: pnpm -C hub/client run typecheck
 
+  # The tools carry the test code users actually write, so their TypeScript is
+  # worth the same gate as the Hub's — this mirrors the `tools/*/tsconfig.json`
+  # loop in `task check`. Each tool is skipped when its repo could not be cloned
+  # (private / unreachable), but a tool that IS present must install and
+  # typecheck: a real signal about real code, not a soft warning. robot-framework
+  # has no tsconfig (Python), so it is not in the loop.
+  typecheck-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/clone-tools
+      - name: Typecheck every tool present
+        run: |
+          for t in playwright k6; do
+            if [ ! -f "tools/$t/tsconfig.json" ]; then
+              echo "[skip] tools/$t not present"
+              continue
+            fi
+            echo "[typecheck] tools/$t"
+            pnpm -C "tools/$t" install --frozen-lockfile
+            pnpm exec tsc --noEmit -p "tools/$t/tsconfig.json"
+          done
+
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      # Best-effort clone of the built-in tool repos (still on GitLab). If they
-      # are private/unreachable the clone is skipped and the manifest-integration
-      # tests self-skip via the realToolsPresent guard — the run stays green.
-      - name: Clone tool repos (best-effort)
-        run: |
-          BASE="https://gitlab.com/automated-tester-project-template/one-stop-service-tools-collections"
-          for t in playwright robot-framework k6; do
-            [ -d "tools/$t/.git" ] && continue
-            git clone --depth 1 "$BASE/$t.git" "tools/$t" \
-              || echo "[tools] clone of $t skipped — its integration tests will self-skip"
-          done
+      # When the tool repos are unreachable the manifest-integration tests
+      # self-skip via the realToolsPresent guard — the run stays green.
+      - uses: ./.github/actions/clone-tools
       - name: Script module tests
         run: |
           pnpm exec vitest run --root scripts/manifests
@@ -78,7 +94,7 @@ jobs:
         run: node scripts/eval/test-quality.mjs
 
   release:
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, typecheck-tools, test]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
