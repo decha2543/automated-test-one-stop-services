@@ -128,6 +128,9 @@ exactly which ones:
 2. a project folder other than `_workspace` exists under `brain/projects/`
 3. any repo — the workspace, `brain/`, or a project under `tools/` — has
    uncommitted changes or commits that are on no remote
+4. the Hub is still answering on `HUB_PORT` after the uninstall stopped it — it
+   holds files inside the folder, so a delete would fail halfway; nothing is
+   removed and it tells you to run `task hub-stop`
 
 That order is deliberate: every project and the knowledge vault is its own git
 repo, so delete your projects and push your work **first**, then purge. The

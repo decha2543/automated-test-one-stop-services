@@ -97,6 +97,22 @@ function step(label, action) {
   }
 }
 
+/**
+ * Is the Hub still answering on HUB_PORT? Delegates to `hub-service.mjs status`,
+ * which exits 0 only while the port is listening — so "is it up" has one
+ * definition shared with the start/stop scripts instead of a second port check
+ * implemented here. A missing launcher counts as down (nothing to hold a file).
+ */
+function hubIsUp() {
+  if (!fs.existsSync(HUB_SERVICE)) return false;
+  const r = spawnSync(process.execPath, [HUB_SERVICE, 'status'], {
+    stdio: 'pipe',
+    timeout: 60_000,
+    encoding: 'utf8',
+  });
+  return r.status === 0;
+}
+
 /** Run a hub-service verb. Never throws: uninstalling must not stall on it. */
 function hubService(verb) {
   if (!fs.existsSync(HUB_SERVICE)) return 'launcher not present, skipped';
@@ -546,6 +562,22 @@ async function main() {
     console.log(`  Then delete the workspace folder itself: ${WORKSPACE_ROOT}`);
     console.log('');
   } else if (PURGE) {
+    // Stop-before-delete guard. `plan()` already ran `hub-service stop`, but if
+    // that did not take (an OS supervisor restarted it, a policy blocked the
+    // kill), the Hub still holds files under hub/ and its cwd inside the tree —
+    // so the delete would fail halfway and leave a wrecked folder. Fail closed
+    // instead: nothing is deleted while anything still answers on HUB_PORT.
+    if (hubIsUp()) {
+      console.error('  [error] The Hub is still running, so the folder was NOT deleted.');
+      console.error(
+        '  Stop it and re-run:  task hub-stop     (or: node hub/bin/hub-service.mjs stop)',
+      );
+      console.error(
+        '  Still up after that? node hub/bin/hub-service.mjs status  shows what owns the port.',
+      );
+      console.error('');
+      return 1;
+    }
     try {
       purgeWorkspace();
       console.log(`  Deleted the workspace folder: ${WORKSPACE_ROOT}`);
@@ -571,6 +603,9 @@ function planPreview() {
     items.push('remove the gb.bat shim and the PATH entries setup added');
     items.push(`clear the user environment variables: ${WIN_USER_ENV_VARS.join(', ')}`);
     items.push('remove the managed Git Bash block from ~/.bashrc');
+  }
+  if (PURGE) {
+    items.push('verify the Hub is really down — the folder is not deleted while it answers');
   }
   items.push(
     PURGE

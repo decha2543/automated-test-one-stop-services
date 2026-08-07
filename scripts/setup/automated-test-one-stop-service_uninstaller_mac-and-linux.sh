@@ -14,8 +14,9 @@
 #
 #   Safety is enforced by uninstall.mjs, not here: it refuses to delete the
 #   folder while a test project, a brain project folder, or uncommitted /
-#   unpushed git work is still in it, and it asks for the folder name to be
-#   typed. Prerequisite: node on PATH (setup installed it).
+#   unpushed git work is still in it, it asks for the folder name to be typed,
+#   and it stops the Hub then verifies the port is free before deleting anything.
+#   Prerequisite: node on PATH (setup installed it).
 #
 #   Plain uninstall, keeping the folder:  task uninstall -- --run
 # ===========================================================================

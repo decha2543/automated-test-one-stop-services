@@ -21,8 +21,9 @@ REM       node scripts\setup\uninstall.mjs --purge --run --yes
 REM
 REM   Safety is enforced by uninstall.mjs, not here: it refuses to delete the
 REM   folder while a test project, a brain project folder, or uncommitted /
-REM   unpushed git work is still in it, and it asks for the folder name to be
-REM   typed. Prerequisite: node on PATH (setup installed it).
+REM   unpushed git work is still in it, it asks for the folder name to be typed,
+REM   and it stops the Hub then verifies the port is free before deleting
+REM   anything. Prerequisite: node on PATH (setup installed it).
 REM
 REM   Plain uninstall, keeping the folder:  task uninstall -- --run
 REM ===========================================================================
