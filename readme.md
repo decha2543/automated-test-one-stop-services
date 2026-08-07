@@ -106,6 +106,34 @@ setup added. It deliberately **keeps** node/pnpm/uv/task (other projects may use
 them) and your workspace folder (it holds your test projects); both are listed in
 the output so nothing is a surprise.
 
+### Removing the workspace folder as well
+
+Add `--purge`, or use the uninstaller for your OS in `scripts/setup/` — same shape
+as the installers:
+
+- **Windows**: double-click `automated-test-one-stop-service_uninstaller_windows.bat`
+- **macOS / Linux**: `bash automated-test-one-stop-service_uninstaller_mac-and-linux.sh`
+
+```bash
+node scripts/setup/uninstall.mjs --purge        # dry run: plan + anything blocking it
+node scripts/setup/uninstall.mjs --purge --run  # delete the folder too (type its name to confirm)
+```
+
+This one is irreversible, so it is **gated** — and the gates are not bypassable,
+not even with `--yes`. It refuses while any of these is still true, and prints
+exactly which ones:
+
+1. a test project exists under `tools/<tool>/projects/<type>/` (the shipped
+   `*-template-example` scaffolds don't count)
+2. a project folder other than `_workspace` exists under `brain/projects/`
+3. any repo — the workspace, `brain/`, or a project under `tools/` — has
+   uncommitted changes or commits that are on no remote
+
+That order is deliberate: every project and the knowledge vault is its own git
+repo, so delete your projects and push your work **first**, then purge. The
+Windows launcher continues in a second window (a batch file cannot delete the
+folder it is running from) — read that window for the result.
+
 ## CLI (no Hub required)
 
 ```bash
@@ -114,9 +142,12 @@ task setup                # install everything (first time)
 task pw:run-local  PROJECT=<name> TYPE=web TAG='@smoke'
 task robot:run-local PROJECT=<name> TYPE=web
 task k6:run-local  PROJECT=<name> SECTION=<name> PERFORMANCE_TYPE=LOAD
-task hub                  # start the Hub (dev)
+task hub                  # start the Hub in dev mode — UI on :5173, API on :5174 (Ctrl+C to stop)
 task hub-build            # build the Hub (production)
-task hub-start            # serve the built Hub
+task hub-start            # serve the built Hub — UI and API both on :5174
+task hub-stop             # stop the Hub running on HUB_PORT
+task hub-restart          # stop, wait for the port, start again
+task hub-status           # port, pid, and boot auto-start state
 task --list               # all tasks
 ```
 

@@ -5,15 +5,25 @@ Web UI for the Automated Test One-Stop Service workspace. Wraps the `task` CLI b
 ## Quick start
 
 ```bash
-task hub          # start dev (server + client)
+task hub          # start dev (server + client) — foreground, Ctrl+C to stop
 task hub-build    # production build
 task hub-start    # serve production bundle
+task hub-stop     # stop the Hub running on HUB_PORT
+task hub-restart  # stop, wait for the port, start the built server
+task hub-status   # port, daemonless pid, boot auto-start state
 ```
 
 Default ports:
 
-- Client (Vite dev): http://localhost:5173
-- Server (Fastify): http://localhost:5174
+- Dev — UI (Vite): <http://localhost:5173>, API (Fastify): <http://localhost:5174>
+- Production (`hub-start`, the installer, the desktop shortcut) — everything on
+  <http://localhost:5174>; the built client is served by the same Fastify server
+
+`hub-stop` / `hub-restart` / `hub-status` wrap `hub/bin/hub-service.mjs`, which owns
+Hub process management for the start scripts, setup, and the in-app Update button.
+They act on whatever holds `HUB_PORT` — the detached background instance, an OS boot
+supervisor registered by `hub-service.mjs enable-boot`, or a foreground `hub-start`.
+Dev mode (`task hub`) is not managed by it: stop that with Ctrl+C.
 
 Checks across all three packages (same commands CI runs):
 

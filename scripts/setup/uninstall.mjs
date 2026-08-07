@@ -4,19 +4,41 @@
 // ----------------------------------------------------------------------------
 // Scope: only the things setup created. It never removes shared toolchains
 // (volta / scoop / uv / task / node / pnpm) because other projects on the
-// machine may depend on them, and it never deletes the workspace folder because
-// that holds the user's own test projects. Both are listed as "kept" instead, so
-// there is no doubt about what is left behind.
+// machine may depend on them, and by default it never deletes the workspace
+// folder because that holds the user's own test projects. Both are listed as
+// "kept" instead, so there is no doubt about what is left behind.
 //
 // SAFE BY DEFAULT (same convention as scripts/release.mjs):
 //   no flags   → DRY RUN: prints the plan, changes nothing
 //   --run      → actually remove (asks for confirmation once)
 //   --yes      → skip the confirmation (for scripted/unattended removal)
+//   --purge    → ALSO delete the workspace folder itself (see the gates below)
 //
 // Usage:
-//   node scripts/setup/uninstall.mjs            # show the plan
-//   node scripts/setup/uninstall.mjs --run      # remove, with a confirm prompt
+//   node scripts/setup/uninstall.mjs                     # show the plan
+//   node scripts/setup/uninstall.mjs --run               # remove, with a confirm prompt
 //   node scripts/setup/uninstall.mjs --run --yes
+//   node scripts/setup/uninstall.mjs --purge             # show the plan incl. the folder
+//   node scripts/setup/uninstall.mjs --purge --run       # remove everything (typed confirm)
+//
+// --purge is irreversible, so it is GATED. The gates are NOT bypassable — not by
+// --yes, not by a TTY-less run — because every test project and the brain vault is
+// its own git repo, and deleting the folder with work still inside it destroys that
+// work permanently. Purge refuses while any of these is true:
+//   1. a user test project exists under tools/<tool>/projects/<type>/ (the
+//      *-template-example scaffolds that ship with the repo do not count)
+//   2. a project knowledge folder exists under brain/projects/ (other than
+//      the workspace's own `_workspace`)
+//   3. any repo (root, brain, or a project under tools/) has uncommitted changes
+//      or commits that are on no remote
+// Only then does it ask for the folder NAME to be typed out — a y/N keypress is too
+// cheap for an action with no undo.
+//
+// Double-clickable wrappers for non-technical users (they are the reason a .bat is
+// needed at all: cmd keeps the running batch file open, so it must relocate itself
+// to TEMP before the workspace can be deleted):
+//   scripts/setup/automated-test-one-stop-service_uninstaller_windows.bat
+//   scripts/setup/automated-test-one-stop-service_uninstaller_mac-and-linux.sh
 //
 // Tunables (env): SETUP_STATE_DIR (where .setup-state.json lives),
 // HUB_SHORTCUT_DIR (where the desktop shortcut was written).
@@ -24,9 +46,11 @@
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { listGitDirs } from '../lib/list-git-dirs.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = path.resolve(HERE, '..', '..');
@@ -37,6 +61,12 @@ const IS_WIN = process.platform === 'win32';
 
 const DRY_RUN = !process.argv.includes('--run');
 const ASSUME_YES = process.argv.includes('--yes');
+const PURGE = process.argv.includes('--purge');
+
+/** Projects that ship WITH the repo as scaffolding, so they are not user work. */
+const TEMPLATE_MARKER = 'template-example';
+/** The brain slug that belongs to the workspace itself, not to a user project. */
+const WORKSPACE_BRAIN_SLUG = '_workspace';
 
 /** Windows user-scope env vars setup persisted with setx. */
 const WIN_USER_ENV_VARS = ['PLAYWRIGHT_BROWSERS_PATH', 'VOLTA_FEATURE_PNPM'];
@@ -127,6 +157,133 @@ function rmIfExists(target, { recursive = false } = {}) {
   return 'removed';
 }
 
+// ── --purge gates ─────────────────────────────────────────────────────────────
+// Every gate function takes the root to scan so `--selftest` can point them at a
+// fixture instead of the real machine.
+
+/** Sub-directories of `dir`; empty when it does not exist or cannot be read. */
+function subDirs(dir) {
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The user's own test projects: `tools/<tool>/projects/<type>/<project>`, minus the
+ * `*-template-example` scaffolds the repo ships with. Tool-agnostic on purpose —
+ * a new tool folder needs no edit here.
+ */
+function userProjects(root) {
+  const found = [];
+  for (const tool of subDirs(path.join(root, 'tools'))) {
+    const projectsDir = path.join(root, 'tools', tool, 'projects');
+    for (const type of subDirs(projectsDir)) {
+      for (const project of subDirs(path.join(projectsDir, type))) {
+        if (project.includes(TEMPLATE_MARKER)) continue;
+        found.push(`tools/${tool}/projects/${type}/${project}`);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Project knowledge folders under `brain/projects/`, excluding the workspace's own
+ * `_workspace` notes and the shipped template — same rule as `userProjects`.
+ */
+function brainProjects(root) {
+  return subDirs(path.join(root, 'brain', 'projects'))
+    .filter((name) => name !== WORKSPACE_BRAIN_SLUG && !name.includes(TEMPLATE_MARKER))
+    .map((name) => `brain/projects/${name}`);
+}
+
+/** Run git inside `repo`; '' on any failure (a broken repo blocks nothing). */
+function git(repo, args) {
+  const r = spawnSync('git', args, {
+    cwd: repo,
+    stdio: 'pipe',
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  return r.status === 0 ? (r.stdout || '').trim() : '';
+}
+
+/**
+ * Every git repo that would be destroyed with the folder: the root, the brain
+ * vault, and each project repo under `tools/` (found with the same helper the
+ * `pull` task uses). Scanning `tools/` rather than the whole tree keeps this off
+ * `.cache/` and `outputs/`.
+ */
+function repoDirs(root) {
+  const candidates = [
+    root,
+    path.join(root, 'brain'),
+    ...listGitDirs(`${root.replace(/\\/g, '/')}/tools`).map((g) => path.dirname(g)),
+  ];
+  return [...new Set(candidates.map((p) => path.resolve(p)))].filter((p) =>
+    fs.existsSync(path.join(p, '.git')),
+  );
+}
+
+/**
+ * Repos holding work that exists only on this machine. `status --porcelain` covers
+ * staged + unstaged + untracked; `log --branches --not --remotes` covers commits on
+ * no remote — which includes a repo with no remote configured at all, where every
+ * commit is local-only. Both are exactly what a folder delete would take with it.
+ */
+function reposWithLocalWork(root) {
+  const out = [];
+  for (const repo of repoDirs(root)) {
+    const dirty = git(repo, ['status', '--porcelain']) !== '';
+    const unpushed = git(repo, ['log', '--branches', '--not', '--remotes', '--oneline']) !== '';
+    if (!dirty && !unpushed) continue;
+    const label = path.relative(root, repo).replace(/\\/g, '/') || '.';
+    const why = [dirty && 'uncommitted changes', unpushed && 'commits on no remote']
+      .filter(Boolean)
+      .join(' + ');
+    out.push(`${label} — ${why}`);
+  }
+  return out;
+}
+
+/** All reasons purge must refuse, as user-facing lines. Empty array = allowed. */
+function purgeBlockers(root) {
+  const blockers = [];
+  const projects = userProjects(root);
+  if (projects.length > 0) {
+    blockers.push(`${projects.length} test project(s) still here: ${projects.join(', ')}`);
+  }
+  const brains = brainProjects(root);
+  if (brains.length > 0) {
+    blockers.push(`${brains.length} project knowledge folder(s) still here: ${brains.join(', ')}`);
+  }
+  for (const repo of reposWithLocalWork(root)) blockers.push(`unsaved work in ${repo}`);
+  return blockers;
+}
+
+/**
+ * Delete the workspace folder itself. `chdir` out of the tree first: the OS holds a
+ * handle on the process's cwd, so a tree containing it cannot be removed on Windows.
+ * This script file lives inside the tree too, which is fine (Node reads a module
+ * fully and closes the fd). A file still locked by an editor or another node process
+ * surfaces as a thrown error — never a silent half-deleted workspace.
+ */
+function purgeWorkspace() {
+  process.chdir(os.tmpdir());
+  fs.rmSync(WORKSPACE_ROOT, { recursive: true, force: true, maxRetries: 5, retryDelay: 400 });
+  if (fs.existsSync(WORKSPACE_ROOT)) {
+    throw new Error(
+      'some files are still locked — close editors/terminals open in the folder, then re-run',
+    );
+  }
+  return 'removed';
+}
+
 function plan() {
   step('Stop the Hub', () => hubService('stop'));
   step('Remove the start-at-login registration', () => hubService('disable-boot'));
@@ -178,10 +335,12 @@ function plan() {
   kept.push(
     'node / pnpm / uv / task and their managers (volta, scoop) — other projects may use them',
   );
-  kept.push(`the workspace folder itself (${WORKSPACE_ROOT}) — it holds your test projects`);
-  kept.push(
-    'downloaded browsers under .cache/playwright-browsers — delete that folder to reclaim the space',
-  );
+  if (!PURGE) {
+    kept.push(`the workspace folder itself (${WORKSPACE_ROOT}) — it holds your test projects`);
+    kept.push(
+      'downloaded browsers under .cache/playwright-browsers — delete that folder to reclaim the space',
+    );
+  }
   kept.push(
     'global git tweaks (core.fscache, core.preloadindex, gc.auto) — harmless, shared with other repos',
   );
@@ -228,6 +387,29 @@ async function confirm() {
 }
 
 /**
+ * Purge has no undo, so a keypress is not enough: the folder NAME must be typed.
+ * `--yes` still skips it for unattended runs — but the gates above are checked
+ * either way, so an unattended purge can only ever run on an already-empty workspace.
+ */
+async function confirmPurge() {
+  const name = path.basename(WORKSPACE_ROOT);
+  if (ASSUME_YES) return true;
+  if (!process.stdin.isTTY) {
+    console.error('  Not a terminal — pass --yes to confirm a non-interactive purge.');
+    return false;
+  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise((resolve) => {
+    rl.question(`  Type the folder name to delete it permanently ("${name}"): `, (a) => {
+      rl.close();
+      resolve(a.trim());
+    });
+  });
+  if (answer !== name) console.log('  Name did not match.');
+  return answer === name;
+}
+
+/**
  * `--selftest` — assertions for the two functions that edit something the user
  * owns (their PATH, their ~/.bashrc). Runnable without touching the machine:
  *   node scripts/setup/uninstall.mjs --selftest
@@ -271,7 +453,53 @@ async function selfTest() {
   assert.equal(stripBashrcBlock('export FOO=1\n'), null, 'no block → null');
 
   process.env.USERPROFILE = savedProfile;
-  console.log('  selftest: PATH filter + .bashrc block strip OK');
+
+  // Purge gates: a fixture tree, so the real machine is never touched.
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'uninstall-selftest-'));
+  try {
+    const mk = (...segments) => fs.mkdirSync(path.join(fixture, ...segments), { recursive: true });
+    mk('tools', 'playwright', 'projects', 'web', 'my-project');
+    mk('tools', 'playwright', 'projects', 'web', 'playwright-web-template-example');
+    mk('tools', 'k6', 'projects', 'performance', 'k6-performance-template-example');
+    mk('brain', 'projects', '_workspace');
+    mk('brain', 'projects', 'project-template-example');
+    mk('brain', 'projects', 'my-project');
+
+    assert.deepEqual(
+      userProjects(fixture),
+      ['tools/playwright/projects/web/my-project'],
+      'counts the user project, ignores every *-template-example scaffold',
+    );
+    assert.deepEqual(
+      brainProjects(fixture),
+      ['brain/projects/my-project'],
+      'keeps _workspace and the template out',
+    );
+    assert.ok(
+      purgeBlockers(fixture).length >= 2,
+      'a workspace with a project and a brain folder is refused',
+    );
+
+    fs.rmSync(path.join(fixture, 'tools', 'playwright', 'projects', 'web', 'my-project'), {
+      recursive: true,
+    });
+    fs.rmSync(path.join(fixture, 'brain', 'projects', 'my-project'), { recursive: true });
+    assert.deepEqual(userProjects(fixture), [], 'templates alone are not user work');
+    assert.deepEqual(
+      purgeBlockers(fixture),
+      [],
+      'a workspace with only templates and no git repo is allowed',
+    );
+    assert.deepEqual(
+      userProjects(path.join(fixture, 'nope')),
+      [],
+      'missing tools/ is not an error',
+    );
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+
+  console.log('  selftest: PATH filter + .bashrc block strip + purge gates OK');
   return 0;
 }
 
@@ -281,13 +509,31 @@ async function main() {
   console.log('  UNINSTALL — Automated Test One-Stop Service');
   console.log('===================================================');
   console.log(`  Workspace: ${WORKSPACE_ROOT}`);
-  console.log(DRY_RUN ? '  Mode: DRY RUN (nothing will change)' : '  Mode: REMOVE');
+  const mode = PURGE ? 'REMOVE + DELETE THE WORKSPACE FOLDER' : 'REMOVE';
+  console.log(DRY_RUN ? `  Mode: DRY RUN of ${mode} (nothing will change)` : `  Mode: ${mode}`);
+
+  // Gates run on a dry run too: the point is to show what must be cleared first.
+  if (PURGE) {
+    const blockers = purgeBlockers(WORKSPACE_ROOT);
+    if (blockers.length > 0) {
+      console.log('');
+      console.log('  PURGE REFUSED — nothing was changed. Clear these first:');
+      for (const line of blockers) console.log(`    ! ${line}`);
+      console.log('');
+      console.log('  Deleting the folder also deletes every git repo inside it, so push your');
+      console.log('  work and remove your projects (Hub → Projects, or delete the folders)');
+      console.log('  before purging. Plain uninstall without --purge works right now.');
+      console.log('');
+      return 2;
+    }
+  }
 
   if (!DRY_RUN) {
     console.log('');
     console.log('  About to remove:');
     for (const line of planPreview()) console.log(`    - ${line}`);
-    if (!(await confirm())) {
+    const approved = PURGE ? await confirmPurge() : await confirm();
+    if (!approved) {
       console.log('  Cancelled — nothing was changed.');
       return 0;
     }
@@ -295,6 +541,22 @@ async function main() {
 
   plan();
   report();
+
+  if (PURGE && DRY_RUN) {
+    console.log(`  Then delete the workspace folder itself: ${WORKSPACE_ROOT}`);
+    console.log('');
+  } else if (PURGE) {
+    try {
+      purgeWorkspace();
+      console.log(`  Deleted the workspace folder: ${WORKSPACE_ROOT}`);
+      console.log('');
+    } catch (e) {
+      console.error(`  [error] Could not delete the workspace folder — ${e.message}`);
+      console.error('');
+      return 1;
+    }
+  }
+
   return failed.length > 0 ? 1 : 0;
 }
 
@@ -310,7 +572,11 @@ function planPreview() {
     items.push(`clear the user environment variables: ${WIN_USER_ENV_VARS.join(', ')}`);
     items.push('remove the managed Git Bash block from ~/.bashrc');
   }
-  items.push('KEEP node/pnpm/uv/task, volta/scoop, and the workspace folder');
+  items.push(
+    PURGE
+      ? `DELETE THE WHOLE WORKSPACE FOLDER (${WORKSPACE_ROOT}) — irreversible; KEEP node/pnpm/uv/task, volta/scoop`
+      : 'KEEP node/pnpm/uv/task, volta/scoop, and the workspace folder',
+  );
   return items;
 }
 
